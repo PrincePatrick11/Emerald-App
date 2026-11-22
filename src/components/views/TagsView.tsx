@@ -13,6 +13,7 @@ import { dashboardLabel } from '../../lib/dashboards';
 import { useUndoStore } from '../../store/undoStore';
 import { useCollapsedSet } from '../../hooks/useCollapsedSet';
 import { useDeepLink } from '../../hooks/useDeepLink';
+import { useNewFormRequest } from '../../hooks/useNewFormRequest';
 import { useOutsideClick } from '../../hooks/useOutsideClick';
 import { generateId } from '../../lib/helpers';
 import { categoryLabel, lookupCategory } from '../../lib/categories';
@@ -216,6 +217,8 @@ export default function TagsView() {
 
   /** A new tag starts with a random colour — like one created in the editor. */
   const openAddForm = () => openForm({ mode: 'add' }, '', randomTagColor());
+  // The rail's plus: "Tag" opens this view with the row for a new one.
+  useNewFormRequest(openAddForm);
   const startRename = (tag: Tag) => openForm({ mode: 'rename', id: tag.id }, tag.name, tag.color);
 
   const closeForm = () => {

@@ -182,7 +182,7 @@ Top to bottom the rail holds:
 
 | Target | Icon class | Kind |
 | --- | --- | --- |
-| Create new | `lucide-plus` | opens the "Create new" modal (tiles: Journal, Practice, Knowledge, All entries, Tasks, Lexicon, Templates, Blocks, Dashboard — number keys 1-9 pick one) |
+| Create new | `lucide-plus` | opens the "Create new" modal: a search field (focused; typing filters, Enter takes the first tile left), then one group per dashboard in rail order with a tile per category ("All entries": "Uncategorized"), "More categories", and "Collections" (Task, Category, Tag, Template, Block, Language, Image, Dashboard). Tiles are `.create-item-tile`, headings `.create-item-group`; pick a tile by its icon (`.create-item-tile:has(.lucide-tag)`) or its emoji, not by text |
 | All entries | `lucide-layout-list` | dashboard, `[data-dashboard-id="all"]` |
 | Journal / Practice / Knowledge | `lucide-book-open` / `lucide-wand-sparkles` / `lucide-library` | dashboards, `[data-dashboard-id="journal"]` etc. |
 | own dashboards | any (default `lucide-layout-dashboard`) | dashboards, placed after Knowledge |

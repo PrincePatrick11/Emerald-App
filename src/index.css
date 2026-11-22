@@ -527,20 +527,27 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   }
 
   /* A tile of `CreateItemModal`. Arrow keys, Tab and Enter work on the focused one,
-     so it shows from the moment the modal opens, also after a mouse click, which
-     `:focus-visible` would not count: see the ring further down. */
+     so it shows also after a mouse click, which `:focus-visible` would not count;
+     while the search has the focus, `.is-default` marks the tile Enter takes.
+     See the ring further down. */
   .create-item-tile {
-    @apply relative flex flex-col items-center justify-center gap-1.5 px-1 py-3 text-xs text-secondary;
+    @apply relative flex items-center gap-2 px-2.5 py-2 text-xs text-secondary text-left;
   }
 
-  /* The key that picks the tile. */
-  .create-item-tile-number {
-    @apply absolute top-1 left-2 text-[10px] leading-4 text-subtle;
+  /* The icon keeps its size; a long name truncates instead. */
+  .create-item-tile > :first-child {
+    flex-shrink: 0;
   }
 
   .create-item-tile:hover,
-  .create-item-tile:focus {
+  .create-item-tile:focus,
+  .create-item-tile.is-default {
     color: var(--text-primary);
+  }
+
+  /* A group's heading above its tiles: the dashboard, "More categories", "Collections". */
+  .create-item-group {
+    @apply flex items-center gap-1.5 mb-2 px-0.5;
   }
 
   .modal-footer {
@@ -4224,7 +4231,8 @@ html[data-theme] .block-manager-row--idle,
 }
 
 /* Unlayered and with the theme's specificity, or `.panel-interactive` would win. */
-html[data-theme] .create-item-tile:focus {
+html[data-theme] .create-item-tile:focus,
+html[data-theme] .create-item-tile.is-default {
   outline: none;
   box-shadow: 0 0 0 2px var(--focus-ring);
 }
@@ -4380,6 +4388,12 @@ html[data-theme] .op-prop-select:focus {
 html[data-theme] .sidebar-search-inner:focus-within {
   border-color: var(--choice-active-border);
   box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
+/* …so the input itself draws none: Parchment's `input:focus` would put a
+   second ring inside the field's. */
+html[data-theme] .sidebar-search-inner .sidebar-search-input:focus {
+  box-shadow: none;
 }
 
 .op-prop-select option {

@@ -94,7 +94,20 @@
     "dashboardDeleted": "Panel eliminado"
   },
   "createItem": {
-    "title": "Crear nuevo"
+    "title": "Crear nuevo",
+    "search": "Buscar categorías y colecciones …",
+    "entry": "Entrada",
+    "moreCategories": "Más categorías",
+    "collections": "Colecciones",
+    "kind": {
+      "task": "Tarea",
+      "category": "Categoría",
+      "tag": "Etiqueta",
+      "template": "Plantilla",
+      "block": "Bloque",
+      "language": "Idioma",
+      "image": "Imagen"
+    }
   },
   "nav": {
     "journal": "Diario",

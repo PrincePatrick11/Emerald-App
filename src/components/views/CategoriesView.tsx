@@ -12,6 +12,7 @@ import { useTaskStore } from '../../store/taskStore';
 import { useTemplateStore } from '../../store/templateStore';
 import { useUndoStore } from '../../store/undoStore';
 import { useDeepLink } from '../../hooks/useDeepLink';
+import { useNewFormRequest } from '../../hooks/useNewFormRequest';
 import { usePointerReorder } from '../../hooks/usePointerReorder';
 import { generateId } from '../../lib/helpers';
 import DashboardItem, { RowContent } from '../ui/DashboardItem';
@@ -51,6 +52,8 @@ export default function CategoriesView() {
   const tasks = useTaskStore((s) => s.tasks);
 
   const [editing, setEditing] = useState<Editing>(null);
+  // The rail's plus: "Category" opens this view with the dialog for a new one.
+  useNewFormRequest(() => setEditing({}));
 
   /**
    * The deep link from the global search scrolls to the row and briefly

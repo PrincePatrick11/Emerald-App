@@ -30,6 +30,29 @@ export function takeTaskToName(id: string): boolean {
 }
 
 /**
+ * The collection view that should open its own "New" — the category dialog,
+ * the tag row, the picture dialog — because the plus asked for it. Those views
+ * create in their own form, so the plus only opens the view and the form; the
+ * view takes this once, by the very `ActiveView` the plus navigated to —
+ * compared by identity, since `setActiveView` stores the object it is given
+ * and every navigation makes a new one. One-shot for the same reason as `taskToName`.
+ */
+let newFormFor: ActiveView | null = null;
+
+export function takeNewForm(view: ActiveView): boolean {
+  if (newFormFor !== view) return false;
+  newFormFor = null;
+  return true;
+}
+
+function requestNewForm(type: 'categories' | 'tags' | 'images'): () => Promise<ActiveView> {
+  return async () => {
+    newFormFor = { type };
+    return newFormFor;
+  };
+}
+
+/**
  * Where a new entry opens: for editing — unless its template brought a loaded
  * sigil that locks the entry, which can only be read until it is unloaded.
  */
@@ -89,12 +112,16 @@ const creators: Record<CreatableViewId, (categoryId?: string) => Promise<ActiveV
     const definition = await useBlockDefinitionStore.getState().createDefinition(i18n.t('blocks.library.defaultName'));
     return { type: 'blocks', id: definition.id, isNew: true };
   },
+  categories: requestNewForm('categories'),
+  tags: requestNewForm('tags'),
+  images: requestNewForm('images'),
 };
 
 /**
  * "New …": creates an item of this view and opens it, for the rail's plus and the
  * views' own buttons. Tasks' own button is the exception: it names the row in
  * place and must not clear the search and filters of the page it is on.
+ * Categories, tags and images only open their view with its own form (`takeNewForm`).
  *
  * The question about an open edit comes first. `setActiveView` would ask too, but
  * only after the creating: "Keep editing" would leave an unasked-for item behind.

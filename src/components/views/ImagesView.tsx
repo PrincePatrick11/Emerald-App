@@ -6,6 +6,7 @@ import { deletePicture, placesShowing } from '../../store/imageActions';
 import { useUndoStore } from '../../store/undoStore';
 import { useTagStore } from '../../store/tagStore';
 import { useDeepLink } from '../../hooks/useDeepLink';
+import { useNewFormRequest } from '../../hooks/useNewFormRequest';
 import { useFileDrop } from '../../hooks/useFileDrop';
 import { AUX_VIEWS } from '../../lib/modules';
 import { imageSrc } from '../../lib/images';
@@ -22,8 +23,9 @@ type ImageItem = PictureItem;
  * "Images", a collection like tags and categories: every picture the
  * vault stores — added here or in texts, fields and drawings — with a name,
  * tags and a note where it has them. Cards show the picture large, the list a
- * small one beside the name. A click edits a picture; "Add images", or files
- * dropped onto the view, open the dialog that stores and names new ones.
+ * small one beside the name. A click edits a picture; "Add images", the
+ * rail's plus, or pictures dropped onto the view (import files go to the import
+ * window) open the dialog that stores and names new ones.
  */
 export default function ImagesView() {
   const { t } = useTranslation();
@@ -35,6 +37,8 @@ export default function ImagesView() {
   const [adding, setAdding] = useState(false);
   const [dropped, setDropped] = useState<string[]>([]);
   const pushUndo = useUndoStore((s) => s.push);
+  // The rail's plus: "Image" opens this view with the dialog that adds pictures.
+  useNewFormRequest(() => setAdding(true));
 
   // Files dropped anywhere over the view go into the add dialog, opening it.
   // Files the import window takes are its own (`useImportDrop`).

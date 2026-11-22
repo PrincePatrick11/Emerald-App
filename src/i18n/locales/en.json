@@ -94,7 +94,20 @@
     "dashboardDeleted": "Dashboard deleted"
   },
   "createItem": {
-    "title": "Create new"
+    "title": "Create new",
+    "search": "Search categories and collections …",
+    "entry": "Entry",
+    "moreCategories": "More categories",
+    "collections": "Collections",
+    "kind": {
+      "task": "Task",
+      "category": "Category",
+      "tag": "Tag",
+      "template": "Template",
+      "block": "Block",
+      "language": "Language",
+      "image": "Image"
+    }
   },
   "nav": {
     "journal": "Journal",

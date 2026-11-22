@@ -94,7 +94,20 @@
     "dashboardDeleted": "Tableau de bord supprimé"
   },
   "createItem": {
-    "title": "Créer"
+    "title": "Créer",
+    "search": "Chercher dans les catégories et collections …",
+    "entry": "Entrée",
+    "moreCategories": "Autres catégories",
+    "collections": "Collections",
+    "kind": {
+      "task": "Tâche",
+      "category": "Catégorie",
+      "tag": "Étiquette",
+      "template": "Modèle",
+      "block": "Bloc",
+      "language": "Langue",
+      "image": "Image"
+    }
   },
   "nav": {
     "journal": "Journal",

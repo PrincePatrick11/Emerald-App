@@ -76,8 +76,12 @@ export function isLibraryView(viewType: string): viewType is LibraryViewId {
   return (LIBRARY_VIEW_IDS as readonly string[]).includes(viewType);
 }
 
-/** What can be newly created besides entries (`createEntryIn`): tasks and the libraries. */
-export type CreatableViewId = 'tasks' | LibraryViewId;
+/**
+ * What can be newly created besides entries (`createEntryIn`): tasks, the
+ * libraries, and the collections whose view has a "New" of its own. Symbols are
+ * not among them: they are only made from a drawing.
+ */
+export type CreatableViewId = 'tasks' | LibraryViewId | 'categories' | 'tags' | 'images';
 
 /** The rail's "All entries" — the one dashboard that cannot go. */
 export const ALL_ENTRIES_ICON: LucideIcon = LayoutList;
@@ -119,14 +123,17 @@ export const AUX_VIEWS: Record<Exclude<AuxViewId, 'entry'>, { icon: LucideIcon; 
 };
 
 /**
- * What the rail's plus offers besides the dashboards (`CreateItemModal` puts
- * one tile per dashboard first): tasks, then the libraries.
+ * What the rail's plus offers below the entries (`CreateItemModal`), in this
+ * order, each under the name of one item (`labelKey`).
  */
-export const CREATABLE_VIEWS: ReadonlyArray<{ id: CreatableViewId; icon: LucideIcon; navLabelKey: string }> = [
-  { id: 'tasks', ...TASKS_VIEW },
-  { id: 'lexicon', ...AUX_VIEWS.lexicon },
-  { id: 'templates', ...AUX_VIEWS.templates },
-  { id: 'blocks', ...AUX_VIEWS.blocks },
+export const CREATABLE_VIEWS: ReadonlyArray<{ id: CreatableViewId; icon: LucideIcon; labelKey: string }> = [
+  { id: 'tasks', icon: TASKS_VIEW.icon, labelKey: 'createItem.kind.task' },
+  { id: 'categories', icon: AUX_VIEWS.categories.icon, labelKey: 'createItem.kind.category' },
+  { id: 'tags', icon: AUX_VIEWS.tags.icon, labelKey: 'createItem.kind.tag' },
+  { id: 'templates', icon: AUX_VIEWS.templates.icon, labelKey: 'createItem.kind.template' },
+  { id: 'blocks', icon: AUX_VIEWS.blocks.icon, labelKey: 'createItem.kind.block' },
+  { id: 'lexicon', icon: AUX_VIEWS.lexicon.icon, labelKey: 'createItem.kind.language' },
+  { id: 'images', icon: AUX_VIEWS.images.icon, labelKey: 'createItem.kind.image' },
 ];
 
 /**

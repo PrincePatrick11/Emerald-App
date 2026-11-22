@@ -99,6 +99,7 @@ src/
 │   ├── useEditActions.ts        registers Done/Cancel/Delete in the sidebar
 │   ├── useDraftPage.ts          draft lifecycle of block/template pages
 │   ├── useGlobalSearch.ts, useDeepLink.ts, useLinkItems.ts
+│   ├── useNewFormRequest.ts     a collection view opens its own "New" when the rail's plus asks
 │   ├── useOutsideClick.ts, useCloseOnKeepEditing.ts, useHorizontalWheel.ts
 │   ├── useMouseNavigation.ts    mouse back/forward buttons, browser keys, ⌘[ / ⌘] on macOS
 │   ├── useCollapsedSet.ts, usePersistedFlag.ts, usePointerReorder.ts

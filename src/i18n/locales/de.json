@@ -94,7 +94,20 @@
     "dashboardDeleted": "Dashboard gelöscht"
   },
   "createItem": {
-    "title": "Neu anlegen"
+    "title": "Neu anlegen",
+    "search": "Kategorien und Sammlungen durchsuchen …",
+    "entry": "Eintrag",
+    "moreCategories": "Weitere Kategorien",
+    "collections": "Sammlungen",
+    "kind": {
+      "task": "Aufgabe",
+      "category": "Kategorie",
+      "tag": "Tag",
+      "template": "Vorlage",
+      "block": "Block",
+      "language": "Sprache",
+      "image": "Bild"
+    }
   },
   "nav": {
     "journal": "Journal",
