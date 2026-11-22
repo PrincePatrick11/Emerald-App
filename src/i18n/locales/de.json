@@ -1398,10 +1398,10 @@
     "comingLater": "Die Synchronisation kommt in v0.3.0. Bis dahin bleibt jeder Vault auf diesem Gerät."
   },
   "store": {
-    "comingLater": "Kommt in v0.3.0: Vorlagen, Blöcke, Themes und Eintrags-Packs entdecken und teilen."
+    "comingLater": "Der Store kommt in v0.3.0: Vorlagen, Blöcke, Themes und Eintrags-Packs entdecken und teilen."
   },
   "start": {
-    "server": "Server",
+    "server": "Synchronisation",
     "store": "Store",
     "appearance": "Aussehen",
     "links": "Links",

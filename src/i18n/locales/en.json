@@ -1398,10 +1398,10 @@
     "comingLater": "Sync is coming in v0.3.0. Until then, every vault stays on this device."
   },
   "store": {
-    "comingLater": "Coming in v0.3.0: discover and share templates, blocks, themes and entry packs."
+    "comingLater": "The Store is coming in v0.3.0: discover and share templates, blocks, themes and entry packs."
   },
   "start": {
-    "server": "Server",
+    "server": "Sync",
     "store": "Store",
     "appearance": "Appearance",
     "links": "Links",

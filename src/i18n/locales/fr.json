@@ -1398,10 +1398,10 @@
     "comingLater": "La synchronisation arrivera dans la v0.3.0. D’ici là, chaque vault reste sur cet appareil."
   },
   "store": {
-    "comingLater": "Arrive dans la v0.3.0 : découvrez et partagez modèles, blocs, thèmes et packs d’entrées."
+    "comingLater": "La boutique arrive dans la v0.3.0 : découvrez et partagez modèles, blocs, thèmes et packs d’entrées."
   },
   "start": {
-    "server": "Serveur",
+    "server": "Synchronisation",
     "store": "Boutique",
     "appearance": "Apparence",
     "links": "Liens",
