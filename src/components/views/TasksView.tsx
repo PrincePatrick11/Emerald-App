@@ -4,9 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { useTaskStore } from '../../store/taskStore';
 import { useCategoryStore } from '../../store/categoryStore';
 import { useUIStore } from '../../store/uiStore';
-import { useUndoStore } from '../../store/undoStore';
+import { deleteTaskWithUndo } from '../../store/entryActions';
 import { takeTaskToName } from '../../lib/createItem';
-import { generateId } from '../../lib/helpers';
 import { displayTitle, hasOwnTitle } from '../../lib/entryTitle';
 import { TASKS_VIEW } from '../../lib/modules';
 import { linkTargetKindOf } from '../../lib/internalLinkHtml';
@@ -452,12 +451,9 @@ const TaskRow = memo(function TaskRow({
   const updateTask = useTaskStore((s) => s.updateTask);
   const categories = useCategoryStore((s) => s.categories);
   const getSubtasks = useTaskStore((s) => s.getSubtasks);
-  const deleteTask = useTaskStore((s) => s.deleteTask);
-  const restoreTask = useTaskStore((s) => s.restoreTask);
   const links = useTaskStore((s) => s.links);
   const createTask = useTaskStore((s) => s.createTask);
   const toggleComplete = useTaskStore((s) => s.toggleComplete);
-  const pushUndo = useUndoStore((s) => s.push);
   // "Show completed" applies at every level, not only the top ones.
   const [showCompleted] = usePersistedFlag(SHOW_COMPLETED_FLAG);
   const subtasks = getSubtasks(task.id).filter((sub) => showCompleted || !sub.completed);
@@ -466,14 +462,7 @@ const TaskRow = memo(function TaskRow({
   const isEditing = editingId === task.id;
   const taskLinks = links.filter((l) => l.task_id === task.id);
 
-  const handleDelete = async () => {
-    await deleteTask(task.id);
-    pushUndo({
-      id: generateId(),
-      description: t('undo.taskDeleted'),
-      undo: () => restoreTask(task.id),
-    });
-  };
+  const handleDelete = () => deleteTaskWithUndo(task.id);
 
   const startRename = () => {
     setEditingId(task.id);

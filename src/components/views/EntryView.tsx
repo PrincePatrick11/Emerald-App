@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { entryBlockSummary } from '../../lib/blocks/entrySummary';
-import { generateId } from '../../lib/helpers';
 import { imageSrc } from '../../lib/images';
 import { formatEntryDate } from '../../lib/formatDate';
 import { displayTitle } from '../../lib/entryTitle';
@@ -17,7 +16,7 @@ import { useEntryContentReady } from '../../hooks/useEntryContentReady';
 import { useEditActions } from '../../hooks/useEditActions';
 import { guardKey } from '../../store/leaveGuardStore';
 import { findEntry, useEntryStore } from '../../store/entryStore';
-import { useUndoStore } from '../../store/undoStore';
+import { deleteEntryWithUndo } from '../../store/entryActions';
 import BlockStack from '../blocks/BlockStack';
 import EntryDetailFrame from '../ui/EntryDetailFrame';
 import DashboardView from './DashboardView';
@@ -40,11 +39,10 @@ export default function EntryView() {
   );
   const dashboard = useDashboardStore((s) => dashboardOrAll(s.dashboards, activeView.dashboard ?? 'all'));
   const dashboardId = dashboard?.id ?? 'all';
-  const { updateEntry, deleteEntry, restoreEntry, getEntry } = useEntryStore(
-    useShallow((s) => ({ updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry, getEntry: s.getEntry }))
+  const { updateEntry, getEntry } = useEntryStore(
+    useShallow((s) => ({ updateEntry: s.updateEntry, getEntry: s.getEntry }))
   );
   const showMoonPhase = useSettingsStore((s) => s.settings.journal.moonPhase);
-  const pushUndo = useUndoStore((s) => s.push);
 
   const entry = useEntryStore((s) => (activeView.id ? findEntry(s.entries, activeView.id) : undefined)) ?? null;
   // Startup loads content after the lists: until it arrives, the frame with
@@ -143,10 +141,7 @@ export default function EntryView() {
     if (!entry) return;
     // Write what is still deferred first: the trash holds the latest state.
     await flushAutoSave().catch(console.error);
-    const id = entry.id;
-    await deleteEntry(id);
-    pushUndo({ id: generateId(), description: t('undo.entryDeleted'), undo: () => restoreEntry(id) });
-    setActiveView({ type: 'dashboard', id: dashboardId });
+    await deleteEntryWithUndo(entry.id);
   };
 
   useEditActions(isEditing, {

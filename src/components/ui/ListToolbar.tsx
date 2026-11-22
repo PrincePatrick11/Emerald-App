@@ -42,6 +42,19 @@ const SORT_DATE_KEYS: Record<SortDateField, string> = {
   deleted: 'listView.dateDeleted',
 };
 
+/**
+ * A second sort below the list's own: the order of what is listed under each
+ * item (the entries under a tag). Its own heading; the same select.
+ */
+export interface SubSort {
+  label: string;
+  sort: SortMode;
+  onSort: (s: SortMode) => void;
+  /** Default: the four date and name modes. */
+  sortModes?: readonly SortMode[];
+  sortDate?: SortDateField;
+}
+
 /** A display toggle: a preference of the view, not a filter; it does not count
  *  towards `activeFilterCount` and stays put on reset. */
 export interface DisplayToggle {
@@ -68,6 +81,7 @@ interface Props {
   displayToggles?: DisplayToggle[];
   /** The grouping axis; if it is missing, its section is omitted. See DashboardGroupBy. */
   groupBy?: DashboardGroupBy;
+  subSort?: SubSort;
 }
 
 /**
@@ -159,7 +173,7 @@ function SortSelect<S extends SortMode>({ label, value, modes, onChange, dateFie
  * have falls away. The search is in the main area (`ListSearchField`).
  */
 export default function ListToolbar({
-  view, sort, onView, onSort, viewOptions: viewOptionsProp, sortModes = DEFAULT_SORT_MODES, sortDate, displayToggles = [], groupBy,
+  view, sort, onView, onSort, viewOptions: viewOptionsProp, sortModes = DEFAULT_SORT_MODES, sortDate, displayToggles = [], groupBy, subSort,
 }: Props) {
   const { t } = useTranslation();
 
@@ -178,7 +192,7 @@ export default function ListToolbar({
 
   const showViewSection = showLayouts || displayToggles.length > 0;
 
-  if (!showViewSection && !showSort && !groupBy) return null;
+  if (!showViewSection && !showSort && !groupBy && !subSort) return null;
 
   return (
     // Without strip chrome of its own: the sidebar's p-3 column provides
@@ -211,6 +225,17 @@ export default function ListToolbar({
             dateField={sortDate}
             isDisabled={inTimeline ? sortBlockedInTimeline : undefined}
             disabledHint={timelineHint}
+          />
+        </SidebarGroup>
+      )}
+      {subSort && (
+        <SidebarGroup label={subSort.label}>
+          <SortSelect
+            label={subSort.label}
+            value={subSort.sort}
+            modes={subSort.sortModes ?? DEFAULT_SORT_MODES}
+            onChange={subSort.onSort}
+            dateField={subSort.sortDate}
           />
         </SidebarGroup>
       )}

@@ -857,7 +857,10 @@
     "placeDashboards": "filtros de paneles",
     "placeDashboardsNamed": "el filtro de {{names}}",
     "onlyElsewhereFilter": "Solo en otro sitio",
-    "onlyElsewhereHint": "Sin entradas, pero en plantillas, imágenes o filtros de paneles"
+    "onlyElsewhereHint": "Sin entradas, pero en plantillas, imágenes o filtros de paneles",
+    "deleteWarning_one": "Asignada a {{count}} entrada – ¿eliminarla igualmente?",
+    "deleteWarning_other": "Asignada a {{count}} entradas – ¿eliminarla igualmente?",
+    "entrySort": "Orden de las entradas"
   },
   "properties": {
     "noEntry": "Abre una entrada para ver sus propiedades.",

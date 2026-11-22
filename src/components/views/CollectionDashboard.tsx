@@ -4,7 +4,7 @@ import Dashboard, { type DashboardEmptyState, type DashboardPrimaryAction } from
 import DashboardItem, { CardContent, RowContent } from '../ui/DashboardItem';
 import ContextMenu, { type ContextMenuAction } from '../ui/ContextMenu';
 import EmptyState, { NoResults } from '../ui/EmptyState';
-import type { SortDateField } from '../ui/ListToolbar';
+import type { SortDateField, SubSort } from '../ui/ListToolbar';
 import { sortItems } from '../../lib/sortItems';
 import { groupByMonth } from '../../lib/groupBy';
 import { isCardView } from '../../lib/viewMode';
@@ -90,6 +90,8 @@ interface CollectionDashboardProps<T extends object> {
   /** The list view drawn by the collection itself (tags: rows that expand; categories: drag handles).
    *  Gets the searched, filtered and sorted items; empty and "No results" are handled here. */
   renderList?: (items: T[], openMenu: (item: T, event: React.MouseEvent) => void, sort: SortMode) => ReactNode;
+  /** The order of what `renderList` shows under each item (the entries under a tag); offered only while it draws. */
+  subSort?: SubSort;
   /** A data attribute every item carries with its key, for the deep link that
    *  scrolls to it (`data-tag-id`) — in every view, cards included. */
   itemAttribute?: string;
@@ -116,7 +118,7 @@ interface CollectionDashboardProps<T extends object> {
  */
 export default function CollectionDashboard<T extends object>({
   state, title, items, itemKey, itemTitle, itemDate, dateField = 'updated', noTimeline, itemCount, manualOrder,
-  matchesSearch, filter, describe, renderItem, renderList, itemAttribute, highlighted, contextActions, primaryAction, emptyState,
+  matchesSearch, filter, describe, renderItem, renderList, subSort, itemAttribute, highlighted, contextActions, primaryAction, emptyState,
   collapsed = false, loading = false, contentHeader, contentFooter, cardsClassName,
 }: CollectionDashboardProps<T>) {
   const { t } = useTranslation();
@@ -246,6 +248,7 @@ export default function CollectionDashboard<T extends object>({
     return (
       <Dashboard<T>
         {...common}
+        subSort={subSort}
         grouping={{
           mode: 'custom',
           render: () => {

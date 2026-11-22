@@ -1,33 +1,33 @@
-import { useMemo, useRef, useState } from 'react';
+import { Fragment, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { Pencil, Trash2 } from 'lucide-react';
 import { TAG_COLORS, TAG_NAME_TAKEN, randomTagColor, useTagStore } from '../../store/tagStore';
 import { useEntryStore } from '../../store/entryStore';
-import { useSettingsStore } from '../../store/settingsStore';
+import { useUIStore } from '../../store/uiStore';
 import { useTemplateStore } from '../../store/templateStore';
 import { useImageStore } from '../../store/imageStore';
-import { useCategoryStore } from '../../store/categoryStore';
 import { useDashboardStore } from '../../store/dashboardStore';
-import { dashboardLabel } from '../../lib/dashboards';
+import { dashboardLabel, entryDateOf } from '../../lib/dashboards';
 import { useUndoStore } from '../../store/undoStore';
 import { useCollapsedSet } from '../../hooks/useCollapsedSet';
 import { useDeepLink } from '../../hooks/useDeepLink';
 import { useNewFormRequest } from '../../hooks/useNewFormRequest';
 import { useOutsideClick } from '../../hooks/useOutsideClick';
+import { useEntryItems, useEntryRows } from '../../hooks/useEntryRows';
 import { generateId } from '../../lib/helpers';
-import { categoryLabel, lookupCategory } from '../../lib/categories';
-import { entryIcon } from '../../lib/entryIcon';
-import { formatEntryDate } from '../../lib/formatDate';
+import { sortItems } from '../../lib/sortItems';
 import { AUX_VIEWS } from '../../lib/modules';
-import { displayTitle } from '../../lib/entryTitle';
 import CollapseChevron from '../ui/CollapseChevron';
-import DashboardItem, { DashboardRow, ItemGlyph, RowContent } from '../ui/DashboardItem';
+import { DashboardRow, RowContent } from '../ui/DashboardItem';
+import InlineConfirm from '../ui/InlineConfirm';
 import InlineNameEditor from '../ui/InlineNameEditor';
 import ModuleCounts from '../ui/ModuleCounts';
 import type { Entry, Tag } from '../../types';
-import { entryView } from '../../store/entryViews';
 import CollectionDashboard, { useCollectionState } from './CollectionDashboard';
+
+/** The date the entries under a tag show and sort by. */
+const TAG_ENTRY_DATE = 'updated' as const;
 
 /** Creating and renaming exclude each other — one state instead of two. */
 type FormState = { mode: 'add' } | { mode: 'rename'; id: string };
@@ -119,10 +119,13 @@ export default function TagsView() {
   // No fetch on mount: reloadAllStores() loads tags and content at startup
   // and on vault switch.
   const entries = useEntryStore((s) => s.entries);
-  const showMoonPhase = useSettingsStore((s) => s.settings.journal.moonPhase);
+  // The entries under a tag open in "All entries" and have an order of their own.
+  const entrySort = useUIStore((s) => s.tagEntriesPrefs.sort);
+  const setTagEntriesPrefs = useUIStore((s) => s.setTagEntriesPrefs);
+  const rows = useEntryRows({ dateField: TAG_ENTRY_DATE });
+  const { render: renderEntry, menu: entryMenu } = useEntryItems(rows, entries);
   const templates = useTemplateStore((s) => s.templates);
   const images = useImageStore((s) => s.images);
-  const categories = useCategoryStore((s) => s.categories);
   const dashboards = useDashboardStore((s) => s.dashboards);
   const state = useCollectionState('tags');
   const { query } = state;
@@ -132,6 +135,8 @@ export default function TagsView() {
   const [name, setName] = useState('');
   const [color, setColor] = useState(TAG_COLORS[0]);
   const [nameError, setNameError] = useState<string | null>(null);
+  /** The tag whose deletion waits for the answer to the warning. */
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   // The deep link from the global search expands the tag; the search and the
   // filter are cleared, otherwise it might not be in the list at all.
@@ -145,7 +150,7 @@ export default function TagsView() {
     },
   });
 
-  /** Tag ID → tagged entries, by title. */
+  /** Tag ID → tagged entries, in the chosen order (by the date the rows show). */
   const itemsByTag = useMemo(() => {
     const map = new Map<string, Entry[]>();
     for (const e of entries) {
@@ -155,9 +160,9 @@ export default function TagsView() {
         else map.set(tagId, [e]);
       }
     }
-    for (const list of map.values()) list.sort((a, b) => a.title.localeCompare(b.title));
+    for (const [tagId, list] of map) map.set(tagId, sortItems(list, entrySort, { date: (e) => entryDateOf(e, TAG_ENTRY_DATE) }));
     return map;
-  }, [entries]);
+  }, [entries, entrySort]);
 
   /** Tag IDs some template carries. A tag used only there is not unused. */
   const templateTags = useMemo(() => new Set(templates.flatMap((tpl) => tpl.tags)), [templates]);
@@ -205,8 +210,6 @@ export default function TagsView() {
   /** Found only through its entries: then it is open, otherwise the reason for the hit would not be visible. */
   const openBySearch = (tag: Tag) => !!query && !tag.name.toLowerCase().includes(query);
 
-  const catById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
-
   // ── Create / rename / delete ──────────────────────────────────────────────
   const openForm = (next: FormState, withName: string, withColor: string) => {
     setNameError(null);
@@ -247,9 +250,21 @@ export default function TagsView() {
     closeForm();
   };
 
-  /** To the trash without confirmation, like everything else — the notice offers undo. */
+  /** To the trash with Undo. A tag still on entries warns first: deleting
+   *  takes it off all of them at once (Undo puts it back on them). */
+  const askOrDelete = (tag: Tag) => {
+    if (inEntries(tag)) setConfirmingId(tag.id);
+    else void handleDelete(tag);
+  };
+
   const handleDelete = async (tag: Tag) => {
-    await deleteTag(tag.id);
+    setConfirmingId(null);
+    try {
+      await deleteTag(tag.id);
+    } catch (err) {
+      console.error('[TagsView] deleting the tag failed:', err);
+      return;
+    }
     pushUndo({
       id: generateId(),
       description: t('undo.tagDeleted'),
@@ -270,20 +285,20 @@ export default function TagsView() {
         {unused(tag) ? t('tags.unused') : t('tags.onlyIn', { places: placesOf(tag, false) })}
       </span>);
 
+  /** In place of the usage, while the warning before deleting is up. */
+  const deleteWarning = (tag: Tag, wrap?: boolean) => (
+    <span onClick={(e) => e.stopPropagation()} className={wrap ? 'flex min-w-0' : 'flex flex-shrink-0'}>
+      <InlineConfirm
+        small
+        wrap={wrap}
+        message={t('tags.deleteWarning', { count: usage(tag) })}
+        onConfirm={() => void handleDelete(tag)}
+        onCancel={() => setConfirmingId(null)}
+      />
+    </span>
+  );
+
   // ── The list: tag rows with their entries below ──────────────────────────
-  const renderEntry = (item: Entry) => {
-    const cat = lookupCategory(catById, item.category_id);
-    const meta = [categoryLabel(t, cat), formatEntryDate(item.updated_at)].filter(Boolean).join(' · ');
-    return (
-      <DashboardItem key={item.id} view={entryView(item.id)} layout="row">
-        <RowContent
-          icon={<ItemGlyph icon={entryIcon(item, cat, showMoonPhase)} />}
-          title={displayTitle(t, 'entry', item.title)}
-          meta={meta}
-        />
-      </DashboardItem>
-    );
-  };
 
   /** Below an open tag without entries: why — it hangs on templates, pictures, dashboard filters, or nowhere. */
   const emptyHint = (tag: Tag) => (unused(tag) ? t('tags.unusedHint') : t('tags.onlyInHint', { places: placesOf(tag, true) }));
@@ -309,60 +324,82 @@ export default function TagsView() {
             <TagColorDot color={tag.color} onPick={(c) => updateTag(tag.id, { color: c })} />
           </span>
           <RowContent title={tag.name} />
-          {usageLabel(tag)}
+          {confirmingId === tag.id ? deleteWarning(tag) : usageLabel(tag)}
         </DashboardRow>
         {!collapsed && (shownEntries.length === 0
           ? <p className="ml-6 mt-1.5 text-xs text-subtle px-1 py-1">{emptyHint(tag)}</p>
-          : <div className="ml-6 mt-1.5 space-y-1.5">{shownEntries.map(renderEntry)}</div>)}
+          : (
+            <div className="ml-6 mt-1.5 space-y-1.5">
+              {shownEntries.map((e) => <Fragment key={e.id}>{renderEntry(e, 'row', undefined, `${tag.id}:${e.id}`)}</Fragment>)}
+            </div>
+          ))}
       </div>
     );
   };
 
   return (
-    <CollectionDashboard<Tag>
-      state={state}
-      title={t('nav.tags')}
-      primaryAction={{ label: t('tags.new'), onClick: openAddForm }}
-      items={tags}
-      itemKey={(tag) => tag.id}
-      itemTitle={(tag) => tag.name}
-      itemCount={usage}
-      // A tag is found by its name or by the titles of the entries under it.
-      matchesSearch={(tag, q) => (itemsByTag.get(tag.id) ?? []).some((e) => e.title.toLowerCase().includes(q))}
-      filter={{
-        label: t('tags.usage'),
-        chips: [
-          { value: 'entries', label: t('tags.inEntries'), test: inEntries },
-          { value: 'elsewhere', label: t('tags.onlyElsewhereFilter'), hint: t('tags.onlyElsewhereHint'), test: (tag) => !inEntries(tag) && !unused(tag) },
-          { value: 'unused', label: t('tags.unusedFilter'), test: unused },
-        ],
-      }}
-      describe={(tag) => ({
-        icon: <TagColorDot color={tag.color} />,
-        title: tag.name,
-        trailing: usageLabel(tag),
-        onOpen: () => startRename(tag),
-      })}
-      renderItem={(tag, layout) => (layout === 'card' && form?.mode === 'rename' && form.id === tag.id
-        ? editRow
-        : undefined)}
-      // Cards too: the deep link and a newly created tag scroll to it.
-      itemAttribute="data-tag-id"
-      renderList={(shown, openMenu) => (
-        <div className="space-y-1.5">{shown.map((tag) => renderTagRow(tag, openMenu))}</div>
-      )}
-      contextActions={(tag) => [
-        { label: t('contextMenu.rename'), icon: <Pencil size={12} />, onClick: () => startRename(tag) },
-        { label: t('contextMenu.delete'), icon: <Trash2 size={12} />, danger: true, onClick: () => void handleDelete(tag) },
-      ]}
-      emptyState={{
-        icon: AUX_VIEWS.tags.icon,
-        title: t('emptyState.tags.title'),
-        description: t('emptyState.tags.description'),
-        actionLabel: t('tags.new'),
-        onAction: openAddForm,
-      }}
-      contentHeader={form?.mode === 'add' && <div className="mb-1.5">{editRow}</div>}
-    />
+    <>
+      <CollectionDashboard<Tag>
+        state={state}
+        title={t('nav.tags')}
+        primaryAction={{ label: t('tags.new'), onClick: openAddForm }}
+        items={tags}
+        itemKey={(tag) => tag.id}
+        itemTitle={(tag) => tag.name}
+        itemCount={usage}
+        // A tag is found by its name or by the titles of the entries under it.
+        matchesSearch={(tag, q) => (itemsByTag.get(tag.id) ?? []).some((e) => e.title.toLowerCase().includes(q))}
+        filter={{
+          label: t('tags.usage'),
+          chips: [
+            { value: 'entries', label: t('tags.inEntries'), test: inEntries },
+            { value: 'elsewhere', label: t('tags.onlyElsewhereFilter'), hint: t('tags.onlyElsewhereHint'), test: (tag) => !inEntries(tag) && !unused(tag) },
+            { value: 'unused', label: t('tags.unusedFilter'), test: unused },
+          ],
+        }}
+        describe={(tag) => ({
+          icon: <TagColorDot color={tag.color} />,
+          title: tag.name,
+          trailing: usageLabel(tag),
+          onOpen: () => startRename(tag),
+        })}
+        renderItem={(tag, layout) => {
+          if (layout !== 'card') return undefined;
+          if (form?.mode === 'rename' && form.id === tag.id) return editRow;
+          if (confirmingId !== tag.id) return undefined;
+          // Like renaming: the card turns into a row holding the warning.
+          return (
+            <DashboardRow className="h-auto min-h-11 py-2">
+              <span className="w-5 flex items-center justify-center flex-shrink-0"><TagColorDot color={tag.color} /></span>
+              {deleteWarning(tag, true)}
+            </DashboardRow>
+          );
+        }}
+        // Cards too: the deep link and a newly created tag scroll to it.
+        itemAttribute="data-tag-id"
+        renderList={(shown, openMenu) => (
+          <div className="space-y-1.5">{shown.map((tag) => renderTagRow(tag, openMenu))}</div>
+        )}
+        subSort={{
+          label: t('tags.entrySort'),
+          sort: entrySort,
+          onSort: (sort) => setTagEntriesPrefs({ sort }),
+          sortDate: TAG_ENTRY_DATE,
+        }}
+        contextActions={(tag) => [
+          { label: t('contextMenu.rename'), icon: <Pencil size={12} />, onClick: () => startRename(tag) },
+          { label: t('contextMenu.delete'), icon: <Trash2 size={12} />, danger: true, onClick: () => askOrDelete(tag) },
+        ]}
+        emptyState={{
+          icon: AUX_VIEWS.tags.icon,
+          title: t('emptyState.tags.title'),
+          description: t('emptyState.tags.description'),
+          actionLabel: t('tags.new'),
+          onAction: openAddForm,
+        }}
+        contentHeader={form?.mode === 'add' && <div className="mb-1.5">{editRow}</div>}
+      />
+      {entryMenu}
+    </>
   );
 }

@@ -857,7 +857,10 @@
     "placeDashboards": "Dashboard-Filtern",
     "placeDashboardsNamed": "dem Filter von {{names}}",
     "onlyElsewhereFilter": "Nur anderswo",
-    "onlyElsewhereHint": "Ohne Einträge, aber in Vorlagen, Bildern oder Dashboard-Filtern"
+    "onlyElsewhereHint": "Ohne Einträge, aber in Vorlagen, Bildern oder Dashboard-Filtern",
+    "deleteWarning_one": "Der Tag hängt an {{count}} Eintrag – trotzdem löschen?",
+    "deleteWarning_other": "Der Tag hängt an {{count}} Einträgen – trotzdem löschen?",
+    "entrySort": "Sortierung der Einträge"
   },
   "properties": {
     "noEntry": "Öffne einen Eintrag, um seine Eigenschaften zu sehen.",

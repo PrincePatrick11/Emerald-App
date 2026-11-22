@@ -32,6 +32,9 @@ Version 0.2.0 is a fresh start: the database, backups and `.emerald` files have 
 - **Middle click on a link chip in the text opens its target in a new tab,** in reading and edit mode; the current entry stays as it is.
 - **After opening a tag, category, task or image from a search hit, the search and filters you set there stay** when you switch tabs or step Back and Forward; an opened subtask stays expanded.
 - **Lists remember how you left them,** per vault.
+- **Entries look and behave the same everywhere.** The left list, dashboards and the entries under a tag share one row with the same context menu (open in new tab, duplicate, save as template, rename, delete with Undo). The left list follows its dashboard's date and sort order; "All entries" follows the "All entries" dashboard, tasks mixed in by the same date.
+- **Entry sorting in Tags.** The entries under each tag have their own sort (last changed newest or oldest, name A–Z or Z–A), per vault.
+- **Delete always comes with Undo.** Entries, tasks, categories, symbols, tags and pictures go to the Trash with an Undo toast; a tag still on entries and a picture still shown in texts warn first, and Undo restores a tag with all its assignments. Permanent deletion in the Trash, deleting a vault and the storage cleanup still ask.
 - **The mouse's back and forward buttons work on every system,** also through mouse software such as Logi Options+; on macOS ⌘[ / ⌘] go back and forward too.
 - **A start page** as the app's home: a tile per vault, a sync and a store placeholder (both "coming in v0.3.0") and the theme cards, language and updates.
 - **Language and theme belong to the device**; all other settings belong to the vault and travel with its backup.

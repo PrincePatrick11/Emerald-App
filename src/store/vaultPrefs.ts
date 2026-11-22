@@ -25,7 +25,7 @@ import { isRecord, oneOf } from '../lib/helpers';
  * keeps its own in the dashboard's row; the collections keep theirs together
  * in `collectionPrefs`.
  */
-const LIST_PREF_KEYS = ['tasksPrefs', 'trashPrefs'] as const;
+const LIST_PREF_KEYS = ['tasksPrefs', 'trashPrefs', 'tagEntriesPrefs'] as const;
 
 const PREF_KEYS = [
   ...LIST_PREF_KEYS,

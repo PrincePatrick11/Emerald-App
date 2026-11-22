@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
+import EditDialogFooter from '../ui/EditDialogFooter';
 import TagInput, { commitDraftTags, type DraftTag } from '../ui/TagInput';
 import FilterList from '../ui/FilterList';
 import Favicon from '../sidebar/fields/Favicon';
@@ -97,15 +98,7 @@ function DashboardSettingsModal({ dashboard, onClose }: { dashboard: Dashboard; 
       widthClassName="w-full max-w-md"
       bodyClassName="modal-body space-y-3"
       footer={(
-        <>
-          {!isAll && (
-            <Button tone="danger" className="mr-auto" onClick={() => void remove()}>
-              <Trash2 size={14} /> {t('common.delete')}
-            </Button>
-          )}
-          <Button tone="neutral" onClick={onClose}>{t('common.cancel')}</Button>
-          <Button tone="jade" onClick={() => void save()}>{t('common.save')}</Button>
-        </>
+        <EditDialogFooter onDelete={isAll ? undefined : () => void remove()} onCancel={onClose} onSave={() => void save()} />
       )}
     >
       <p className="label-xs -mb-2">{t('dashboards.name')}</p>

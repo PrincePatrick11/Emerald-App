@@ -90,7 +90,7 @@ Top-level keys of `en.json`, with the conventions worth knowing:
 | `search` | Dashboard search placeholders (`placeholder`, `placeholderIn` with `{{title}}`) and the title bar's global search (`globalPlaceholder`, `hint`, `clear`, `showMore`). Result module labels reuse `nav.*`; only `categories` has its own |
 | `templates` | Templates dashboard and page; `builtin.sigil` and `builtin.altar` name the built-in `core-sigil` and `core-altar` templates the way `categories.builtin.*` names a category; `insert.*` is the editor's picker and apply flow |
 | `lexicon` | Lexicon dashboard, language page and translate field. `wordCount` counts vocabulary rows; the translated text's own count is `textWordCount` |
-| `tags` | Tags view (`new`, `name`, `nameTaken`, `color`, `unused`; the usage filter `usage`, `inEntries` and the `onlyIn*`, `*Filter` and `*Hint` keys, one set per state) |
+| `tags` | Tags view (`new`, `name`, `nameTaken`, `color`, `unused`; the usage filter `usage`, `inEntries` and the `onlyIn*`, `*Filter` and `*Hint` keys, one set per state; `deleteWarning` before deleting a tag still on entries, `entrySort` for the sort of the entries under the tags) |
 | `properties` | Right sidebar Properties panel |
 | `filters` | Filter panel; `all` is the "All" row every `FilterList` shows on top |
 | `vault` | `VaultPicker`: list/switch, edit, create, open/relocate, delete, the way back. Some keys (`chooseFolder`, `defaultFolder`, `alreadyOpen`, `accessDenied`, `folderHasVault`, `folderNotEmpty`) also serve the backup import's add-vault mode via `VaultLocationRow` and `NEW_VAULT_TARGET_ERROR_KEY`. `outdated` and `tooNew` are what a vault of an earlier or a newer version is refused with (`vaultOpenErrorKey`) |

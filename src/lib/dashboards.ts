@@ -89,6 +89,11 @@ export function parseDashboardDisplay(raw: unknown): DashboardDisplay {
   };
 }
 
+/** A dashboard's sort; newest first by its date while it has none (a dashboard that is gone). */
+export function dashboardSort(dashboard: Pick<Dashboard, 'sort'> | undefined): DashboardSort {
+  return dashboard?.sort ?? { by: dashboardDateField(dashboard), dir: 'desc' };
+}
+
 /** The toolbar's sort mode for a dashboard's sort: the date modes compare the date the sort names. */
 export function sortModeOf(sort: DashboardSort): Exclude<SortMode, 'count_desc' | 'manual'> {
   if (sort.by === 'title') return sort.dir === 'asc' ? 'alpha_asc' : 'alpha_desc';

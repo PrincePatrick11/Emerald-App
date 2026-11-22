@@ -57,7 +57,7 @@ function mayHoldCharge(content: string): boolean {
  * Is a unit of `sigilUnits` a drawing (a sigil drawing block or a drawing part)?
  * Only for the type of a unit: a plain paint block is never one, `sigilUnits` leaves it out.
  */
-export function isDrawingUnitType(type: string): boolean {
+function isDrawingUnitType(type: string): boolean {
   return type === SIGIL_CANVAS_KIND || type === PAINT_BLOCK_TYPE;
 }
 

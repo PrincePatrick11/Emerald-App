@@ -857,7 +857,10 @@
     "placeDashboards": "des filtres de tableaux de bord",
     "placeDashboardsNamed": "le filtre de {{names}}",
     "onlyElsewhereFilter": "Seulement ailleurs",
-    "onlyElsewhereHint": "Sans entrée, mais dans des modèles, des images ou des filtres de tableaux de bord"
+    "onlyElsewhereHint": "Sans entrée, mais dans des modèles, des images ou des filtres de tableaux de bord",
+    "deleteWarning_one": "Attribuée à {{count}} entrée – la supprimer quand même ?",
+    "deleteWarning_other": "Attribuée à {{count}} entrées – la supprimer quand même ?",
+    "entrySort": "Tri des entrées"
   },
   "properties": {
     "noEntry": "Ouvrez une entrée pour voir ses propriétés.",

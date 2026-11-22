@@ -1,28 +1,25 @@
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
-import { formatEntryDate } from '../../lib/formatDate';
-import { categoryLabel, lookupCategory } from '../../lib/categories';
+import { lookupCategory } from '../../lib/categories';
 import type { LeftListTabId } from '../../lib/modules';
-import { entryIcon } from '../../lib/entryIcon';
-import { dashboardDateField, entryDateOf } from '../../lib/dashboards';
+import { dashboardDateField, dashboardSort, entryDateOf, sortModeOf } from '../../lib/dashboards';
+import { sortItems } from '../../lib/sortItems';
 import { displayTitle } from '../../lib/entryTitle';
-import { CheckSquare, Square, Copy, Pencil, Trash2 } from 'lucide-react';
+import { CheckSquare, Square, Pencil, Trash2 } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useEntryStore } from '../../store/entryStore';
 import { useDashboardEntries } from '../../hooks/useDashboardEntries';
 import { dashboardOrAll, useDashboardStore } from '../../store/dashboardStore';
-import { entryView } from '../../store/entryViews';
 import { useTaskStore } from '../../store/taskStore';
 import { useCategoryStore } from '../../store/categoryStore';
-import { useUndoStore } from '../../store/undoStore';
+import { deleteTaskWithUndo } from '../../store/entryActions';
 import { setDragItem } from '../../lib/dragState';
-import { generateId, isImageIcon } from '../../lib/helpers';
+import { isImageIcon } from '../../lib/helpers';
 import { iconSrc } from '../../lib/icons';
 import type { Entry, Task } from '../../types';
 import EntryListTab, { type EntryListTabProps } from '../ui/EntryListTab';
-import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
-import { useSaveAsTemplateAction } from '../../hooks/useSaveAsTemplateAction';
+import { useEntryRows } from '../../hooks/useEntryRows';
 
 /**
  * The entry list on the left: the search on top, the list below it. Which list —
@@ -53,10 +50,11 @@ function ActiveList({ list }: { list: LeftListTabId }) {
 }
 
 // ── All ──────────────────────────────────────────────────────────────────────
-// One flat, type-erased row per entry and task, so the combined list reuses
-// each list's real handlers (duplicate, delete-with-undo, rename) instead of
-// copying them. EntryListTab<T> is single-typed, so the erasure has to happen
-// somewhere; the closures below are that seam. Two config fields cannot
+// One flat, type-erased row per entry and task, in the order of "All entries",
+// so the combined list reuses each list's real handlers (duplicate,
+// delete-with-undo, rename) instead of copying them. EntryListTab<T> is
+// single-typed, so the erasure has to happen somewhere; the closures below
+// are that seam. Two config fields cannot
 // survive it and are dropped on purpose: renderRow (only Tasks has one — in
 // "All" its rows fall back to the plain icon/title layout), plus emptyMessage,
 // which "All" answers for itself.
@@ -94,16 +92,23 @@ function AllList() {
   const entries = useEntryStore((s) => s.entries);
   const entryConfig = useEntriesConfig(entries, 'all');
   const tasks = useTasksConfig();
+  // In the order of "All entries"; tasks by the same date.
+  const sort = dashboardSort(useDashboardStore((s) => dashboardOrAll(s.dashboards, 'all')));
+  const dateField = dashboardDateField({ sort });
 
-  const rows = [
+  const allRows = sortItems([
     // An entry is labelled by its category (in its own subtitle), a task as a task.
-    ...toAllRows('entry', () => '', entryConfig, (e) => e.updated_at),
-    ...toAllRows('task', () => t('nav.tasks'), tasks, (task) => task.updated_at),
-  ].sort((a, b) => b.sortDate.localeCompare(a.sortDate));
+    ...toAllRows('entry', () => '', entryConfig, (e) => entryDateOf(e, dateField)),
+    ...toAllRows('task', () => t('nav.tasks'), tasks, (task) => entryDateOf(task, dateField)),
+  ], sortModeOf(sort), {
+    date: (r) => r.sortDate,
+    // The stored title, like the dashboard: an untitled one sorts as empty, not as "Untitled …".
+    title: (r) => (r.src.cfg.getEditTitle ?? r.src.cfg.getTitle)(r.item),
+  });
 
   return (
     <EntryListTab
-      items={rows}
+      items={allRows}
       getId={(r) => r.id}
       getTitle={(r) => r.src.cfg.getTitle(r.item)}
       getEditTitle={(r) => (r.src.cfg.getEditTitle ?? r.src.cfg.getTitle)(r.item)}
@@ -124,77 +129,39 @@ function AllList() {
 
 // ── Entries ──────────────────────────────────────────────────────────────────
 /**
- * One config for every list of entries: each entry with its icon
- * (`entryIcon`), its category and the date the dashboard sorts by — newest
- * first, by that date. It opens on the entry page inside `dashboardId`.
+ * One config for every list of entries: each entry as the shared entry row
+ * (`useEntryRows`), in the order and with the date of the dashboard
+ * `dashboardId`. It opens on the entry page inside that dashboard.
  */
 function useEntriesConfig(entries: readonly Entry[], dashboardId: string): EntryListTabProps<Entry> {
   const { t } = useTranslation();
-  const openInNewTabAction = useOpenInNewTabAction();
-  const saveAsTemplateAction = useSaveAsTemplateAction();
-  const { activeView, setActiveView, openViewInNewTab } = useUIStore(
-    useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, openViewInNewTab: s.openViewInNewTab }))
+  const { activeView, openViewInNewTab } = useUIStore(
+    useShallow((s) => ({ activeView: s.activeView, openViewInNewTab: s.openViewInNewTab }))
   );
-  const { duplicateEntry, updateEntry, deleteEntry, restoreEntry } = useEntryStore(
-    useShallow((s) => ({ duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry }))
-  );
-  const dateField = useDashboardStore((s) => dashboardDateField(dashboardOrAll(s.dashboards, dashboardId)));
-  const categories = useCategoryStore((s) => s.categories);
-  const pushUndo = useUndoStore((s) => s.push);
-  const showMoonPhase = useSettingsStore((s) => s.settings.journal.moonPhase);
-
-  const catById = Object.fromEntries(categories.map((c) => [c.id, c]));
-  const viewOf = (e: Entry) => entryView(e.id, dashboardId);
-  const dateOf = (e: Entry) => entryDateOf(e, dateField);
-
-  const handleDuplicate = async (entry: Entry) => {
-    const copy = await duplicateEntry(entry.id);
-    if (copy) setActiveView(viewOf(copy));
-  };
-
-  const handleDelete = async (entry: Entry) => {
-    await deleteEntry(entry.id);
-    pushUndo({ id: generateId(), description: t('undo.entryDeleted'), undo: () => restoreEntry(entry.id) });
-    if (activeView.type === 'entry' && activeView.id === entry.id) {
-      setActiveView({ type: 'dashboard', id: activeView.dashboard ?? 'all' });
-    }
-  };
-
-  const sorted = entries.slice().sort((a, b) => dateOf(b).localeCompare(dateOf(a)));
+  const setActiveView = useUIStore((s) => s.setActiveView);
+  const sort = dashboardSort(useDashboardStore((s) => dashboardOrAll(s.dashboards, dashboardId)));
+  const dateField = dashboardDateField({ sort });
+  const rows = useEntryRows({ dashboardId, dateField });
 
   return {
-    items: sorted,
+    // In the dashboard's own order: the same list as in the main area.
+    items: sortItems(entries, sortModeOf(sort), { date: rows.date }),
     getId: (e) => e.id,
-    getTitle: (e) => displayTitle(t, 'entry', e.title),
-    getEditTitle: (e) => e.title,
-    getDateStr: (e) => {
-      // No fallback to the raw category_id — for a deleted category the label is omitted.
-      const catLabel = categoryLabel(t, lookupCategory(catById, e.category_id));
-      return `${catLabel}${catLabel ? ' · ' : ''}${formatEntryDate(dateOf(e))}`;
-    },
+    getTitle: rows.title,
+    getEditTitle: rows.editTitle,
+    getDateStr: rows.meta,
     getIcon: (e) => {
-      const icon = entryIcon(e, lookupCategory(catById, e.category_id), showMoonPhase);
+      const icon = rows.icon(e);
       return isImageIcon(icon)
         ? <img src={iconSrc(icon)} alt="" className="w-4 h-4 object-cover rounded-md flex-shrink-0" />
         : <span className="text-base leading-none flex-shrink-0">{icon}</span>;
     },
     isActive: (e) => activeView.type === 'entry' && activeView.id === e.id,
-    onOpen: (e) => setActiveView(viewOf(e)),
-    onOpenNewTab: (e) => openViewInNewTab(viewOf(e)),
-    onDragStart: (e) => {
-      setDragItem({
-        id: e.id, targetKind: 'entry', label: displayTitle(t, 'entry', e.title),
-        category: lookupCategory(catById, e.category_id)?.emoji,
-      });
-    },
-    onRename: (e, title) => updateEntry(e.id, { title }),
-    contextMenuActions: (e, startRename) => [
-      openInNewTabAction(viewOf(e)),
-      { label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => handleDuplicate(e) },
-      saveAsTemplateAction(e.id),
-      { label: t('contextMenu.rename'), icon: <Pencil size={12} />, onClick: startRename },
-      { label: t('contextMenu.delete'), icon: <Trash2 size={12} />, onClick: () => handleDelete(e), danger: true },
-    ],
+    onOpen: (e) => setActiveView(rows.view(e)),
+    onOpenNewTab: (e) => openViewInNewTab(rows.view(e)),
+    onDragStart: rows.dragStart,
+    onRename: rows.rename,
+    contextMenuActions: rows.actions,
     emptyMessage: t('sidebar.dashboardEmpty'),
   };
 }
@@ -210,11 +177,10 @@ function useTasksConfig(): EntryListTabProps<Task> {
   const { activeView, setActiveView } = useUIStore(
     useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView }))
   );
-  const { tasks, updateTask, toggleComplete, deleteTask, restoreTask } = useTaskStore(
-    useShallow((s) => ({ tasks: s.tasks, updateTask: s.updateTask, toggleComplete: s.toggleComplete, deleteTask: s.deleteTask, restoreTask: s.restoreTask }))
+  const { tasks, updateTask, toggleComplete } = useTaskStore(
+    useShallow((s) => ({ tasks: s.tasks, updateTask: s.updateTask, toggleComplete: s.toggleComplete }))
   );
   const categories = useCategoryStore((s) => s.categories);
-  const pushUndo = useUndoStore((s) => s.push);
 
   const catById = Object.fromEntries(categories.map((c) => [c.id, c]));
 
@@ -226,11 +192,6 @@ function useTasksConfig(): EntryListTabProps<Task> {
   // the hand grip in renderRow below), so they do not drift apart.
   const taskDragItem = (task: Task) =>
     setDragItem({ id: task.id, targetKind: 'task', label: displayTitle(t, 'task', task.title), category: lookupCategory(catById, task.category_id)?.emoji });
-
-  const handleDelete = async (task: (typeof tasks)[number]) => {
-    await deleteTask(task.id);
-    pushUndo({ id: generateId(), description: t('undo.taskDeleted'), undo: () => restoreTask(task.id) });
-  };
 
   const categoryNameOf = (task: (typeof tasks)[number]) => lookupCategory(catById, task.category_id)?.name ?? '';
 
@@ -257,7 +218,7 @@ function useTasksConfig(): EntryListTabProps<Task> {
     onRename: (task, title) => updateTask(task.id, { title }),
     contextMenuActions: (task, startRename) => [
       { label: t('contextMenu.rename'), icon: <Pencil size={12} />, onClick: startRename },
-      { label: t('contextMenu.delete'), icon: <Trash2 size={12} />, onClick: () => handleDelete(task), danger: true },
+      { label: t('contextMenu.delete'), icon: <Trash2 size={12} />, onClick: () => void deleteTaskWithUndo(task.id), danger: true },
     ],
     emptyMessage: t('sidebar.tasksEmpty'),
     renderRow: ({ item: task, isActive, isRenaming, renameValue, setRenameValue, commitRename, cancelRename, openCtxMenu }) => {

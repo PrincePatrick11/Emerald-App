@@ -82,6 +82,8 @@ interface UIState {
   searchQuery: string;
   tasksPrefs: ListPrefs;
   trashPrefs: ListPrefs;
+  /** The order of the entries under each tag in "Tags" (only `sort` is used). */
+  tagEntriesPrefs: ListPrefs;
   /** View and sorting of each collection (`grouping` is unused there, kept
    *  for the shared `ListPrefs`). */
   collectionPrefs: Record<CollectionId, ListPrefs>;
@@ -125,6 +127,7 @@ interface UIState {
   setSearchQuery: (q: string) => void;
   setTasksPrefs: (p: Partial<ListPrefs>) => void;
   setTrashPrefs: (p: Partial<ListPrefs>) => void;
+  setTagEntriesPrefs: (p: Partial<ListPrefs>) => void;
   setCollectionPrefs: (id: CollectionId, p: Partial<ListPrefs>) => void;
 }
 
@@ -341,6 +344,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   // dashboard's row (`useDashboardPrefs`), not here.
   tasksPrefs: { view: 'list', sort: 'date_desc', grouping: 'grouped' },
   trashPrefs: { view: 'list', sort: 'date_desc', grouping: 'flat' },
+  tagEntriesPrefs: { view: 'list', sort: 'date_desc', grouping: 'flat' },
   collectionPrefs: DEFAULT_COLLECTION_PREFS,
   collapsedGroups: {},
   flags: {},
@@ -514,6 +518,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   setSearchQuery: (q) => set({ searchQuery: q }),
   setTasksPrefs: (p) => set((s) => ({ tasksPrefs: { ...s.tasksPrefs, ...p } })),
   setTrashPrefs: (p) => set((s) => ({ trashPrefs: { ...s.trashPrefs, ...p } })),
+  setTagEntriesPrefs: (p) => set((s) => ({ tagEntriesPrefs: { ...s.tagEntriesPrefs, ...p } })),
   setCollectionPrefs: (id, p) => set((s) => ({
     collectionPrefs: { ...s.collectionPrefs, [id]: { ...s.collectionPrefs[id], ...p } },
   })),

@@ -816,9 +816,9 @@ console.log('\n4h. Sigils as parts of custom blocks\n');
       && parseSigilCharge(chargeUnit(parseBlocks(serializeBlocks([standaloneCharge]))[0])).targets?.[0] === sigilPartId(block.id, 'draw'), mixed);
 
   const summary = entryBlockSummary('sigil-part', content, '2029-12-31');
-  check('the summary knows the sigil in the part (lock, no card image while hidden)',
-    summary.sigil?.lockEntry === true && summary.sigil.image === null
-      && entryBlockSummary('sigil-part-2', content, '2030-02-01').sigil?.image === `${'ab'.repeat(32)}.png`, summary.sigil);
+  check('the summary knows the sigil in the part (lock, target date)',
+    summary.sigil?.lockEntry === true && !!summary.sigil.revealDate
+      && !('image' in summary.sigil), summary.sigil);
   const dupId = 'dup-block';
   const targeted = setPart(parseBlocks(unloaded)[1], 'charge', (p) => serializeSigilCharge(p, {
     ...parseSigilCharge(p), targets: [sigilPartId(block.id, 'calc'), 'fremd-block'],

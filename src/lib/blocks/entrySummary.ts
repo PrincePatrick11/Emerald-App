@@ -1,7 +1,5 @@
 import { parseBlocks } from './blockHtml';
-import { isBlockHidden } from './blockAttrs';
-import { isDrawingUnitType, mayHoldSigil, sigilState, sigilUnits, type SigilState } from './sigil';
-import { drawingImage } from './paint';
+import { mayHoldSigil, sigilState, sigilUnits, type SigilState } from './sigil';
 import { localIsoDay } from '../helpers';
 
 /**
@@ -10,8 +8,8 @@ import { localIsoDay } from '../helpers';
  * keep in memory anyway, once per content state (and day).
  */
 interface EntryBlockSummary {
-  /** The entry's sigil together with the file name of the first visible, non-concealed drawing (cards) — `null` without sigil blocks. */
-  sigil: (SigilState & { image: string | null }) | null;
+  /** The entry's sigil — `null` without sigil blocks. */
+  sigil: SigilState | null;
 }
 
 const EMPTY: EntryBlockSummary = { sigil: null };
@@ -23,14 +21,8 @@ function summarize(content: string, today: string): EntryBlockSummary {
   if (!mayHoldSigil(content)) return EMPTY;
   const blocks = parseBlocks(content);
 
-  const units = sigilUnits(blocks);
-  if (units.length === 0) return EMPTY;
-  const state = sigilState(blocks, today);
-  // The first visible drawing, block or part — a part counts as visible if its block is.
-  const canvas = units.find(({ block, part }) =>
-    isDrawingUnitType(block.type) && !isBlockHidden(part?.parent ?? block) && !part?.element.archived
-      && !state.concealed.has(block.id) && drawingImage(block));
-  return { sigil: { ...state, image: canvas ? drawingImage(canvas.block) : null } };
+  if (sigilUnits(blocks).length === 0) return EMPTY;
+  return { sigil: sigilState(blocks, today) };
 }
 
 /** The summary of an entry; the same content is not parsed twice on the same day. */

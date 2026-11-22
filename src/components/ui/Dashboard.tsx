@@ -6,7 +6,7 @@ import SidebarPortal from './SidebarPortal';
 import SidebarColumn, { SidebarActionBar } from './SidebarColumn';
 import CollapsibleGroupHeader from './CollapsibleGroupHeader';
 import EmptyState, { NoResults, type EmptyStateProps } from './EmptyState';
-import ListToolbar, { ListSearchField, type DisplayToggle, type SortDateField } from './ListToolbar';
+import ListToolbar, { ListSearchField, type DisplayToggle, type SortDateField, type SubSort } from './ListToolbar';
 import { ENTRY_TITLE_HEADING_CLASSES } from './EntryDetailFrame';
 import FilterPanel, { type FilterPanelProps } from './FilterPanel';
 import { useUIStore, type ViewMode, type SortMode, type GroupingMode } from '../../store/uiStore';
@@ -97,6 +97,8 @@ interface DashboardBaseProps<T> {
    *  Without it the toolbar shows only view and sorting (templates: they
    *  have nothing to group). */
   groupBy?: DashboardGroupBy;
+  /** A second sort for what is listed under each item (the entries under a tag). */
+  subSort?: SubSort;
   search?: string;
   onSearch?: (v: string) => void;
 
@@ -168,6 +170,7 @@ export default function Dashboard<T>({
   sortDate,
   displayToggles,
   groupBy,
+  subSort,
   search,
   onSearch,
   filters,
@@ -316,6 +319,7 @@ export default function Dashboard<T>({
         sortDate={sortDate}
         displayToggles={displayToggles}
         groupBy={groupBy}
+        subSort={subSort}
       />
 
       {/* The sidebar has room in height: the FilterPanel stays

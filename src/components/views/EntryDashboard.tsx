@@ -1,36 +1,22 @@
-import { useState } from 'react';
-import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
-import { Copy, Pencil, SlidersHorizontal, Trash2, type LucideIcon } from 'lucide-react';
-import ContextMenu from '../ui/ContextMenu';
+import { SlidersHorizontal, type LucideIcon } from 'lucide-react';
 import Dashboard, { type DashboardGroup } from '../ui/Dashboard';
-import DashboardItem, { CardContent, ItemGlyph, RENAME_INPUT_CLASS, RowContent } from '../ui/DashboardItem';
-import RenameField from '../ui/RenameField';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import CardTags from '../ui/CardTags';
-import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
-import { useSaveAsTemplateAction } from '../../hooks/useSaveAsTemplateAction';
 import { useCollapsedSet } from '../../hooks/useCollapsedSet';
 import { useDashboardEntries } from '../../hooks/useDashboardEntries';
 import { useDashboardPrefs } from '../../hooks/useDashboardPrefs';
+import { useEntryItems, useEntryRows } from '../../hooks/useEntryRows';
 import { entryBlockSummary } from '../../lib/blocks/entrySummary';
-import { generateId } from '../../lib/helpers';
-import { entryIcon } from '../../lib/entryIcon';
-import { dashboardDateField, entryDateOf } from '../../lib/dashboards';
-import { displayTitle } from '../../lib/entryTitle';
+import { dashboardDateField } from '../../lib/dashboards';
 import { categoriesUsedBy, categoryLabel, hasUncategorized, lookupCategory } from '../../lib/categories';
 import { formatEntryDate } from '../../lib/formatDate';
 import { sortItems } from '../../lib/sortItems';
 import { isCardView } from '../../lib/viewMode';
 import { countByCategory, groupByCategory, groupByMonth, UNCATEGORIZED_KEY } from '../../lib/groupBy';
-import { useUIStore } from '../../store/uiStore';
-import { useEntryStore } from '../../store/entryStore';
 import { useTagMap, visibleTags } from '../../store/tagStore';
 import { useCategoryStore } from '../../store/categoryStore';
-import { useSettingsStore } from '../../store/settingsStore';
-import { useUndoStore } from '../../store/undoStore';
 import { useSessionState } from '../../store/sessionStore';
-import { entryView } from '../../store/entryViews';
 import { openDashboardSettings } from '../../store/dashboardSettingsStore';
 import type { Dashboard as DashboardRow, Entry } from '../../types';
 
@@ -59,55 +45,27 @@ interface EntryDashboardProps {
 export default function EntryDashboard({ dashboard, title, newLabel, onNew, emptyState }: EntryDashboardProps) {
   const { t } = useTranslation();
   const tagMap = useTagMap();
-  const setActiveView = useUIStore((s) => s.setActiveView);
-  const openInNewTabAction = useOpenInNewTabAction();
-  const saveAsTemplateAction = useSaveAsTemplateAction();
   const entries = useDashboardEntries(dashboard?.id);
-  const { duplicateEntry, updateEntry, deleteEntry, restoreEntry } = useEntryStore(
-    useShallow((s) => ({ duplicateEntry: s.duplicateEntry, updateEntry: s.updateEntry, deleteEntry: s.deleteEntry, restoreEntry: s.restoreEntry }))
-  );
   const categories = useCategoryStore((s) => s.categories);
-  const showMoonPhase = useSettingsStore((s) => s.settings.journal.moonPhase);
-  const pushUndo = useUndoStore((s) => s.push);
 
   // Keys the session's search and category selection and the collapsed groups.
   const scope = `dashboard:${dashboard?.id ?? 'all'}` as const;
   const dateField = dashboardDateField(dashboard);
   const [{ view, sort, grouping }, setPrefs] = useDashboardPrefs(dashboard, dateField);
-  const dateOf = (e: Entry) => entryDateOf(e, dateField);
-
-  const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number } | null>(null);
-  const [renamingId, setRenamingId] = useState<string | null>(null);
-  const [renameValue, setRenameValue] = useState('');
+  const rows = useEntryRows({
+    dashboardId: dashboard?.id,
+    dateField,
+    // A sigil with a target date appends it — row and card alike.
+    extraMeta: (e) => {
+      const revealDate = entryBlockSummary(e.id, e.content).sigil?.revealDate;
+      return revealDate ? `${t('creation.targetDate')}: ${formatEntryDate(revealDate)}` : null;
+    },
+  });
+  const dateOf = rows.date;
+  const { render, menu } = useEntryItems(rows, entries);
   const [search, setSearch] = useSessionState(`${scope}.search`, '');
   const [filterCatIds, setFilterCatIds] = useSessionState<string[]>(`${scope}.filter`, []);
   const { isCollapsed: isCatCollapsed, toggle: toggleCatCollapse } = useCollapsedSet(scope);
-
-  const openView = (e: Entry) => entryView(e.id, dashboard?.id);
-
-  const openCtxMenu = (e: React.MouseEvent, id: string) => { e.preventDefault(); setCtxMenu({ id, x: e.clientX, y: e.clientY }); };
-
-  const handleDuplicate = async (entry: Entry) => {
-    const copy = await duplicateEntry(entry.id);
-    if (copy) setActiveView(openView(copy));
-  };
-
-  const startRename = (entry: Entry) => {
-    setRenameValue(entry.title);
-    setRenamingId(entry.id);
-  };
-
-  const commitRename = async () => {
-    if (!renamingId) return;
-    if (renameValue.trim()) await updateEntry(renamingId, { title: renameValue.trim() });
-    setRenamingId(null);
-  };
-
-  const handleDelete = async (entry: Entry) => {
-    const id = entry.id;
-    await deleteEntry(id);
-    pushUndo({ id: generateId(), description: t('undo.entryDeleted'), undo: () => restoreEntry(id) });
-  };
 
   const catById = Object.fromEntries(categories.map((c) => [c.id, c]));
   // Chips and groups only show what occurs here (plus Other); catById stays
@@ -145,38 +103,9 @@ export default function EntryDashboard({ dashboard, title, newLabel, onNew, empt
   const sorted = sortItems(filtered, sort, { date: dateOf });
   const timelineGroups = groupByMonth(sorted, dateOf);
 
-  const renderEntry = (e: Entry) => {
-    const cat = lookupCategory(catById, e.category_id);
-    const icon = entryIcon(e, cat, showMoonPhase);
-    // No fallback to the raw category_id: for a deleted category the label is omitted.
-    const catLabel = categoryLabel(t, cat);
-    // A sigil with a target date appends it — row and card alike.
-    const revealDate = entryBlockSummary(e.id, e.content).sigil?.revealDate;
-    const meta = [
-      catLabel,
-      formatEntryDate(dateOf(e)),
-      revealDate ? `${t('creation.targetDate')}: ${formatEntryDate(revealDate)}` : '',
-    ].filter(Boolean).join(' · ');
-    const renaming = renamingId === e.id;
-    const itemTitle = renaming
-      ? <RenameField value={renameValue} onChange={setRenameValue} onCommit={commitRename}
-          onCancel={() => setRenamingId(null)} className={RENAME_INPUT_CLASS} />
-      : displayTitle(t, 'entry', e.title);
-    return (
-      <DashboardItem
-        view={openView(e)}
-        layout={isCardView(view) ? 'card' : 'row'}
-        editing={renaming}
-        onContextMenu={(ev) => openCtxMenu(ev, e.id)}
-      >
-        {isCardView(view)
-          ? <CardContent icon={<ItemGlyph icon={icon} large />} title={itemTitle} meta={meta}>
-              <CardTags tags={visibleTags(e.tags, tagMap)} />
-            </CardContent>
-          : <RowContent icon={<ItemGlyph icon={icon} />} title={itemTitle} meta={meta} />}
-      </DashboardItem>
-    );
-  };
+  const renderEntry = (e: Entry) => (isCardView(view)
+    ? render(e, 'card', <CardTags tags={visibleTags(e.tags, tagMap)} />)
+    : render(e, 'row'));
 
   // Hide deselected categories entirely instead of leaving them empty.
   const visibleCategories = filterCatIds.length > 0
@@ -214,8 +143,6 @@ export default function EntryDashboard({ dashboard, title, newLabel, onNew, empt
       />
     );
   };
-
-  const ctxEntry = ctxMenu ? entries.find((e) => e.id === ctxMenu.id) : undefined;
 
   return (
     <Dashboard<Entry>
@@ -264,19 +191,7 @@ export default function EntryDashboard({ dashboard, title, newLabel, onNew, empt
               }
             : { mode: 'flat' }
       }
-      contextMenuSlot={ctxMenu && ctxEntry && (
-        <ContextMenu
-          x={ctxMenu.x} y={ctxMenu.y}
-          onClose={() => setCtxMenu(null)}
-          actions={[
-            openInNewTabAction(openView(ctxEntry)),
-            { label: t('contextMenu.duplicate'), icon: <Copy size={12} />, onClick: () => handleDuplicate(ctxEntry) },
-            saveAsTemplateAction(ctxEntry.id),
-            { label: t('contextMenu.rename'), icon: <Pencil size={12} />, onClick: () => startRename(ctxEntry) },
-            { label: t('contextMenu.delete'), icon: <Trash2 size={12} />, onClick: () => handleDelete(ctxEntry), danger: true },
-          ]}
-        />
-      )}
+      contextMenuSlot={menu}
     />
   );
 }

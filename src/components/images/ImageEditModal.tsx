@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Trash2 } from 'lucide-react';
 import { useImageStore } from '../../store/imageStore';
 import { deletePicture, placesShowing } from '../../store/imageActions';
 import { useUndoStore } from '../../store/undoStore';
@@ -14,6 +13,7 @@ import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
 import type { ActiveView, VaultImage } from '../../types';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
+import EditDialogFooter from '../ui/EditDialogFooter';
 import TagInput, { commitDraftTags, type DraftTag } from '../ui/TagInput';
 
 /** The icon of a place of use: an entry, the templates, the custom blocks. */
@@ -93,13 +93,7 @@ export default function ImageEditModal({ file, image, confirmDelete = false, onC
           <Button tone="danger" onClick={remove}>{t('images.removeAndDelete')}</Button>
         </>
       ) : (
-        <>
-          <Button tone="danger" className="mr-auto" onClick={() => void askOrRemove()}>
-            <Trash2 size={14} /> {t('common.delete')}
-          </Button>
-          <Button tone="neutral" onClick={onClose}>{t('common.cancel')}</Button>
-          <Button tone="jade" onClick={save}>{t('common.save')}</Button>
-        </>
+        <EditDialogFooter onDelete={() => void askOrRemove()} onCancel={onClose} onSave={() => void save()} />
       )}
     >
       <div className="image-edit-preview">

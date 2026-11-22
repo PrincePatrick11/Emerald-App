@@ -857,7 +857,10 @@
     "placeDashboards": "dashboard filters",
     "placeDashboardsNamed": "the filter of {{names}}",
     "onlyElsewhereFilter": "Only elsewhere",
-    "onlyElsewhereHint": "No entries, but in templates, images or dashboard filters"
+    "onlyElsewhereHint": "No entries, but in templates, images or dashboard filters",
+    "deleteWarning_one": "This tag is on {{count}} entry – delete anyway?",
+    "deleteWarning_other": "This tag is on {{count}} entries – delete anyway?",
+    "entrySort": "Entry sorting"
   },
   "properties": {
     "noEntry": "Open an entry to see its properties.",

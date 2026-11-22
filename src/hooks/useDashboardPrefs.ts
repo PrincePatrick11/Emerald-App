@@ -1,4 +1,4 @@
-import { sortFromMode, sortModeOf, DEFAULT_DISPLAY } from '../lib/dashboards';
+import { dashboardSort, sortFromMode, sortModeOf, DEFAULT_DISPLAY } from '../lib/dashboards';
 import { useDashboardStore } from '../store/dashboardStore';
 import type { ListPrefs } from '../store/uiStore';
 import type { Dashboard } from '../types';
@@ -15,7 +15,7 @@ export function useDashboardPrefs(
 ): [ListPrefs, (patch: Partial<ListPrefs>) => void] {
   const updateDashboard = useDashboardStore((s) => s.updateDashboard);
   const display = dashboard?.display ?? DEFAULT_DISPLAY;
-  const sort = dashboard?.sort ?? { by: dateField, dir: 'desc' as const };
+  const sort = dashboardSort(dashboard);
   const prefs: ListPrefs = { view: display.view, grouping: display.grouping, sort: sortModeOf(sort) };
 
   const setPrefs = (patch: Partial<ListPrefs>) => {

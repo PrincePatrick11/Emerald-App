@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Trash2 } from 'lucide-react';
 import Modal from '../ui/Modal';
-import Button from '../ui/Button';
+import EditDialogFooter from '../ui/EditDialogFooter';
 import { SymbolGlyph } from '../editors/canvas/symbols/SymbolPicker';
 import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
 import { useSymbolStore } from '../../store/symbolStore';
@@ -42,13 +41,7 @@ export default function SymbolEditModal({ symbol, onClose, onDelete }: {
       widthClassName="w-full max-w-sm"
       bodyClassName="modal-body space-y-4"
       footer={(
-        <>
-          <Button tone="danger" className="mr-auto" onClick={() => { onClose(); onDelete(symbol); }}>
-            <Trash2 size={14} /> {t('common.delete')}
-          </Button>
-          <Button tone="neutral" onClick={onClose}>{t('common.cancel')}</Button>
-          <Button tone="jade" onClick={() => void save()}>{t('common.save')}</Button>
-        </>
+        <EditDialogFooter onDelete={() => { onClose(); onDelete(symbol); }} onCancel={onClose} onSave={() => void save()} />
       )}
     >
       <div className="panel rounded-xl flex items-center justify-center py-6 text-soft">
