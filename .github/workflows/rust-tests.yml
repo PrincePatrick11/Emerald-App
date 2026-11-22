@@ -7,10 +7,10 @@ name: Rust tests
 # enough for lines of its own, because it is otherwise remembered wrongly:
 #
 # It brings: that the tests actually *run* rather than only compile (this is
-# the first time the Rust side is also linked on a push), and the three
+# the first time the Rust side is also linked on a push), and the two
 # path parsers and `rename` semantics checked against each other. The test
 # around `..` in a stored path, for instance, says something different on
-# Windows than on Linux.
+# Windows than on macOS.
 #
 # It does *not* bring the case the first version of the takeover would have
 # failed on. That lies not in the code but in Tauri's startup order
@@ -25,7 +25,7 @@ on:
   push:
     branches: [main, 'version/**']
     # Only when the Rust side changes. The run costs the same
-    # setup as `ci.yml` (toolchain, Linux packages, frontend build, because
+    # setup as `ci.yml` (toolchain, frontend build, because
     # `tauri-build` aborts without `dist/`), and the price is only worth
     # paying when there is something new to check.
     paths:
@@ -48,12 +48,12 @@ jobs:
     name: cargo test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
-      # A red Linux run should not kill the macOS run; the tests touch
+      # A red Windows run should not kill the macOS run; the tests touch
       # paths and `rename`, which behave differently per platform, so
-      # each of the three results is interesting on its own.
+      # each result is interesting on its own.
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, macos-15, windows-latest]
+        os: [macos-15, windows-latest]
     steps:
       - uses: actions/checkout@v4
 
@@ -67,20 +67,6 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
-
-      - name: Install Linux dependencies
-        if: runner.os == 'Linux'
-        timeout-minutes: 10
-        run: |
-          sudo apt-get update
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
-            patchelf \
-            libssl-dev \
-            libdbus-1-dev \
-            pkg-config
 
       - run: npm ci
 

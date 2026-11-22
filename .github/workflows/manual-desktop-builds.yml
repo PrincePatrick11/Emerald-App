@@ -14,10 +14,10 @@ on:
         type: boolean
         default: true
       build_linux:
-        description: Build Linux bundles
+        description: Build Linux bundles (not supported, only for trying it out)
         required: true
         type: boolean
-        default: true
+        default: false
 
 permissions:
   contents: read

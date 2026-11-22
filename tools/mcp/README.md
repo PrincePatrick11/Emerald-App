@@ -200,7 +200,7 @@ Everything that looks at the DOM is in `pagelib.js`, which `cdp.py` sends along 
   back to the app that was in front; on Linux the window opens on screen.
   `Emerald.window` (`{"visible": true}`, not part of the DevTools protocol)
   shows a window that is out of sight and puts it away again.
-  The Linux side compiles in CI and has not been run.
+  Linux is currently not supported: CI does not compile it and it has not been run.
 - **Dialogs on macOS and Linux are held back, not shown.** macOS lets nothing
   outside a file dialog confirm it or choose its path, so the bridge catches
   the page's dialog calls before a window opens and `dialog` answers those.

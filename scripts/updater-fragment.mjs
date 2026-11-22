@@ -3,8 +3,8 @@
 // once; `updater-manifest.mjs` later assembles the fragments into a
 // `latest.json`.
 //
-// Why a Node script and not a shell one-liner: the three runners come with three
-// different shells (bash, bash, pwsh). Node is already available on all three, because
+// Why a Node script and not a shell one-liner: the runners come with
+// different shells (bash, pwsh). Node is already available on both, because
 // the build needs it.
 //
 // Usage:

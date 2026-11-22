@@ -5,6 +5,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased] (targeting v0.2.0)
 
+**Linux is currently not supported:** CI and the release no longer build or test Linux; the Linux code stays in the repository. Releases contain Windows and macOS only; existing Linux installs get no further updates.
+
 Version 0.2.0 is a fresh start: the database, backups and `.emerald` files have a new format, and nothing from 0.1.x is opened directly (see Removed).
 
 ### Entries and categories

@@ -2,7 +2,7 @@
 
 Emerald is a private desktop workspace for magical practice: a journal, knowledge and practice entries with sigils and altars, tasks and a lexicon for your own languages, with templates and custom blocks, all in encrypted vaults. This repository is where it is developed; [`Documentation/features.md`](Documentation/features.md) describes what the app does.
 
-Built with Tauri 2, React 19 and SQLCipher, for macOS, Windows and Linux. Emerald is in early development: expect breaking changes between versions and back up your data.
+Built with Tauri 2, React 19 and SQLCipher, for macOS and Windows. Linux is currently not supported. Emerald is in early development: expect breaking changes between versions and back up your data.
 
 ## Download
 
@@ -12,7 +12,7 @@ Pre-built binaries are on the [Releases](../../releases) page.
 |---|---|
 | macOS | Apple Silicon only, macOS 13.1 Ventura or newer |
 | Windows | x64, `.exe` (NSIS) and `.msi` |
-| Linux | x64, `.deb` and `.AppImage`, built on Ubuntu 22.04 |
+| Linux | currently not supported (code exists, but it is neither built nor tested) |
 
 The macOS app is not notarised. On first launch, right-click it in Finder, choose **Open** and confirm, or run `sudo xattr -cr "/Applications/Emerald App.app"`. On Windows, SmartScreen may warn: choose **More info**, then **Run anyway**.
 

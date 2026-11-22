@@ -542,7 +542,7 @@ With **Check for updates on start** on (the default), the app checks once per la
 
 **Update server**, at the bottom right of the start page, opens a small panel with the source and the check on start. The source is a free-text address field. Empty — the normal state — uses the built-in addresses: `the-emerald-app.de` first, the GitHub release manifest as a fallback. It exists so a moved address can be fixed without a new build; the signing key is *not* editable, so a wrong address can only fail to deliver, never deliver something else (see [In-App Updates](security.md#in-app-updates)). Only complete `https` addresses are accepted, and changing the source clears the last result. Ticking **Check for updates on start** saves just that checkbox, leaving an unsaved address in the field as it is; the Reset beside the field clears it.
 
-A `.deb` install is not offered updates and says so — the new version comes from the website. AppImage, the Windows installer and macOS update in place.
+Windows and macOS update in place. Linux is currently not supported and the release manifest has no Linux entry, so existing Linux installs get no further updates (a `.deb` install would say so and point to the website; an AppImage would update in place once Linux is built again).
 
 ## Language
 
