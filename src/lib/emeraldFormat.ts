@@ -70,7 +70,7 @@ function collectContentLinks(contents: readonly string[]): ManifestLink[] {
       const key = linkItemKey(link);
       if (seen.has(key)) continue;
       seen.add(key);
-      out.push({ id: link.id, kind: link.targetKind === 'task' ? 'task' : 'entry', title: byKey.get(key)?.label ?? '' });
+      out.push({ id: link.id, kind: link.targetKind === 'task' ? 'task' : 'entry', title: byKey.get(key)?.label ?? link.label });
     }
   }
   return out;

@@ -4342,6 +4342,28 @@ html[data-theme] .create-item-tile.is-default {
   font-weight: 500;
 }
 
+/* A link whose target is in the trash or deleted for good: it keeps its place
+   and its stored title, but reads as dead — muted, struck through, a neutral
+   frame, no hover, no pointer. The same look as the sidebar row and the task
+   chip. Restoring the target brings the normal chip back. */
+.internal-link-chip.is-gone,
+.internal-link-chip.is-gone:hover {
+  cursor: default;
+  background-color: transparent;
+  border-color: var(--border-default);
+}
+
+.internal-link-chip.is-gone .internal-link-icon {
+  opacity: 0.6;
+}
+
+.internal-link-chip.is-gone .internal-link-label,
+.internal-link-chip.is-gone:hover .internal-link-label,
+.link-gone-label {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
 .tasks-linked-entry {
   color: var(--link-chip-text);
   background: var(--link-chip-bg);
@@ -4350,6 +4372,18 @@ html[data-theme] .create-item-tile.is-default {
 .tasks-linked-entry:hover {
   color: var(--link-chip-text-hover);
   background: var(--link-chip-bg-hover);
+}
+
+/* A task link whose target is gone: quiet, struck through like every gone
+   link, and nothing to click. Task links store no title, so it reads "Deleted".
+   `html[data-theme]` outranks the themes' own chip colours further down. */
+html[data-theme] .tasks-linked-entry.is-gone,
+html[data-theme] .tasks-linked-entry.is-gone:hover {
+  color: var(--text-muted);
+  background: transparent;
+  border-color: var(--border-default);
+  cursor: default;
+  text-decoration: line-through;
 }
 
 /* The attribute selector outranks the utilities on the trigger in CategorySelect. */

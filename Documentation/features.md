@@ -61,6 +61,8 @@ The list opens with a collapsible "Your blocks" section; below it a collapsible 
 
 **Linked entries.** The Properties sidebar's "Linked entries" field (above the tags) lists everything the entry links in its own text — entries and tasks — read directly from the content rather than kept as a separate list. The chips are grouped by category under small headings.
 
+**Links to deleted entries.** Deleting an entry or task leaves the links to it where they are: nothing in other entries is rewritten. Such a link shows dimmed and struck through, under the title it had, with "Deleted or in the trash" as its tooltip, and leads nowhere. In "Linked entries" it is listed last, marked "Deleted", and while editing its "×" removes it from the text. Restoring the target from the Trash makes every link to it work again. The same holds for a link in a block's link field, and for PDF and HTML exports, which print it struck through. A task's own links (on its row in Tasks) store no title: while the target is in the Trash they read "Deleted", struck through; deleting the target for good removes them (for an entry, the next time the vault is opened).
+
 - In edit mode, searching (up to 50 matches, most recently updated first) and picking a result appends the link to the end of the entry as its own block — a divider, the linked item's category as a heading, then the chip; one block per link. The view jumps to it and briefly highlights it. An entry with no text yet gets its first link block without the divider. A result is picked by click, or with the arrow keys and Enter (Enter takes the highlighted one, the first unless moved); the same holds for a link field's search.
 - Clicking a listed link does the same jump-and-highlight (or navigates to the target if the link somehow isn't in the text).
 - The "×" removes it — the whole block if it is one of these appended blocks, just the chip if it sits inline in running text.
@@ -249,7 +251,7 @@ The Tasks module is a hierarchical task manager with categories, priorities, and
 
 **Priorities.** Low, Medium or High, shown as a coloured flag (green, yellow, red) and changed from a dropdown on each row.
 
-**Links.** A task can link to entries (altars included) and other tasks — the same link picker the editor uses. Linked entries show as clickable chips on the row. A link whose target was deleted for good reads "Deleted".
+**Links.** A task can link to entries (altars included) and other tasks — the same link picker the editor uses. Linked entries show as clickable chips on the row. A link whose target is in the Trash reads "Deleted", struck through and not clickable; deleting the target for good removes the link (for an entry, the next time the vault is opened).
 
 **Toolbar.** Search, a sort ("Created · newest/oldest", "Name · A → Z/Z → A") and a separate Grouping switch (by category, or ungrouped). Only the List view is available.
 

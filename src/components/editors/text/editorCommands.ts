@@ -131,9 +131,13 @@ export function removeEntryLink(editor: Editor, target: EntryLinkRequest): boole
     } else if (
       // The first block in a previously empty entry: it begins with the
       // heading, with no divider before it. So that no self-typed
-      // heading goes along here, its text must be exactly the target's category.
+      // heading goes along here, its text must be the target's category
+      // (`categoryLabel`), or for a gone target, whose category is unknown,
+      // one of the headings a link block could carry (`headingLabels`).
       prev?.type.name === 'heading' && index === 1 &&
-      target.categoryLabel && prev.textContent === target.categoryLabel
+      (target.categoryLabel
+        ? prev.textContent === target.categoryLabel
+        : !!target.headingLabels?.includes(prev.textContent))
     ) {
       from -= prev.nodeSize;
     } else {

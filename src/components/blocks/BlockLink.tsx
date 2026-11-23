@@ -2,11 +2,11 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import LinkedEntryPicker, { LinkedEntryChip, LinkItemIcon } from '../sidebar/fields/LinkedEntryPicker';
 import { useUIStore } from '../../store/uiStore';
-import { useLinkItems } from '../../hooks/useLinkItems';
+import { useLinkItems, useLinkTarget } from '../../hooks/useLinkItems';
 import { linkFromSlot } from '../../lib/blocks/fields';
 import { internalLinkChipHtml, toInternalLinkChip } from '../../lib/internalLinkHtml';
 import { isValidLinkTarget } from '../../lib/links';
-import { linkItemKey, linkItemsByKey, type SuggestionItem } from '../../lib/linkItems';
+import { linkItemKey, type SuggestionItem } from '../../lib/linkItems';
 import { viewOfLinkTarget } from '../../store/entryViews';
 
 /**
@@ -62,13 +62,9 @@ export function LinkEditor({ slot, onChange }: {
 /** A linked entry, with current title and icon as long as it exists. */
 export function LinkTarget({ target, onRemove }: { target: { id: string; targetKind: string; label: string }; onRemove?: () => void }) {
   const { t } = useTranslation();
-  const items = useLinkItems();
   const setActiveView = useUIStore((s) => s.setActiveView);
-  const { id, targetKind } = target;
-  const live = useMemo(
-    () => linkItemsByKey(items).get(linkItemKey({ id, targetKind })),
-    [items, id, targetKind],
-  );
+  // In the trash or deleted for good: the stored title, struck through, no jump.
+  const { item, gone } = useLinkTarget(target);
   const open = () => {
     if (!isValidLinkTarget(target)) return;
     setActiveView(viewOfLinkTarget(target.targetKind, target.id));
@@ -76,12 +72,13 @@ export function LinkTarget({ target, onRemove }: { target: { id: string; targetK
   return (
     <span className="inline-flex">
       <LinkedEntryChip
-        icon={live ? <LinkItemIcon item={live} /> : null}
-        label={live?.label ?? target.label}
+        icon={<LinkItemIcon item={item} />}
+        label={item.label}
         labelMaxWidth="max-w-[240px]"
-        onClick={onRemove ? undefined : open}
+        onClick={onRemove || gone ? undefined : open}
         onRemove={onRemove}
         removeTitle={t('properties.removeLink')}
+        gone={gone}
       />
     </span>
   );

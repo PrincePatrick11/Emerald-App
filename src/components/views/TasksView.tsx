@@ -227,9 +227,10 @@ export default function TasksView() {
    */
   const linkItems = useLinkItems();
   const linkItemByKey = useMemo(() => linkItemsByKey(linkItems), [linkItems]);
+  // `null`: the target is in the trash or deleted for good.
   const resolveTaskLinkTitle = useCallback((targetKind: string, targetId: string) =>
-    linkItemByKey.get(linkItemKey({ id: targetId, targetKind }))?.label ?? t('tasks.linkTargetGone'),
-  [linkItemByKey, t]);
+    linkItemByKey.get(linkItemKey({ id: targetId, targetKind }))?.label ?? null,
+  [linkItemByKey]);
 
   const renderTasksContent = () => (
     <>
@@ -436,7 +437,7 @@ interface TaskRowProps {
   expandedTasks: Set<string>;
   setCtxMenu: (menu: { id: string; x: number; y: number; actions: ContextMenuAction[] } | null) => void;
   setLinkModal: (modal: { taskId: string } | null) => void;
-  resolveTaskLinkTitle: (targetType: string, targetId: string) => string;
+  resolveTaskLinkTitle: (targetType: string, targetId: string) => string | null;
   t: (key: string) => string;
 }
 
@@ -579,7 +580,15 @@ const TaskRow = memo(function TaskRow({
 
         {resolvedLinks.length > 0 && (
           <div className="flex items-center gap-1 flex-shrink-0 ml-2">
-            {resolvedLinks.map((link) => (
+            {resolvedLinks.map((link) => link.title === null ? (
+              <span
+                key={link.id}
+                className="tasks-linked-entry is-gone text-xs px-1.5 py-0.5 rounded-md"
+                title={t('properties.linkGoneHint')}
+              >
+                {t('properties.linkGone')}
+              </span>
+            ) : (
               <span
                 key={link.id}
                 className="tasks-linked-entry text-xs cursor-pointer px-1.5 py-0.5 rounded-md transition-colors"

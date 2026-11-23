@@ -1,9 +1,9 @@
-import { escapeHtml, extractInternalLinks, internalLinkChipHtml, isBlankContent, isValidLinkTarget, linkTargetKindOf } from '../internalLinkHtml';
+import { escapeHtml, extractInternalLinks, internalLinkChipHtml, isBlankContent, isValidLinkTarget, linkTargetKindOf, decodeHtmlAttr } from '../internalLinkHtml';
 import { generateId, isRecord } from '../helpers';
 import { storedImageName } from '../schema';
 import { MOON_PHASE_ORDER, MOON_PHASE_SYMBOLS } from '../moonPhase';
 import type { LinkTargetKind, MoonPhase } from '../../types';
-import { decodeHtmlAttr, neutralizeSectionTags } from './blockHtml';
+import { neutralizeSectionTags } from './blockHtml';
 import { BLOCK_ATTR, type BlockInstance, type BlockTypeId } from './types';
 
 /**
@@ -376,10 +376,7 @@ export function parseFields(block: BlockInstance): FieldsModel {
 /** Target of the link chip in a slot, with its stored label — or `null`. */
 export function linkFromSlot(html: string | undefined): { id: string; targetKind: string; label: string } | null {
   if (typeof html !== 'string' || !html) return null;
-  const [link] = extractInternalLinks(html);
-  if (!link) return null;
-  const label = /\bdata-label="([^"]*)"/i.exec(html)?.[1];
-  return { ...link, label: label !== undefined ? decodeHtmlAttr(label) : '' };
+  return extractInternalLinks(html)[0] ?? null;
 }
 
 /** The stored image file name in a slot — or `null`. */

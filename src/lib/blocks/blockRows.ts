@@ -1,6 +1,6 @@
 import { isRecord } from '../helpers';
 import { htmlTags } from '../htmlTags';
-import { decodeHtmlAttr } from './blockHtml';
+import { decodeHtmlAttr } from '../internalLinkHtml';
 import { isCanvasBlockType } from './canvas';
 import { isDrawingBlockType } from './paint';
 import { BLOCK_ATTR, type BlockInstance } from './types';

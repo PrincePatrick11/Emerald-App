@@ -40,26 +40,50 @@ function tagAttr(tag: string, name: string): string | null {
   return match[2] ?? match[3] ?? '';
 }
 
+const ENTITY_RE = /&(#x[0-9a-f]+|#\d+|quot|apos|lt|gt|amp|nbsp);/gi;
+const NAMED_ENTITIES: Record<string, string> = {
+  quot: '"', apos: "'", lt: '<', gt: '>', amp: '&', nbsp: ' ',
+};
+
+/** Resolve entities in an attribute value — like the browser, without a DOM. */
+export function decodeHtmlAttr(value: string): string {
+  return value.replace(ENTITY_RE, (match, entity: string) => {
+    const lower = entity.toLowerCase();
+    if (lower.startsWith('#')) {
+      const cp = lower.startsWith('#x') ? parseInt(lower.slice(2), 16) : parseInt(lower.slice(1), 10);
+      return cp <= 0x10ffff ? String.fromCodePoint(cp) : match;
+    }
+    return NAMED_ENTITIES[lower] ?? match;
+  });
+}
+
 /**
- * All internal link targets in the content — only `id` and `targetKind`.
+ * All internal link targets in the content: `id`, `targetKind` and the title
+ * the chip stored when it was made (`label` — what a link to a deleted target
+ * still shows).
  *
  * Deliberately without `DOMParser`: this function sits on the database path
  * (the import, the backup merge) and has to run without a browser too, otherwise it
- * cannot be checked in the schema harness (Node). For two attributes,
- * reading the start tag is enough — and both are entity-free: IDs are UUIDs,
- * `targetKind` is a fixed word. Anyone who rebuilds the markup themselves uses
- * `remapInternalLinks` further down; that needs a real DOM.
+ * cannot be checked in the schema harness (Node). For three attributes,
+ * reading the start tag is enough: IDs are UUIDs, `targetKind` is a fixed
+ * word, and the label's character references are resolved by hand. Anyone
+ * who rebuilds the markup themselves uses `remapInternalLinks` further down;
+ * that needs a real DOM.
  */
 export function extractInternalLinks(
   html: string
-): Array<{ id: string; targetKind: string }> {
+): Array<{ id: string; targetKind: string; label: string }> {
   if (!html) return [];
-  const out: Array<{ id: string; targetKind: string }> = [];
+  const out: Array<{ id: string; targetKind: string; label: string }> = [];
   for (const { tag } of spanStartTags(html)) {
     if (tagAttr(tag, 'data-type') !== 'internalLink') continue;
     const id = tagAttr(tag, 'data-id');
     if (!id) continue;
-    out.push({ id, targetKind: linkTargetKindOf(tagAttr(tag, 'data-target-kind')) });
+    out.push({
+      id,
+      targetKind: linkTargetKindOf(tagAttr(tag, 'data-target-kind')),
+      label: decodeHtmlAttr(tagAttr(tag, 'data-label') ?? ''),
+    });
   }
   return out;
 }

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { useUIStore } from '../../../store/uiStore';
 import { Search } from 'lucide-react';
 import SidebarSection, { SidebarEmpty, SidebarItemRow, SidebarRowRemove } from './SidebarSection';
@@ -9,8 +10,13 @@ import {
   requestEntryLinkAppend, requestEntryLinkRemove, requestEntryLinkReveal,
 } from '../../../lib/links';
 import { extractInternalLinks } from '../../../lib/internalLinkHtml';
+import { useCategoryStore } from '../../../store/categoryStore';
+import { categoryLabel } from '../../../lib/categories';
+import { MOON_PHASE_ORDER } from '../../../lib/moonPhase';
 import { viewOfLinkTarget } from '../../../store/entryViews';
-import { linkItemKey as itemKey, linkItemsByKey } from '../../../lib/linkItems';
+import {
+  linkItemKey as itemKey, linkItemsByKey, resolveLink, type ResolvedLink as LinkedRow,
+} from '../../../lib/linkItems';
 import {
   TARGET_KIND_ICONS,
   TARGET_KIND_LABEL_KEYS,
@@ -54,33 +60,45 @@ const NO_KEYS: string[] = [];
  * The links of an entry, sorted by category: the link chips
  * of its content. `pending`/`removed` bridge the autosave when editing
  * (see `LinkedEntriesField`).
+ *
+ * A target in the trash or deleted for good keeps its row, with the title the
+ * chip stored, at the end of the list — like the chip in the text it stays
+ * until it is removed, and comes back to life when the target is restored.
  */
 function useLinkedEntries(
   content: string,
   pending: SuggestionItem[] = NO_ITEMS,
   removed: string[] = NO_KEYS,
-): SuggestionItem[] {
-  const items = useLinkItems();
-  const byKey = useMemo(() => linkItemsByKey(items), [items]);
+): LinkedRow[] {
+  const { t } = useTranslation();
+  // Cached per list (`linkItemsByKey`), so the memo below only reruns on a change.
+  const byKey = linkItemsByKey(useLinkItems());
   return useMemo(() => {
-    const gone = new Set(removed);
+    const dropped = new Set(removed);
     const seen = new Set<string>();
-    const out: SuggestionItem[] = [];
+    const live: SuggestionItem[] = [];
+    const gone: SuggestionItem[] = [];
     for (const link of [...extractInternalLinks(content), ...pending]) {
       const key = itemKey(link);
-      if (seen.has(key) || gone.has(key)) continue;
-      // Target deleted or unknown: the chip in the text then shows its
-      // stored label text; here the row is better left empty.
-      const item = byKey.get(key);
-      if (!item) continue;
+      if (seen.has(key) || dropped.has(key)) continue;
       seen.add(key);
-      out.push(item);
+      const row = resolveLink(byKey, link, t);
+      (row.gone ? gone : live).push(row.item);
     }
     // Sorted by category, not in text order: links of the same kind
     // thus stand together, regardless of when they got into the
     // entry.
-    return out.sort(byCategory);
-  }, [content, pending, removed, byKey]);
+    return [
+      ...live.sort(byCategory).map((item) => ({ item, gone: false })),
+      ...gone.sort((a, b) => a.label.localeCompare(b.label)).map((item) => ({ item, gone: true })),
+    ];
+  }, [content, pending, removed, byKey, t]);
+}
+
+/** Assignment on the right of a row: the category, else entry/task — or that it is gone. */
+function rowMeta(t: TFunction, { item, gone }: LinkedRow): string {
+  if (gone) return t('properties.linkGone');
+  return item.categoryLabel || t(TARGET_KIND_LABEL_KEYS[item.targetKind]);
 }
 
 /**
@@ -89,9 +107,10 @@ function useLinkedEntries(
  */
 function useRevealLink() {
   const setActiveView = useUIStore((s) => s.setActiveView);
-  return (item: SuggestionItem) => {
+  return ({ item, gone }: LinkedRow) => {
     if (requestEntryLinkReveal(item)) return;
-    setActiveView(viewOfLinkTarget(item.targetKind, item.id));
+    // A gone target has no view to open.
+    if (!gone) setActiveView(viewOfLinkTarget(item.targetKind, item.id));
   };
 }
 
@@ -106,13 +125,14 @@ export function LinkedEntriesSection({ content }: Props) {
   return (
     <SidebarSection storageKey={OPEN_KEY} label={t('properties.linkedEntries')} count={linked.length}>
       {linked.length === 0 && <SidebarEmpty>{t('properties.noLinkedEntries')}</SidebarEmpty>}
-      {linked.map((item) => (
+      {linked.map((row) => (
         <SidebarItemRow
-          key={itemKey(item)}
-          icon={<LinkItemIcon item={item} />}
-          label={item.label}
-          meta={item.categoryLabel || t(TARGET_KIND_LABEL_KEYS[item.targetKind])}
-          onClick={() => reveal(item)}
+          key={itemKey(row.item)}
+          icon={<LinkItemIcon item={row.item} />}
+          label={row.item.label}
+          meta={rowMeta(t, row)}
+          gone={row.gone}
+          onClick={() => reveal(row)}
         />
       ))}
     </SidebarSection>
@@ -145,7 +165,7 @@ export default function LinkedEntriesField({ content }: Props) {
   const linked = useLinkedEntries(content, pending, removed);
 
   const filtered = useMemo(() => {
-    const linkedKeys = new Set(linked.map(itemKey));
+    const linkedKeys = new Set(linked.map((row) => itemKey(row.item)));
     const q = query.trim().toLowerCase();
     return items
       .filter((i) => !linkedKeys.has(itemKey(i)) && i.label.toLowerCase().includes(q))
@@ -166,8 +186,14 @@ export default function LinkedEntriesField({ content }: Props) {
     }
   };
 
-  const remove = (item: SuggestionItem) => {
-    if (!requestEntryLinkRemove(item)) return;
+  // A gone target's category is unknown: the editor may take along any
+  // heading an appended link block could have carried (`headingLabels`).
+  const categories = useCategoryStore((s) => s.categories);
+  const remove = ({ item, gone }: LinkedRow) => {
+    const headingLabels = gone
+      ? [...categories.map((c) => categoryLabel(t, c)), ...MOON_PHASE_ORDER.map((p) => t(`moonPhase.${p}`))]
+      : undefined;
+    if (!requestEntryLinkRemove({ ...item, headingLabels })) return;
     setPending((prev) => prev.filter((p) => itemKey(p) !== itemKey(item)));
     setRemoved((prev) => [...prev, itemKey(item)]);
   };
@@ -175,15 +201,16 @@ export default function LinkedEntriesField({ content }: Props) {
   return (
     <SidebarSection storageKey={OPEN_KEY} label={t('properties.linkedEntries')} count={linked.length}>
       {linked.length === 0 && <SidebarEmpty>{t('properties.noLinkedEntries')}</SidebarEmpty>}
-      {linked.map((item) => (
+      {linked.map((row) => (
         <SidebarItemRow
-          key={itemKey(item)}
-          icon={<LinkItemIcon item={item} />}
-          label={item.label}
-          meta={item.categoryLabel || t(TARGET_KIND_LABEL_KEYS[item.targetKind])}
-          title={item.label}
-          onClick={() => reveal(item)}
-          action={<SidebarRowRemove title={t('properties.removeLink')} onClick={() => remove(item)} />}
+          key={itemKey(row.item)}
+          icon={<LinkItemIcon item={row.item} />}
+          label={row.item.label}
+          meta={rowMeta(t, row)}
+          title={row.item.label}
+          gone={row.gone}
+          onClick={() => reveal(row)}
+          action={<SidebarRowRemove title={t('properties.removeLink')} onClick={() => remove(row)} />}
         />
       ))}
       <div className="mt-1 pl-[9px] pr-3">

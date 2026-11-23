@@ -874,6 +874,8 @@
     "linkedEntries": "Entrées liées",
     "noLinkedEntries": "Aucune entrée liée pour l'instant",
     "removeLink": "Retirer l'entrée liée",
+    "linkGone": "Supprimé",
+    "linkGoneHint": "Supprimé ou dans la corbeille",
     "icon": "Icône",
     "emoji": "Emoji",
     "chooseEmoji": "Choisir un emoji…",
@@ -1261,7 +1263,6 @@
     "markCompleted": "Marquer comme terminée",
     "addSubtask": "Ajouter sous-tâche",
     "linkEntry": "Lier une entrée",
-    "linkTargetGone": "Supprimé",
     "showCompleted": "Afficher terminées",
     "untitled": "Tâche sans titre"
   },

@@ -1,4 +1,6 @@
 import Mention from '@tiptap/extension-mention';
+import { useTranslation } from 'react-i18next';
+import { useLinkTarget } from '../../../hooks/useLinkItems';
 import { mergeAttributes } from '@tiptap/core';
 import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react';
 import type { NodeViewRendererProps } from '@tiptap/react';
@@ -9,22 +11,21 @@ import { linkTargetKindOf } from '../../../lib/internalLinkHtml';
 import { isImageIcon } from '../../../lib/helpers';
 import { iconSrc } from '../../../lib/icons';
 
-interface InternalLinkOptions {
-  getIcon?: (id: string, targetKind: string) => string | null;
-  getLabel?: (id: string, targetKind: string) => string | null;
-}
-
-function InternalLinkNodeView({ node, editor, extension }: NodeViewRendererProps) {
+function InternalLinkNodeView({ node, editor }: NodeViewRendererProps) {
+  const { t } = useTranslation();
   const { id, targetKind, label } = node.attrs;
 
-  // Look up icon and label live from the store via extension callbacks,
-  // so both always reflect the latest state without re-parsing stored HTML.
-  const { getIcon, getLabel } = (extension as unknown as { options: InternalLinkOptions }).options;
-  const icon = getIcon?.(id, targetKind) ?? defaultLinkIcon(targetKind);
-  const displayLabel = getLabel?.(id, targetKind) ?? label;
+  // Icon and title come live from the same list as the picker and the sidebar
+  // (`buildLinkItems`), so all three show the same thing and follow renames.
+  // A target missing from it is in the trash or deleted for good: the chip
+  // stays, with its stored title, but marked as gone and leading nowhere —
+  // restoring the target brings it back to life.
+  const { item, gone } = useLinkTarget({ id, targetKind, label });
+  const icon = item.displayIcon ?? item.icon ?? defaultLinkIcon(targetKind);
 
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
+    if (gone) return;
     // Use editor.isEditable directly (live value) rather than the isEditable React state,
     // which may lag behind if the transaction event hasn't fired yet.
     if (!editor.isEditable) {
@@ -44,6 +45,7 @@ function InternalLinkNodeView({ node, editor, extension }: NodeViewRendererProps
   const handleAuxClick = (e: React.MouseEvent) => {
     if (e.button !== 1) return;
     e.preventDefault();
+    if (gone) return;
     document.dispatchEvent(new CustomEvent('internal-link-navigate', {
       detail: { id, targetKind, newTab: true },
       bubbles: true,
@@ -53,7 +55,8 @@ function InternalLinkNodeView({ node, editor, extension }: NodeViewRendererProps
   return (
     <NodeViewWrapper
       as="span"
-      className="internal-link-chip"
+      className={gone ? 'internal-link-chip is-gone' : 'internal-link-chip'}
+      title={gone ? t('properties.linkGoneHint') : undefined}
       onClick={handleClick}
       onMouseDown={handleMouseDown}
       onAuxClick={handleAuxClick}
@@ -62,16 +65,12 @@ function InternalLinkNodeView({ node, editor, extension }: NodeViewRendererProps
       <span className="internal-link-icon">
         {isImageIcon(icon) ? <img src={iconSrc(icon)} alt="" /> : icon}
       </span>
-      <span className="internal-link-label">{displayLabel}</span>
+      <span className="internal-link-label">{item.label}</span>
     </NodeViewWrapper>
   );
 }
 
-export function createInternalLinkExtension(
-  getItems: (query: string) => SuggestionItem[],
-  getIcon: (id: string, targetKind: string) => string | null,
-  getLabel: (id: string, targetKind: string) => string | null
-) {
+export function createInternalLinkExtension(getItems: (query: string) => SuggestionItem[]) {
   return Mention.extend({
     name: 'internalLink',
 
@@ -152,9 +151,6 @@ export function createInternalLinkExtension(
     },
   }).configure({
     HTMLAttributes: { class: 'internal-link' },
-    // @ts-expect-error: custom extension options not in MentionOptions type
-    getIcon,
-    getLabel,
 
     suggestion: {
       char: '[[',

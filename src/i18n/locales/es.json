@@ -874,6 +874,8 @@
     "linkedEntries": "Entradas enlazadas",
     "noLinkedEntries": "Aún no hay entradas enlazadas",
     "removeLink": "Quitar entrada enlazada",
+    "linkGone": "Eliminado",
+    "linkGoneHint": "Eliminado o en la papelera",
     "icon": "Icono",
     "emoji": "Emoji",
     "chooseEmoji": "Elegir emoji…",
@@ -1261,7 +1263,6 @@
     "markCompleted": "Marcar como completada",
     "addSubtask": "Añadir subtarea",
     "linkEntry": "Enlazar entrada",
-    "linkTargetGone": "Eliminado",
     "showCompleted": "Mostrar completadas",
     "untitled": "Tarea sin título"
   },

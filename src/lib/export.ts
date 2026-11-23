@@ -74,6 +74,9 @@ function stripImages(html: string): string {
  * TipTap only stores the icon at save-time; if it was null then, we fill it now.
  * An uploaded icon is a file the export document cannot reach: it goes in as
  * a data URL (`portableIcon`).
+ *
+ * A link whose target is in the trash or deleted for good gets `data-gone`,
+ * so the export shows it struck through like the app does (`il-gone`).
  */
 async function resolveInternalLinkIcons(html: string): Promise<string> {
   const doc = new DOMParser().parseFromString(html, 'text/html');
@@ -85,11 +88,16 @@ async function resolveInternalLinkIcons(html: string): Promise<string> {
   const { categories } = useCategoryStore.getState();
 
   for (const el of links) {
-    // Only fill missing icons
-    if (el.getAttribute('data-icon')) continue;
     const id        = el.getAttribute('data-id');
     const targetKind = el.getAttribute('data-target-kind');
     if (!id) continue;
+    const exists = targetKind === 'task' ? tasks.some((t) => t.id === id) : entries.some((e) => e.id === id);
+    if (!exists) {
+      el.setAttribute('data-gone', '');
+      continue;
+    }
+    // Only fill missing icons
+    if (el.getAttribute('data-icon')) continue;
 
     let icon = '';
     if (targetKind === 'entry') {
@@ -125,7 +133,8 @@ export function entryAnchor(id: string): string {
  *
  * With `bundleIds` (the HTML export) a link to an entry in the same file
  * becomes an `<a href="#entry-…">` that jumps there; one to an entry outside
- * stays a chip, marked `il-external`.
+ * stays a chip, marked `il-external`. A link to a gone target is marked
+ * `il-gone` (see `resolveInternalLinkIcons`).
  */
 function transformInternalLinks(html: string, bundleIds?: ReadonlySet<string>): string {
   const doc = new DOMParser().parseFromString(html, 'text/html');
@@ -135,10 +144,12 @@ function transformInternalLinks(html: string, bundleIds?: ReadonlySet<string>): 
   for (const el of Array.from(links)) {
     const icon  = el.getAttribute('data-icon')  || '';
     const label = el.getAttribute('data-label') || el.textContent || '';
+    const gone  = el.hasAttribute('data-gone');
 
     // Drop attributes the CSS no longer reads — they're now baked into the children.
     el.removeAttribute('data-icon');
     el.removeAttribute('data-label');
+    el.removeAttribute('data-gone');
 
     el.textContent = '';
     if (icon.startsWith('data:')) {
@@ -156,6 +167,11 @@ function transformInternalLinks(html: string, bundleIds?: ReadonlySet<string>): 
     lbl.textContent = label;
     el.appendChild(lbl);
 
+    // Target in the trash or deleted: struck through, never a jump.
+    if (gone) {
+      el.classList.add('il-gone');
+      continue;
+    }
     if (!bundleIds) continue;
     const targetId = el.getAttribute('data-id') ?? '';
     if (bundleIds.has(targetId)) {
@@ -313,6 +329,9 @@ const PRINT_CSS = `
     width: 13px; height: 13px; object-fit: cover; border-radius: 2px;
   }
   .entry-content span[data-type="internalLink"] .il-icon-emoji { font-size: 0.9em; line-height: 1; }
+  .entry-content span[data-type="internalLink"].il-gone {
+    background: transparent; border-color: #ccc; color: #888; text-decoration: line-through;
+  }
   /* Mirrored for the native page setup in src-tauri/src/pdf_export/mod.rs. */
   @page { margin: 2cm 2.5cm; }
   @media print {

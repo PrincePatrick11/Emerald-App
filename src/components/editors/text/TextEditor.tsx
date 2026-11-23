@@ -13,7 +13,7 @@ import { ResizableImage, pinPercentImageWidths } from './ResizableImageExtension
 import { TextColorMark } from './TextColorExtension';
 import { SearchExtension } from './SearchExtension';
 import { createHeadingFold } from './HeadingFoldExtension';
-import { useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { useContext, useEffect, useRef, useState, useCallback } from 'react';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { ExternalLink, Pencil, Unlink } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -30,7 +30,6 @@ import i18n from '../../../i18n';
 import { createInternalLinkExtension } from './InternalLinkExtension';
 import type { SuggestionItem } from './SuggestionList';
 import { useLinkItems } from '../../../hooks/useLinkItems';
-import { linkItemKey, linkItemsByKey } from '../../../lib/linkItems';
 import { isAcceptedImageFile } from '../../../lib/helpers';
 import { useSettingsStore } from '../../../store/settingsStore';
 import type { EditorSettings } from '../../../lib/vaultSettings';
@@ -126,19 +125,6 @@ export default function TextEditor({
   const itemsRef = useRef<SuggestionItem[]>([]);
   itemsRef.current = linkItems;
 
-  // Icon and title of a chip, looked up live from the same list as
-  // picker and sidebar (`buildLinkItems`), so that all three show the same
-  // thing. `displayIcon` can also be an image, which must not go into the node attrs.
-  const byKey = useMemo(() => linkItemsByKey(linkItems), [linkItems]);
-  const byKeyRef = useRef(byKey);
-  byKeyRef.current = byKey;
-  const getIconRef = useRef((id: string, targetKind: string): string | null => {
-    const item = byKeyRef.current.get(linkItemKey({ id, targetKind }));
-    return item ? (item.displayIcon ?? item.icon ?? null) : null;
-  });
-  const getLabelRef = useRef((id: string, targetKind: string): string | null =>
-    byKeyRef.current.get(linkItemKey({ id, targetKind }))?.label ?? null);
-
   // What the editor formats by itself while typing and pasting
   // (Settings → Entries). Read at creation: an open editor
   // keeps what it opened with; a new one would otherwise get different rules mid-typing.
@@ -186,16 +172,12 @@ export default function TextEditor({
       ...(features.align ? [TextAlign.configure({ types: [...TEXT_ALIGN_TYPES] })] : []),
       ...(features.entryLinks
         ? [
-            createInternalLinkExtension(
-              (query) => {
-                const q = query.toLowerCase();
-                return itemsRef.current.filter((item) =>
-                  item.label.toLowerCase().includes(q)
-                );
-              },
-              (id, targetKind) => getIconRef.current(id, targetKind),
-              (id, targetKind) => getLabelRef.current(id, targetKind)
-            ),
+            createInternalLinkExtension((query) => {
+              const q = query.toLowerCase();
+              return itemsRef.current.filter((item) =>
+                item.label.toLowerCase().includes(q)
+              );
+            }),
           ]
         : []),
       ...(features.images ? [ResizableImage] : []),

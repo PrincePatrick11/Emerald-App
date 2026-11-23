@@ -1,5 +1,6 @@
 import type Database from './sqlite';
-import { decodeHtmlAttr, parseBlocks, serializeBlocks } from './blocks/blockHtml';
+import { decodeHtmlAttr } from './internalLinkHtml';
+import { parseBlocks, serializeBlocks } from './blocks/blockHtml';
 import type { BlockRefRole } from './blocks/blockRefs';
 import type { BlockInstance } from './blocks/types';
 import { FIELDS_BLOCK_TYPE, isSigilElement, parseFields, withoutElementContent } from './blocks/fields';

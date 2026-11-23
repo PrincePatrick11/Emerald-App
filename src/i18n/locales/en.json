@@ -874,6 +874,8 @@
     "linkedEntries": "Linked entries",
     "noLinkedEntries": "No linked entries yet",
     "removeLink": "Remove linked entry",
+    "linkGone": "Deleted",
+    "linkGoneHint": "Deleted or in the trash",
     "icon": "Icon",
     "emoji": "Emoji",
     "chooseEmoji": "Choose emoji…",
@@ -1261,7 +1263,6 @@
     "markCompleted": "Mark as completed",
     "addSubtask": "Add subtask",
     "linkEntry": "Link entry",
-    "linkTargetGone": "Deleted",
     "showCompleted": "Show completed",
     "untitled": "Untitled Task"
   },

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import { usePersistedFlag } from '../../../hooks/usePersistedFlag';
 import SidebarSectionHeader from './SidebarSectionHeader';
@@ -72,8 +73,12 @@ export function SidebarPropertyRow({ icon, label, value, muted = false }: {
  * When editing, `action` attaches a button behind the row (the links:
  * `SidebarRowRemove`). The row is then a frame around two buttons, with the
  * main part carrying icon, name and assignment as the whole row otherwise would.
+ *
+ * `gone` marks a row whose target no longer exists (a link to an entry in the
+ * trash): its name is struck through and dimmed, like the chip in the text,
+ * and the tooltip says why.
  */
-export function SidebarItemRow({ icon, label, meta, onClick, active = false, title, action }: {
+export function SidebarItemRow({ icon, label, meta, onClick, active = false, title: ownTitle, action, gone = false }: {
   icon: ReactNode;
   label: string;
   meta?: string;
@@ -81,7 +86,11 @@ export function SidebarItemRow({ icon, label, meta, onClick, active = false, tit
   active?: boolean;
   title?: string;
   action?: ReactNode;
+  gone?: boolean;
 }) {
+  const { t } = useTranslation();
+  const title = gone ? t('properties.linkGoneHint') : ownTitle;
+  const labelClass = gone ? 'flex-1 min-w-0 truncate link-gone-label' : 'flex-1 min-w-0 truncate';
   const state = active ? ' sidebar-row--active' : '';
   if (action !== undefined) {
     return (
@@ -94,7 +103,7 @@ export function SidebarItemRow({ icon, label, meta, onClick, active = false, tit
           className="sidebar-row-main flex flex-1 min-w-0 h-full items-center gap-1.5 pl-[9px] rounded-md text-left"
         >
           <RowIcon>{icon}</RowIcon>
-          <span className="flex-1 min-w-0 truncate">{label}</span>
+          <span className={labelClass}>{label}</span>
           {meta && <span className="sidebar-row-meta flex-shrink-0 max-w-[45%] truncate text-[11px]">{meta}</span>}
         </button>
         {action}
@@ -110,7 +119,7 @@ export function SidebarItemRow({ icon, label, meta, onClick, active = false, tit
       className={`sidebar-row flex items-center gap-1.5 w-full pl-[9px] pr-3 py-1.5 rounded-md text-[13px] text-left min-w-0${state}`}
     >
       <RowIcon>{icon}</RowIcon>
-      <span className="flex-1 min-w-0 truncate">{label}</span>
+      <span className={labelClass}>{label}</span>
       {meta && <span className="sidebar-row-meta flex-shrink-0 max-w-[45%] truncate text-[11px]">{meta}</span>}
     </button>
   );

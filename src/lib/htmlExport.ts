@@ -332,6 +332,7 @@ ${TEXT_COLORS.map((c) => `.entry-content span[data-color="${c}"] { color: var(--
 }
 .entry-content a[data-type="internalLink"]:hover { border-color: var(--accent); }
 .entry-content [data-type="internalLink"].il-external { background: var(--chip); border-color: var(--border); color: var(--muted); border-style: dashed; }
+.entry-content [data-type="internalLink"].il-gone { background: transparent; border-color: var(--border); color: var(--muted); text-decoration: line-through; }
 .entry-content [data-type="internalLink"] .il-icon-img { width: 13px; height: 13px; object-fit: cover; border-radius: 2px; margin: 0; display: inline; }
 mark.hit { background: var(--mark); color: inherit; border-radius: 2px; padding: 0 1px; }
 

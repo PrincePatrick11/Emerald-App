@@ -42,10 +42,11 @@ const MENU_MAX_HEIGHT = 160;
 /**
  * The chip of a link. `onClick` makes the label clickable (the
  * links field jumps to the spot in the text with it), `onRemove` attaches the "×".
- * Without either it is a pure display.
+ * Without either it is a pure display. `gone` marks a link whose target
+ * is in the trash or deleted for good: struck through, with the hint as tooltip.
  */
 export function LinkedEntryChip({
-  icon, label, labelMaxWidth = 'max-w-[110px]', onClick, onRemove, removeTitle,
+  icon, label, labelMaxWidth = 'max-w-[110px]', onClick, onRemove, removeTitle, gone = false,
 }: {
   icon: ReactNode;
   label: string;
@@ -53,11 +54,18 @@ export function LinkedEntryChip({
   onClick?: () => void;
   onRemove?: () => void;
   removeTitle?: string;
+  gone?: boolean;
 }) {
+  const { t } = useTranslation();
   const body = (
     <>
       {icon}
-      <span className={`truncate ${labelMaxWidth}`}>{label}</span>
+      <span
+        className={`truncate ${labelMaxWidth}${gone ? ' link-gone-label' : ''}`}
+        title={gone ? t('properties.linkGoneHint') : undefined}
+      >
+        {label}
+      </span>
     </>
   );
   return (

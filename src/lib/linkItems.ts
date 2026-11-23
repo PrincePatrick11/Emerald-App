@@ -4,6 +4,7 @@ import { DEFAULT_ENTRY_ICON, DEFAULT_TASK_ICON, entryIcon } from './entryIcon';
 import { displayTitle } from './entryTitle';
 import { categoryLabel, lookupCategory } from './categories';
 import { isImageIcon } from './helpers';
+import { linkTargetKindOf } from './internalLinkHtml';
 import type { Category, Entry, LinkTargetKind, Task } from '../types';
 
 /**
@@ -120,6 +121,42 @@ export function linkItemKey(target: { id: string; targetKind: string }): string 
   return `${target.targetKind === 'task' ? 'task' : 'entry'}:${target.id}`;
 }
 
-export function linkItemsByKey(items: SuggestionItem[]): Map<string, SuggestionItem> {
-  return new Map(items.map((i) => [linkItemKey(i), i]));
+/** A link target as shown: the live item, or (`gone`) a stand-in from what the chip stored. */
+export interface ResolvedLink {
+  item: SuggestionItem;
+  gone: boolean;
+}
+
+/**
+ * The one answer to "what does this link show": the live item from
+ * `buildLinkItems`, or for a target in the trash or deleted for good a
+ * stand-in with the chip's stored title (or "Untitled …") and the kind's
+ * default icon. The stores hold neither trashed nor purged rows, so "not in
+ * the list" is what gone means.
+ */
+export function resolveLink(
+  byKey: ReadonlyMap<string, SuggestionItem>,
+  link: { id: string; targetKind: string; label?: string | null },
+  t: TFunction,
+): ResolvedLink {
+  const item = byKey.get(linkItemKey(link));
+  if (item) return { item, gone: false };
+  const targetKind = linkTargetKindOf(link.targetKind);
+  return { item: { id: link.id, targetKind, label: link.label || displayTitle(t, targetKind, '') }, gone: true };
+}
+
+const byKeyCache = new WeakMap<readonly SuggestionItem[], Map<string, SuggestionItem>>();
+
+/**
+ * The same list keyed by `linkItemKey`. Built once per list: every link chip
+ * looks itself up here, and the shared list (`useLinkItems`) stays the same
+ * array until a store changes.
+ */
+export function linkItemsByKey(items: readonly SuggestionItem[]): Map<string, SuggestionItem> {
+  let map = byKeyCache.get(items);
+  if (!map) {
+    map = new Map(items.map((i) => [linkItemKey(i), i]));
+    byKeyCache.set(items, map);
+  }
+  return map;
 }

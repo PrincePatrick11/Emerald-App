@@ -874,6 +874,8 @@
     "linkedEntries": "Verlinkungen",
     "noLinkedEntries": "Noch keine Verlinkungen",
     "removeLink": "Verlinkung entfernen",
+    "linkGone": "Gelöscht",
+    "linkGoneHint": "Gelöscht oder im Papierkorb",
     "icon": "Icon",
     "emoji": "Emoji",
     "chooseEmoji": "Emoji wählen…",
@@ -1261,7 +1263,6 @@
     "markCompleted": "Als erledigt markieren",
     "addSubtask": "Unteraufgabe hinzufügen",
     "linkEntry": "Eintrag verlinken",
-    "linkTargetGone": "Gelöscht",
     "showCompleted": "Erledigte anzeigen",
     "untitled": "Unbenannte Aufgabe"
   },

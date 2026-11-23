@@ -1,4 +1,4 @@
-import { escapeHtml } from '../internalLinkHtml';
+import { decodeHtmlAttr, escapeHtml } from '../internalLinkHtml';
 import { generateId } from '../helpers';
 import { htmlTags } from '../htmlTags';
 import { BLOCK_ATTR, TEXT_BLOCK_TYPE, type BlockInstance } from './types';
@@ -40,27 +40,6 @@ const ATTR_RE = /([^\s"'<>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))
  *  meaning for the format and should not get one either (`onclick` …). */
 const KEPT_ATTR_RE = /^data-[a-z0-9-]+$/;
 
-const ENTITY_RE = /&(#x[0-9a-f]+|#\d+|quot|apos|lt|gt|amp|nbsp);/gi;
-const NAMED_ENTITIES: Record<string, string> = {
-  quot: '"', apos: "'", lt: '<', gt: '>', amp: '&', nbsp: ' ',
-};
-
-/** Resolve entities in an attribute value — like the browser, without a DOM. */
-export function decodeHtmlAttr(value: string): string {
-  return decodeAttr(value);
-}
-
-function decodeAttr(value: string): string {
-  return value.replace(ENTITY_RE, (match, entity: string) => {
-    const lower = entity.toLowerCase();
-    if (lower.startsWith('#')) {
-      const cp = lower.startsWith('#x') ? parseInt(lower.slice(2), 16) : parseInt(lower.slice(1), 10);
-      return cp <= 0x10ffff ? String.fromCodePoint(cp) : match;
-    }
-    return NAMED_ENTITIES[lower] ?? match;
-  });
-}
-
 /** The attributes of a section tag — `body` is everything between the tag name and `>`. */
 function parseSectionAttrs(body: string): Record<string, string> {
   const out: Record<string, string> = {};
@@ -68,7 +47,7 @@ function parseSectionAttrs(body: string): Record<string, string> {
     const name = m[1].toLowerCase();
     // As in the browser, the first occurrence of an attribute wins.
     if (!KEPT_ATTR_RE.test(name) || name in out) continue;
-    out[name] = decodeAttr(m[2] ?? m[3] ?? m[4] ?? '');
+    out[name] = decodeHtmlAttr(m[2] ?? m[3] ?? m[4] ?? '');
   }
   return out;
 }

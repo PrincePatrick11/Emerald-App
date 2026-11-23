@@ -4,7 +4,7 @@ import { useEntryStore } from '../store/entryStore';
 import { useTaskStore } from '../store/taskStore';
 import { useCategoryStore } from '../store/categoryStore';
 import { useSettingsStore } from '../store/settingsStore';
-import { buildLinkItems } from '../lib/linkItems';
+import { buildLinkItems, linkItemsByKey, resolveLink, type ResolvedLink } from '../lib/linkItems';
 import type { SuggestionItem } from '../components/editors/text/SuggestionList';
 
 /** The last result together with its inputs — shared across all callers. */
@@ -40,4 +40,14 @@ export function useLinkItems(): SuggestionItem[] {
     ),
     [t, entries, tasks, categories, showMoonPhase],
   );
+}
+
+/**
+ * What one link shows (`resolveLink`): its live target, or a stand-in when the
+ * target is in the trash or deleted for good. Re-renders when the target is
+ * renamed, deleted or restored.
+ */
+export function useLinkTarget(link: { id: string; targetKind: string; label?: string | null }): ResolvedLink {
+  const { t } = useTranslation();
+  return resolveLink(linkItemsByKey(useLinkItems()), link, t);
 }

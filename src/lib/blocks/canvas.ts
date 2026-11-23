@@ -1,8 +1,8 @@
 import { generateId, isRecord } from '../helpers';
-import { escapeHtml } from '../internalLinkHtml';
+import { escapeHtml, decodeHtmlAttr } from '../internalLinkHtml';
 import { ALTAR_LIBRARY_TAG_ID, storedImageName } from '../schema';
 import { paintDocToJson, type PaintDoc } from '../paint/document';
-import { createTextBlock, decodeHtmlAttr } from './blockHtml';
+import { createTextBlock } from './blockHtml';
 import { readBlockJson } from './blockJson';
 import { BLOCK_ATTR, type BlockInstance, type BlockTypeId } from './types';
 

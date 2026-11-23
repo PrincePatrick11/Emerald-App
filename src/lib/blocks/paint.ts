@@ -1,6 +1,5 @@
-import { escapeHtml } from '../internalLinkHtml';
+import { escapeHtml, decodeHtmlAttr } from '../internalLinkHtml';
 import { generateId } from '../helpers';
-import { decodeHtmlAttr } from './blockHtml';
 import { readBlockData, withBlockData } from './blockJson';
 import { BLOCK_ATTR, type BlockInstance, type BlockTypeId } from './types';
 import { paintDocFromImage, paintDocFromJson, paintDocToJson, type PaintDoc } from '../paint/document';

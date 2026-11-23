@@ -11,6 +11,12 @@ export interface EntryLinkRequest {
   icon?: string | null;
   /** Heading above the appended link — see `SuggestionItem.categoryLabel`. */
   categoryLabel?: string;
+  /**
+   * Removing a link to a gone target, whose category is no longer known: the
+   * headings an appended link block could have been given (every category's
+   * label and the moon phases). Only consulted where `categoryLabel` would be.
+   */
+  headingLabels?: readonly string[];
   entry_number?: number | null;
 }
 
@@ -59,12 +65,13 @@ export function requestEntryLinkReveal(target: { id: string; targetKind: LinkTar
  * `categoryLabel` is part of it, even though it is not needed to find the link:
  * the editor only clears an appended link block together with its heading
  * if the heading's text is exactly this category. Without it, the heading
- * would stay.
+ * would stay. For a gone target, whose category is unknown, `headingLabels`
+ * stands in.
  */
 export const REMOVE_ENTRY_LINK_EVENT = 'entry-link-remove';
 
 export function requestEntryLinkRemove(
-  target: { id: string; targetKind: LinkTargetKind; categoryLabel?: string },
+  target: Pick<EntryLinkRequest, 'id' | 'targetKind' | 'categoryLabel' | 'headingLabels'>,
 ): boolean {
   const event = new CustomEvent(REMOVE_ENTRY_LINK_EVENT, {
     detail: target,
