@@ -22,7 +22,7 @@ export const TAG_LINKS = {
 export type TagOwner = keyof typeof TAG_LINKS;
 
 /** Ids bound per query, below SQLite's variable limit. */
-const SQL_PARAM_CHUNK = 500;
+export const SQL_PARAM_CHUNK = 500;
 
 /** A tag ID from a foreign source (backup): only harmless characters, like `isDefinitionId`. */
 export function isTagId(id: unknown): id is string {

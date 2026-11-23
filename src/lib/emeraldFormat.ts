@@ -29,6 +29,7 @@ import type { WriteOptions } from './stamp';
 import { displayTitle, hasOwnTitle } from './entryTitle';
 import { compressDataUrl } from './imageCompression';
 import { exportDefaultPath } from './vaultManager';
+import { imageDetailsOf, importImageDetails } from './emerald/imageDetails';
 import {
   definitionImageRefs, parseDefinitionElements, remapDefinitionDefaults, type LinkDefaultResolver,
 } from './blocks/definitions';
@@ -152,7 +153,8 @@ export interface EmeraldExportItem {
  *
  * Always along, without a setting: category (a built-in or starter one with
  * its ID) and tags by name, icons, cover, the copies of custom blocks in the
- * content and concealed sigils (concealed).
+ * content, concealed sigils (concealed), and name, note and tags (by name) of
+ * the pictures that are in "Images".
  */
 export interface EmeraldExportOptions {
   items: readonly EmeraldExportItem[];
@@ -282,6 +284,8 @@ export async function writeEmeraldFile(path: string, options: EmeraldExportOptio
     links: collectContentLinks(contents),
     omittedImages,
     blockDefinitions,
+    // Name, note and tags of the pictures the file carries; a left-out one is a placeholder there.
+    images: await imageDetailsOf(await getDb(), images.map((image) => image.name)),
   };
   await writeArchive(path, 'items', JSON.stringify(manifest), images, [...icons], options.protection ?? { type: 'none' });
 }
@@ -527,14 +531,17 @@ async function resolveFileCategories(items: readonly ManifestItem[]): Promise<Ma
  * one is usable at once, at the end of the Blocks view. Its prefilled pictures
  * and its icon point at the files stored here; a prefilled link only at an
  * entry of the same file (the export keeps no other), else it is dropped.
+ * Returns the rows it added — not those this vault had already.
  */
 async function importBlockDefinitions(
   rows: readonly ManifestBlockDefinition[],
   imageNames: ReadonlyMap<string, string>,
   iconNames: ReadonlyMap<string, string>,
   idMap: ReadonlyMap<string, string>,
-): Promise<void> {
-  if (rows.length === 0) return;
+): Promise<ManifestBlockDefinition[]> {
+  if (rows.length === 0) return [];
+  const db = await getDb();
+  const known = new Set((await db.select<{ id: string }[]>('SELECT id FROM block_definitions')).map((r) => r.id));
   const pictures = new Map<string, string>();
   for (const row of rows) {
     for (const name of definitionPictures(row)) {
@@ -542,7 +549,6 @@ async function importBlockDefinitions(
       if (here) pictures.set(name, here);
     }
   }
-  const db = await getDb();
   let sortOrder = await nextDefinitionSortOrder(db);
   const fresh = rows.map((row) => ({
     ...row,
@@ -556,6 +562,19 @@ async function importBlockDefinitions(
     const id = idMap.get(t.id);
     return id ? { id, label: t.label } : null;
   }));
+  return rows.filter((row) => !known.has(row.id));
+}
+
+/** The hash parts of the pictures the items use — content and cover — and the definitions prefill. */
+function importedPictureStems(items: readonly ManifestItem[], definitions: readonly ManifestBlockDefinition[]): Set<string> {
+  const names = [
+    ...items.flatMap((item) => [
+      ...storedFilesOf(blocksToContent(item.blocks)).images,
+      ...(item.kind === 'entry' && item.cover ? [item.cover] : []),
+    ]),
+    ...definitions.flatMap(definitionPictures),
+  ];
+  return new Set(names.map(storedNameStem));
 }
 
 /** The stored names of the pictures a definition row prefills. */
@@ -570,8 +589,9 @@ function definitionPictures(row: ManifestBlockDefinition): string[] {
  * first, all of them, so that links between items of the same file can point
  * at the new ones (and at the ones already here that were left out); then
  * each gets its content, category, tags, icon and cover. If a step fails, the
- * entries and templates created are removed again; categories and custom
- * blocks it found missing stay, as they would after a successful import. `storedImages`/`iconNames`: the hash part of
+ * entries and templates created are removed again; categories, custom blocks
+ * and pictures' details it found missing stay, as they would after a
+ * successful import. `storedImages`/`iconNames`: the hash part of
  * a name in the file → the name stored here.
  */
 async function importManifest(
@@ -657,7 +677,16 @@ async function importManifest(
     // before here would have removed again. The copies need no definition.
     // Only the definitions the imported items' copies came from.
     const used = new Set(usedDefinitionIds(items.map((item) => blocksToContent(item.blocks))));
-    await importBlockDefinitions(manifest.blockDefinitions.filter((row) => used.has(row.id)), imageNames, iconNames, relinkMap);
+    const definitions = manifest.blockDefinitions.filter((row) => used.has(row.id));
+    // One this vault has already (also in the trash) stays as it is — its prefills bring no details either.
+    const added = await importBlockDefinitions(definitions, imageNames, iconNames, relinkMap);
+    // The pictures of what came in, with their name, note and tags — not those
+    // only items left out use. `storedImages`, not `imageNames`: there a
+    // left-out picture is the placeholder, which must not take its details.
+    // "Images" reloads with the modules afterwards (`showImportedItems`).
+    const pictures = importedPictureStems(items, added);
+    const details = manifest.images.filter((image) => pictures.has(storedNameStem(image.file)));
+    await importImageDetails(await getDb(), details, storedImages, ensureTagIds);
     return result;
   } catch (err) {
     await Promise.allSettled([

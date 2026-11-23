@@ -1302,6 +1302,20 @@ console.log('\n8. .emerald manifest (lib/emerald/manifest.ts)\n');
   ] }));
   check('more items than the limit are refused as too large',
     parseManifest(JSON.stringify({ ...manifest, items: Array.from({ length: 1001 }, () => manifest.items[2]) })) === 'tooLarge');
+  check('more picture details than the limit are refused as too large',
+    parseManifest(JSON.stringify({ ...manifest, images: Array.from({ length: 50_001 }, () => ({ file: pic })) })) === 'tooLarge');
+  const details = parseManifest(JSON.stringify({ ...manifest, images: [
+    { file: pic, name: '  Moon ', note: 7, tags: [' a ', 'a', '', 5, 'x'.repeat(101), ...Array.from({ length: 200 }, (_, i) => `t${i}`)] },
+    { file: '../evil.png', name: 'x' },
+    'x',
+    null,
+  ] }));
+  check('picture details from a foreign file: a stored name only, the name trimmed, tags bounded and once each',
+    typeof details === 'object' && details.images.length === 1 && details.images[0].name === 'Moon' && details.images[0].note === ''
+      && details.images[0].tags.length === 100 && details.images[0].tags[0] === 'a' && !details.images[0].tags.some((t) => t.length > 100),
+    typeof details === 'object' ? details.images : details);
+  check('a file without picture details reads as none', typeof parseManifest(JSON.stringify(manifest)) === 'object'
+    && parseManifest(JSON.stringify(manifest)).images.length === 0);
   const shortId = parseManifest(JSON.stringify({ ...manifest, items: [{ ...manifest.items[0], id: 'e' }, manifest.items[2]] }));
   const twice = parseManifest(JSON.stringify({ ...manifest, items: [manifest.items[0], { ...manifest.items[1], id: idA }] }));
   check('an item ID that appears twice is taken once', typeof twice === 'object' && twice.items.length === 1, twice);

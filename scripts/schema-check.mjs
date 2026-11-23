@@ -139,7 +139,8 @@ writeFileSync(
    export { invalidateVaultCache } from '${root}/src/lib/vaultManager';
    export { clearSavedBlocks, readContents, replaceOwnerBlocks } from '${root}/src/lib/blockStore';
    export { entriesWithFieldValue } from '${root}/src/lib/blocks/blockQuery';
-   export { collectImageUses } from '${root}/src/lib/imageUsage';`
+   export { collectImageUses } from '${root}/src/lib/imageUsage';
+   export { imageDetailsOf, importImageDetails } from '${root}/src/lib/emerald/imageDetails';`
 );
 
 const bundlePath = join(workDir, 'bundle.mjs');
@@ -180,6 +181,7 @@ const {
   resolveImportedCategories, vaultContentOf, vaultManifestOf, FULL_BACKUP_OPTIONS, prepareRawDatabase,
   categoryRowsOf, contentToBlocks, manifestCategoryOf, parseManifest, parseVaultManifest, usedDefinitionIds, EMERALD_FORMAT_VERSION,
   invalidateVaultCache, clearSavedBlocks, readContents, replaceOwnerBlocks, entriesWithFieldValue, collectImageUses,
+  imageDetailsOf, importImageDetails,
 } = await import(pathToFileURL(bundlePath).href);
 
 const now = new Date().toISOString();
@@ -1172,6 +1174,91 @@ console.log('\n11. .vault.emerald: the round trip of a vault content, other vers
     const definitions = await itemDst.select('SELECT id, name FROM block_definitions WHERE id = $1', [DEF]);
     check('.emerald: the custom block is created, and recognised by its ID the second time', definitions.length === 1 && definitions[0].name === 'Plant', definitions);
     itemDst.close();
+  }
+
+  // ── A .emerald file of entries: the pictures in "Images" bring name, note and tags ──
+  {
+    const pic = (c) => `${c.repeat(64)}.png`;
+    const src = await freshVault('items-images-src.db');
+    await src.execute("INSERT INTO tags (id, name, color) VALUES ('t-night', 'Night', '#111111'), ('t-fresh', 'Fresh', '#222222'), ('t-gone', 'Gone', '#333333')");
+    await src.execute("UPDATE tags SET deleted_at = $1 WHERE id = 't-gone'", [now]);
+    await src.execute(
+      `INSERT INTO images (id, file, name, note, created_at, updated_at) VALUES
+         ('img-moon', $1, 'Moon', 'Over the hill', $4, $4),
+         ('img-bare', $2, '', '', $4, $4),
+         ('img-trash', $3, 'Trashed', '', $4, $4)`,
+      [pic('a'), pic('b'), pic('c'), now],
+    );
+    await src.execute("UPDATE images SET deleted_at = $1 WHERE id = 'img-trash'", [now]);
+    await src.batch(tagStatements('image', 'img-moon', ['t-night', 't-fresh', 't-gone']));
+    const details = await imageDetailsOf(src, [pic('a'), pic('b'), pic('c'), pic('d')]);
+    const moon = details.find((d) => d.file === pic('a'));
+    check('.emerald: a picture in "Images" goes with name, note and its live tags in order; one in the trash or not there without',
+      details.length === 2 && moon?.name === 'Moon' && moon.note === 'Over the hill' && moon.tags.join() === 'Night,Fresh'
+        && !details.some((d) => d.file === pic('c')), details);
+    const manifest = {
+      format: 'emerald', version: EMERALD_FORMAT_VERSION, kind: 'items', exportedAt: now, links: [], omittedImages: [], blockDefinitions: [],
+      items: [{ kind: 'entry', id: '7c000000-0000-4000-8000-0000000000aa', title: 'Pictures', number: null, createdAt: now, updatedAt: now, icon: '', cover: null, tags: [], category: null, blocks: [] }],
+      images: [...details, { file: 'not-a-picture', name: 'x', note: '', tags: [] }],
+    };
+    const parsed = parseManifest(JSON.stringify(manifest));
+    check('.emerald: the manifest reads the pictures\' details, a foreign file name dropped',
+      typeof parsed === 'object' && parsed.images.length === 2 && parsed.images[0].tags.join() === 'Night,Fresh', parsed?.images);
+
+    /** Tag names → IDs as the import does: an existing tag by name regardless of case, else a new one. */
+    const tagIdsIn = (db) => async (names) => {
+      const ids = [];
+      for (const name of names) {
+        const [hit] = await db.select('SELECT id FROM tags WHERE lower(name) = lower($1)', [name]);
+        const id = hit?.id ?? `t-new-${name}`;
+        if (!hit) await db.execute("INSERT INTO tags (id, name, color) VALUES ($1, $2, '#00ff00')", [id, name]);
+        ids.push(id);
+      }
+      return ids;
+    };
+    const storedBy = (pairs) => new Map(pairs.map(([from, to]) => [from.replace(/\.[a-z]+$/, ''), to]));
+
+    // Another vault: "night" is there with its own colour, "Fresh" is not.
+    const dst = await freshVault('items-images-dst.db');
+    await dst.execute("INSERT INTO tags (id, name, color) VALUES ('t-local', 'night', '#abcdef')");
+    // The moon was stored under another name (compressed on export); the bare one did not come.
+    const changed = await importImageDetails(dst, parsed.images, storedBy([[pic('a'), pic('e')]]), tagIdsIn(dst));
+    const [arrived] = await dst.select('SELECT id, name, note, deleted_at FROM images WHERE file = $1', [pic('e')]);
+    const arrivedTags = arrived ? (await readTagLinks(dst, 'image', [arrived.id])).get(arrived.id) ?? [] : [];
+    const [local] = await dst.select("SELECT color FROM tags WHERE id = 't-local'");
+    check('.emerald into another vault: the picture arrives in "Images" with name, note and both tags',
+      changed === 1 && arrived?.name === 'Moon' && arrived.note === 'Over the hill' && arrived.deleted_at === null
+        && arrivedTags.join() === 't-local,t-new-Fresh', { changed, arrived, arrivedTags });
+    check('.emerald into another vault: an existing tag keeps its colour and gains no namesake',
+      local?.color === '#abcdef' && (await dst.select("SELECT COUNT(*) AS n FROM tags WHERE lower(name) = 'night'"))[0].n === 1, local);
+    check('.emerald into another vault: a picture the file did not bring gets no details',
+      (await dst.select('SELECT COUNT(*) AS n FROM images'))[0].n === 1);
+    check('.emerald into another vault: importing again changes nothing',
+      await importImageDetails(dst, parsed.images, storedBy([[pic('a'), pic('e')]]), tagIdsIn(dst)) === 0
+        && (await dst.select('SELECT COUNT(*) AS n FROM images'))[0].n === 1);
+    dst.close();
+
+    // The same vault: one picture per file; a name and note it has stay, an
+    // empty one is filled, tags are added; one in the trash comes back.
+    await src.execute("UPDATE images SET name = 'Renamed here' WHERE id = 'img-moon'");
+    await src.batch(tagStatements('image', 'img-moon', ['t-night']));
+    const same = [
+      { ...moon, note: 'From the file' },
+      { file: pic('b'), name: 'Named in the file', note: 'Note', tags: [] },
+      { file: pic('c'), name: 'Other', note: '', tags: ['Night'] },
+    ];
+    await importImageDetails(src, same, storedBy([[pic('a'), pic('a')], [pic('b'), pic('b')], [pic('c'), pic('c')]]), tagIdsIn(src));
+    const rows = new Map((await src.select('SELECT id, name, note, deleted_at FROM images')).map((r) => [r.id, r]));
+    const sameTags = await readTagLinks(src, 'image');
+    check('.emerald into the same vault: no second picture, its own name and note stay, its tags come back',
+      rows.size === 3 && rows.get('img-moon').name === 'Renamed here' && rows.get('img-moon').note === 'Over the hill'
+        && sameTags.get('img-moon')?.join() === 't-night,t-fresh', { rows: [...rows.values()], tags: [...sameTags] });
+    check('.emerald into the same vault: an unnamed picture takes the name and note of the file',
+      rows.get('img-bare').name === 'Named in the file' && rows.get('img-bare').note === 'Note', rows.get('img-bare'));
+    check('.emerald into the same vault: a picture in the trash comes back, keeping its name',
+      rows.get('img-trash').deleted_at === null && rows.get('img-trash').name === 'Trashed'
+        && sameTags.get('img-trash')?.join() === 't-night', rows.get('img-trash'));
+    src.close();
   }
 
 

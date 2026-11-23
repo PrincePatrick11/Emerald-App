@@ -106,6 +106,18 @@ export interface ManifestLink {
   title: string;
 }
 
+/**
+ * The details of a picture taken into "Images" (table `images`) that travels
+ * in the file: by its stored name in the archive, with its name, note and the
+ * names of its tags — tags go by name, as an item's do; their colour stays.
+ */
+export interface ManifestImage {
+  file: string;
+  name: string;
+  note: string;
+  tags: string[];
+}
+
 export interface EmeraldManifest {
   format: 'emerald';
   version: typeof EMERALD_FORMAT_VERSION;
@@ -117,6 +129,8 @@ export interface EmeraldManifest {
   omittedImages: string[];
   /** The custom blocks the items' copies came from — empty when the export left them out. */
   blockDefinitions: ManifestBlockDefinition[];
+  /** The details of the file's pictures that are in "Images" here — not of left-out ones. */
+  images: ManifestImage[];
 }
 
 /**
@@ -201,7 +215,10 @@ export type ManifestProblem = 'oldVersion' | 'newVersion' | 'unsupported' | 'too
  * the bytes turn into — every item is a write of its own, so a crafted
  * manifest of tiny items could otherwise keep the app busy for hours.
  */
-export const MANIFEST_LIMITS = { items: 1000, blocks: 50_000, links: 50_000 } as const;
+// `images`, `imageTags`, `imageTagName`: a picture's details — how many, how
+// many tags each, how long a tag name (as the backup's `TAG_NAME_MAX`, but a
+// longer one is dropped, not cut). `items` is mirrored in Rust (`check:schema`).
+export const MANIFEST_LIMITS = { items: 1000, blocks: 50_000, links: 50_000, images: 50_000, imageTags: 100, imageTagName: 100 } as const;
 
 /** What `generateId` makes. An entry's ID in a file must be one: re-linking replaces it wherever it stands. */
 const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
@@ -305,7 +322,8 @@ export function parseManifest(json: string): EmeraldManifest | ManifestProblem {
   if (typeof raw === 'string') return raw;
   if ((Array.isArray(raw.blockDefinitions) && raw.blockDefinitions.length > MANIFEST_LIMITS.items)
     || (Array.isArray(raw.items) && raw.items.length > MANIFEST_LIMITS.items)
-    || (Array.isArray(raw.links) && raw.links.length > MANIFEST_LIMITS.links)) return 'tooLarge';
+    || (Array.isArray(raw.links) && raw.links.length > MANIFEST_LIMITS.links)
+    || (Array.isArray(raw.images) && raw.images.length > MANIFEST_LIMITS.images)) return 'tooLarge';
   // An ID twice would create an entry nothing ever fills: the first one stays.
   const seen = new Set<string>();
   const items = (Array.isArray(raw.items) ? raw.items.map(readItem) : [])
@@ -320,6 +338,7 @@ export function parseManifest(json: string): EmeraldManifest | ManifestProblem {
   const blockDefinitions = Array.isArray(raw.blockDefinitions)
     ? raw.blockDefinitions.filter((d): d is ManifestBlockDefinition => isRecord(d) && isRowId(d.id))
     : [];
+  const images = Array.isArray(raw.images) ? raw.images.flatMap(readImage) : [];
   return {
     format: 'emerald',
     version: EMERALD_FORMAT_VERSION,
@@ -329,12 +348,28 @@ export function parseManifest(json: string): EmeraldManifest | ManifestProblem {
     links,
     omittedImages: strings(raw.omittedImages),
     blockDefinitions,
+    images,
   };
+}
+
+/**
+ * A picture's details from the file — none without a stored name. Tag names
+ * trimmed, empty and overlong ones dropped, at most `MANIFEST_LIMITS.imageTags`:
+ * each new one is a tag created on import.
+ */
+function readImage(raw: unknown): ManifestImage[] {
+  if (!isRecord(raw) || typeof raw.file !== 'string' || !STORED_NAME_ONLY_RE.test(raw.file)) return [];
+  const names = strings(raw.tags).map((t) => t.trim()).filter((t) => t && t.length <= MANIFEST_LIMITS.imageTagName);
+  const tags = [...new Set(names)].slice(0, MANIFEST_LIMITS.imageTags);
+  return [{ file: raw.file, name: text(raw.name).trim(), note: text(raw.note), tags }];
 }
 
 /* ---------------- Rewriting the content ---------------- */
 
-const STORED_NAME_RE = /\b([0-9a-f]{64})\.(?:png|jpe?g|gif|webp|svg)\b/g;
+/** A stored picture's name: its hash, then its type. */
+const STORED_NAME = String.raw`([0-9a-f]{64})\.(?:png|jpe?g|gif|webp|svg)`;
+const STORED_NAME_RE = new RegExp(String.raw`\b${STORED_NAME}\b`, 'g');
+const STORED_NAME_ONLY_RE = new RegExp(`^${STORED_NAME}$`);
 
 /** The hash part of a stored name — what the archive's pictures are matched by. */
 export function storedNameStem(name: string): string {
