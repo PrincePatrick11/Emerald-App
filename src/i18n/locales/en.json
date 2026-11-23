@@ -1018,7 +1018,7 @@
     "includeDeleted": "Include deleted items",
     "importMode": "Import mode",
     "modeMerge": "Merge",
-    "modeMergeDesc": "Add all entries alongside existing ones (each entry gets a unique ID prefix)",
+    "modeMergeDesc": "Add all entries as copies alongside the existing ones – nothing already here is overwritten",
     "modeReplace": "Replace",
     "modeReplaceDesc": "Delete all current data and restore from the file",
     "modeAddVault": "New Vault",

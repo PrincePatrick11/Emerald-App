@@ -1018,7 +1018,7 @@
     "includeDeleted": "Inclure les éléments supprimés",
     "importMode": "Mode d'importation",
     "modeMerge": "Fusionner",
-    "modeMergeDesc": "Ajouter toutes les entrées aux existantes (chaque entrée reçoit un préfixe d'ID unique)",
+    "modeMergeDesc": "Ajouter toutes les entrées comme copies – rien d'existant n'est écrasé",
     "modeReplace": "Remplacer",
     "modeReplaceDesc": "Supprimer toutes les données actuelles et restaurer depuis le fichier",
     "modeAddVault": "Nouveau vault",

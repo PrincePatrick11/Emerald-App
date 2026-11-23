@@ -8,7 +8,7 @@
  *
  * Import modes:
  *   replace  — wipe the current vault and restore from the file
- *   merge    — insert all rows with a date-based ID prefix (no overwrites)
+ *   merge    — insert all entries and tasks under fresh IDs (no overwrites)
  *   add-vault — create a new vault from the file and switch to it
  *
  * A raw backup (the automatic backup's `.vault.emerald`, `raw_backup.rs`)
@@ -1077,7 +1077,7 @@ function fileBlockRow(row: Row): StoredBlockRow | null {
 
 /**
  * The blocks of a file, for the owners the import has just inserted:
- * `owners` maps an owner's ID in the file to its ID here (the merge prefix), and
+ * `owners` maps an owner's ID in the file to its ID here (a merge's fresh one), and
  * an owner not in it — filtered out, or a template that already existed here —
  * gets none. Each block goes through `remapBlock` (pictures, and on a merge the
  * IDs) and keeps its position and time (`copyBlockStatements`); `block_refs`
@@ -1545,7 +1545,7 @@ export async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: V
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Merge import (ID-prefix strategy)
+// Merge import (fresh IDs)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: VaultContent, files: ImportedFiles): Promise<void> {
@@ -1558,18 +1558,17 @@ export async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: Vau
   await assertPayloadReferencesResolve(db, d);
   const { map: catMap, startTemplates } = await resolveImportedCategories(db, usedCategoryRows(d));
 
-  // Prefix = base36 encoding of current timestamp (8 chars, unique per merge)
-  const prefix = Date.now().toString(36).slice(-8);
-  const pid = (id: string) => `${prefix}-${id}`;
-
-  // Build id maps for every entity type
-  const allOldIds = new Set<string>([
-    ...(d.entries ?? []).map((r: Row) => r.id as string),
-    ...(d.tasks ?? []).map((r: Row) => r.id as string),
-  ]);
-
+  // Every entry and task arrives under a fresh ID of its own — a plain UUID like
+  // one created here, so a copy is an entry like any other (a `.emerald` file
+  // only carries entries with such IDs). No conflicts with what is here, even
+  // when the same file is merged twice.
+  const newIds = new Map<string, string>();
+  for (const r of [...(d.entries ?? []), ...(d.tasks ?? [])] as Row[]) {
+    const id = r.id as string;
+    if (!newIds.has(id)) newIds.set(id, generateId());
+  }
   /** The ID here of an entry or task of the file; `undefined` for any other ID. */
-  const nextId = (id: string): string | undefined => (allOldIds.has(id) ? pid(id) : undefined);
+  const nextId = (id: string): string | undefined => newIds.get(id);
   function remapId(id: unknown): unknown {
     return typeof id === 'string' ? nextId(id) ?? id : id;
   }
@@ -1583,7 +1582,8 @@ export async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: Vau
 
   function remapEntry(row: Row, imagePaths: string[], idFields: string[], numbered = false): Row {
     const out = remapRow(row, imagePaths, pathMap);
-    out.id = pid(out.id as string);
+    // Every row here is one of `d.entries`/`d.tasks`, which filled `newIds`.
+    out.id = nextId(out.id as string)!;
     if (numbered && out.entry_number != null) {
       out.entry_number = Number(out.entry_number) + offset;
     }
@@ -1601,23 +1601,23 @@ export async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: Vau
   ), catMap);
   const taskLinks = (d.taskLinks ?? []).map((r: Row) => ({
     ...r,
-    id: pid(r.id as string),
+    id: generateId(),
     task_id: remapId(r.task_id),
     target_id: remapId(r.target_id),
   }));
 
   // Categories and tags are already resolved (resolveImportedCategories,
   // importTagsAndRemap above).
-  // Without prefix, so that a block arriving twice stays one.
+  // Under the file's own ID, so that a block arriving twice stays one.
   // Link defaults point to the renamed entries, like the chips in the content.
   await insertBlockDefinitions(
     db, remapDefinitionRows(d.blockDefinitions, pathMap, (t) => ({ id: String(remapId(t.id)), label: t.label })),
   );
-  // Without prefix, like the definitions.
+  // Under the file's own ID, like the definitions.
   const templateIds = await insertTemplates(db, d.templates);
   await applyStartTemplates(db, startTemplates);
   await importDashboards(db, d.dashboards, catMap, 'merge');
-  // Without prefix like the two above: a language stands on its own, its ID
+  // Under the file's own ID like the two above: a language stands on its own, its ID
   // appears in no entry.
   await insertLexicon(db, d.languages, d.lexiconEntries);
   // By file, like the replace: a picture that is already here stays as it is.
@@ -1625,13 +1625,13 @@ export async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: Vau
   // The same for own symbols: an element on an altar keeps its own copy of the path.
   await insertSymbols(db, d.symbols);
 
-  // Content: plain INSERT with prefixed IDs (no conflicts possible)
+  // Content: plain INSERT with fresh IDs (no conflicts possible)
   await insertRows(db, 'entries', entries);
   await numberUnnumbered(db);
-  // The blocks under the prefixed owners, their pictures and links pointed here like the rows'.
+  // The blocks under the new owners, their pictures and links pointed here like the rows'.
   const inserted = new Set(entries.map((r) => String(r.id)));
-  const owners = new Map([...allOldIds].filter((id) => inserted.has(pid(id))).map((id) => [id, pid(id)]));
-  await insertTagLinks(db, 'entry', d.entries, (id) => (inserted.has(pid(id)) ? pid(id) : undefined));
+  const owners = new Map([...newIds].filter(([, to]) => inserted.has(to)));
+  await insertTagLinks(db, 'entry', d.entries, (id) => owners.get(id));
   await insertImportedBlocks(db, d.blocks, 'entry', owners, { images: fileMap, id: nextId });
   await insertImportedBlocks(db, d.blocks, 'template', new Map(templateIds.map((id) => [id, id])), { images: fileMap, id: nextId });
   await insertTasks(db, tasks);

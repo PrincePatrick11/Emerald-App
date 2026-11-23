@@ -4,7 +4,7 @@ import { BLOCK_ATTR, type BlockInstance } from './types';
 /**
  * A block brought along by an import, pointed at the vault it arrives in:
  * the pictures under the names they were stored under here, and — on a merge,
- * where the entries arrive under prefixed IDs — every link at the new ID.
+ * where the entries arrive under fresh IDs — every link at the new ID.
  *
  * Pictures are named after their content (a hash), so a name is replaced
  * wherever it stands: in the markup and in every attribute, the JSON of a

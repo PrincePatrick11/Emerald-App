@@ -1011,23 +1011,28 @@ console.log('\n11. .vault.emerald: the round trip of a vault content, other vers
   check("restore: schema identical to the fresh vault", JSON.stringify(await readSchema(dst)) === JSON.stringify(schemaA));
   dst.close();
 
-  // (b) Merge into the vault it came from: copies under prefixed IDs, links pointing at the copies.
+  // (b) Merge into the vault it came from: copies under fresh IDs, links pointing at the copies.
   clearSavedBlocks();
   const again = asFile(collected);
   await doMerge(src, again.content, again.files);
-  const [copy] = await src.select('SELECT id FROM entries WHERE id LIKE $1', [`%-${J}`]);
-  const prefixed = copy ? copy.id.slice(0, copy.id.length - J.length) + W : null;
+  const copyOf = async (id) => (await src.select(
+    'SELECT c.id FROM entries c JOIN entries o ON o.id = $1 WHERE c.title = o.title AND c.id <> o.id', [id]))[0] ?? null;
+  // By title: J's and W's titles are unique in this fixture.
+  const copy = await copyOf(J);
+  const copyWId = (await copyOf(W))?.id ?? null;
+  const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+  check('merge: the copies carry plain UUIDs, as a .emerald file requires',
+    !!copy && uuidRe.test(copy.id) && !!copyWId && uuidRe.test(copyWId), { copy, copyWId });
   const copyStack = copy ? await stackOf(src, 'entry', copy.id) : '';
   check("merge: the copy's chip and link prefill point at the copied target",
-    !!copy && copyStack.includes(`data-id="${prefixed}"`) && !copyStack.includes(`data-id="${W}"`)
-      && copyStack.includes(`&quot;id&quot;:&quot;${prefixed}&quot;`), copyStack);
+    !!copy && copyStack.includes(`data-id="${copyWId}"`) && !copyStack.includes(`data-id="${W}"`)
+      && copyStack.includes(`&quot;id&quot;:&quot;${copyWId}&quot;`), copyStack);
   check("merge: the copy's references to entries point at the copied target",
-    !!copy && (await refRows(src, 'entry', copy.id)).filter((r) => r.target_kind === 'entry').every((r) => r.target === prefixed));
+    !!copy && (await refRows(src, 'entry', copy.id)).filter((r) => r.target_kind === 'entry').every((r) => r.target === copyWId));
   check("merge: the original keeps its blocks", JSON.stringify(await blockRows(src, 'entry', J)) === JSON.stringify(journalBefore));
   check("merge: a template that is already there gets no second set of blocks", (await blockRows(src, 'template', TPL)).length === 1);
-  const copyW = copy ? copy.id.slice(0, copy.id.length - J.length) + W : null;
   check('merge: the copy carries the tags of its original, the template keeps its own',
-    !!copyW && (await readTagLinks(src, 'entry', [copyW])).get(copyW)?.join() === 't-b,t-a' && (await readTagLinks(src, 'template', [TPL])).get(TPL)?.join() === 't-a');
+    !!copyWId && (await readTagLinks(src, 'entry', [copyWId])).get(copyWId)?.join() === 't-b,t-a' && (await readTagLinks(src, 'template', [TPL])).get(TPL)?.join() === 't-a');
   src.close();
 
   // (c) A partial replace — journal and tasks only: no other owner gets blocks, a link to the missing article goes.
@@ -1117,7 +1122,7 @@ console.log('\n11. .vault.emerald: the round trip of a vault content, other vers
   clearSavedBlocks();
   const mergeFile = asFile(dreamsBackup);
   await doMerge(mergeDst, mergeFile.content, mergeFile.files);
-  const [merged] = await mergeDst.select("SELECT category_id FROM entries WHERE id LIKE '%-dream-1'");
+  const [merged] = await mergeDst.select("SELECT category_id FROM entries WHERE title = 'Tower'");
   check('merge after renaming a starter category: no duplicate, the entry lands in it',
     (await mergeDst.select('SELECT COUNT(*) AS n FROM categories'))[0].n === mergeBefore && merged?.category_id === 'dreams', merged);
   mergeDst.close();
@@ -1356,7 +1361,7 @@ console.log('\n12. The raw backup: an open and a closed vault, replaced and merg
     clearSavedBlocks();
     const again = await readRaw(copyPath);
     await doMerge(replaced, again.content, again.files);
-    const copies = await replaced.select('SELECT id, category_id FROM entries WHERE id LIKE $1', [`%-${id}`]);
+    const copies = await replaced.select('SELECT id, category_id FROM entries WHERE title = $1 AND id <> $2', [title, id]);
     check(`raw backup of ${label}, merged: a copy beside the original, in the same starter category`,
       copies.length === 1 && copies[0].category_id === 'dreams'
         && (await replaced.select('SELECT COUNT(*) AS n FROM entries WHERE id = $1', [id]))[0].n === 1

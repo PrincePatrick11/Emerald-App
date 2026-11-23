@@ -1,4 +1,5 @@
 import type { LinkTargetKind } from '../types';
+import { ITEM_ID_RE } from './helpers';
 import { htmlTags } from './htmlTags';
 
 /**
@@ -101,7 +102,7 @@ const DATA_ID_ATTR_RE = /\bdata-id=("[^"]*"|'[^']*')/i;
 
 /**
  * Points every chip whose target `next` knows at the new ID — the merge
- * import, where the same entries arrive under prefixed IDs. A chip `next`
+ * import, where the same entries arrive under fresh IDs. A chip `next`
  * returns `undefined` for stays as it is.
  *
  * Via the start tag like `extractInternalLinks`: no DOM (the schema harness
@@ -195,8 +196,6 @@ export function remapInternalLinks(
 }
 
 const VALID_TARGET_KINDS: readonly string[] = ['entry', 'task'];
-/** Standard UUIDs and the 8-character prefix put in front of them on merge import. */
-const LINK_ID_RE = /^([0-9a-z]{8}-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Is this a plausible link target? The link events travel via
@@ -209,7 +208,7 @@ const LINK_ID_RE = /^([0-9a-z]{8}-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]
 export function isValidLinkTarget(target: { id?: unknown; targetKind?: unknown } | null | undefined): boolean {
   if (!target) return false;
   return typeof target.id === 'string'
-    && LINK_ID_RE.test(target.id)
+    && ITEM_ID_RE.test(target.id)
     && VALID_TARGET_KINDS.includes(String(target.targetKind).trim());
 }
 

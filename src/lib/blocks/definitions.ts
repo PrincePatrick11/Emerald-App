@@ -105,7 +105,7 @@ export type LinkDefaultResolver = (target: { id: string; targetKind: string; lab
 /**
  * The `elements` of a definition row from a foreign source with rewritten
  * defaults: image names via `image`, link targets via `link` (merge import
- * with prefix, `.emerald` by the ID of an entry of the same file). If `link` finds no target, the
+ * by the copies' fresh IDs, `.emerald` by the ID of an entry of the same file). If `link` finds no target, the
  * default is dropped — otherwise every new copy would carry a chip pointing
  * nowhere. Unreadable input comes back unchanged; reading validates anyway.
  */

@@ -1018,7 +1018,7 @@
     "includeDeleted": "Gelöschte Einträge einschließen",
     "importMode": "Import-Modus",
     "modeMerge": "Mergen",
-    "modeMergeDesc": "Alle Einträge neben bestehenden hinzufügen (jeder Eintrag erhält einen eindeutigen ID-Präfix)",
+    "modeMergeDesc": "Alle Einträge als Kopien hinzufügen – nichts Vorhandenes wird überschrieben",
     "modeReplace": "Ersetzen",
     "modeReplaceDesc": "Alle aktuellen Daten löschen und aus der Datei wiederherstellen",
     "modeAddVault": "Neuer Vault",

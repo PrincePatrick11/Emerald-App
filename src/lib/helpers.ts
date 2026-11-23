@@ -23,6 +23,13 @@ export function generateId(): string {
   return crypto.randomUUID();
 }
 
+/** What `generateId` makes. */
+export const UUID_PATTERN = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
+/** The prefix a merge import used to put in front of the UUIDs of its copies; vaults merged before still carry it. */
+export const LEGACY_MERGE_PREFIX = '[0-9a-z]{8}-';
+/** An entry's or task's ID as a whole value: a UUID, perhaps with the legacy merge prefix. */
+export const ITEM_ID_RE = new RegExp(`^(?:${LEGACY_MERGE_PREFIX})?${UUID_PATTERN}$`, 'i');
+
 export function nowIso(): string {
   return new Date().toISOString();
 }

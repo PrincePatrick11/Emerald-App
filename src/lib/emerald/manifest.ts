@@ -1,5 +1,5 @@
 import { parseBlocks, serializeBlocks } from '../blocks/blockHtml';
-import { asString, isRecord } from '../helpers';
+import { asString, isRecord, ITEM_ID_RE, LEGACY_MERGE_PREFIX, UUID_PATTERN } from '../helpers';
 import { fromBlockRow, toBlockRow, type BlockRowValues } from '../blocks/blockRows';
 import { FIELDS_BLOCK_TYPE, parseFields } from '../blocks/fields';
 
@@ -220,9 +220,15 @@ export type ManifestProblem = 'oldVersion' | 'newVersion' | 'unsupported' | 'too
 // longer one is dropped, not cut). `items` is mirrored in Rust (`check:schema`).
 export const MANIFEST_LIMITS = { items: 1000, blocks: 50_000, links: 50_000, images: 50_000, imageTags: 100, imageTagName: 100 } as const;
 
-/** What `generateId` makes. An entry's ID in a file must be one: re-linking replaces it wherever it stands. */
-const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
-const isUuid = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+/**
+ * An entry's ID in a file must be a UUID, perhaps with the prefix an older
+ * merge import put in front (`ITEM_ID_RE`): re-linking replaces it wherever it
+ * stands. `ENTRY_ID_IN_TEXT_RE` finds them in content: a prefix counts only
+ * at the start of a word, so none is cut out of a longer run of characters;
+ * the UUID itself needs no boundary, on purpose (it is unambiguous).
+ */
+const ENTRY_ID_IN_TEXT_RE = new RegExp(`(?:(?<![0-9a-z])${LEGACY_MERGE_PREFIX})?${UUID_PATTERN}`, 'gi');
+const isEntryId = (v: string) => ITEM_ID_RE.test(v);
 
 /** A category's or definition's ID from a file: harmless characters only, as `isDefinitionId`. */
 const isRowId = (v: unknown): v is string => typeof v === 'string' && /^[\w-]{1,100}$/.test(v);
@@ -265,7 +271,7 @@ function readItem(raw: unknown): ManifestItem | null {
   if (raw.kind === 'template') {
     return { kind: 'template', ...common, name: text(raw.name), title: text(raw.title) };
   }
-  if (raw.kind !== 'entry' || !isUuid(raw.id)) return null;
+  if (raw.kind !== 'entry' || !isEntryId(raw.id)) return null;
   const category = isRecord(raw.category) && typeof raw.category.name === 'string' && raw.category.name.trim()
     && isRowId(raw.category.id)
     ? { id: raw.category.id, name: raw.category.name, icon: text(raw.category.icon), builtin: raw.category.builtin === true }
@@ -391,12 +397,15 @@ export function renameStoredFiles(content: string, byStem: ReadonlyMap<string, s
 /**
  * Points every reference to an item of the same file at the item as it was
  * created here (`idMap`: ID in the file → new ID) — link chips and the link
- * slots of field blocks alike. Entry IDs are UUIDs (`parseManifest` takes no
- * other) and stand for nothing else; one pass, whatever the number of items.
+ * slots of field blocks alike. Entry IDs are UUIDs, perhaps prefixed
+ * (`parseManifest` takes no other), and stand for nothing else; one pass,
+ * whatever the number of items. An ID is replaced whole or not at all: a
+ * link to an older merge's copy that is not in the file keeps pointing at
+ * that copy, even when its original is.
  */
 export function relinkWithinFile(content: string, idMap: ReadonlyMap<string, string>): string {
   if (idMap.size === 0) return content;
-  return content.replace(UUID_RE, (id) => idMap.get(id) ?? id);
+  return content.replace(ENTRY_ID_IN_TEXT_RE, (id) => idMap.get(id) ?? id);
 }
 
 /** The picture each mode keeps: the gentlest one any item asks for wins. */

@@ -1322,6 +1322,17 @@ console.log('\n8. .emerald manifest (lib/emerald/manifest.ts)\n');
   check('an entry whose ID is no UUID is dropped', typeof shortId === 'object' && shortId.items.length === 1 && shortId.items[0].kind === 'template', shortId);
   check('re-linking replaces whole IDs only, in one pass',
     relinkWithinFile(`x${idA}y ${idA.slice(0, 8)}`, idMap) === `x${newA}y ${idA.slice(0, 8)}`);
+  // A copy an older merge import made carries its ID with an 8-character prefix.
+  const mergedId = `mf3k2x9q-${idB}`;
+  const merged = parseManifest(JSON.stringify({ ...manifest, items: [{ ...manifest.items[0], id: mergedId }] }));
+  check('an entry copied by an older merge (prefixed ID) is read', typeof merged === 'object' && merged.items[0]?.id === mergedId, merged);
+  const mergedMap = new Map([[mergedId, newB], [idA, newA]]);
+  check('a prefixed ID is re-linked whole',
+    relinkWithinFile(`a ${mergedId} b data-id="${mergedId}"`, mergedMap) === `a ${newB} b data-id="${newB}"`);
+  check('a link to an older merge copy outside the file keeps its ID, even when its original is in the file',
+    relinkWithinFile(`data-id="abcdefgh-${idA}" link:${idA}`, mergedMap) === `data-id="abcdefgh-${idA}" link:${newA}`);
+  check('a prefix is not cut out of a longer run of characters',
+    relinkWithinFile(`xabcdefgh-${idA}`, mergedMap) === `xabcdefgh-${newA}`);
   check('foreign values of the wrong type are dropped, not trusted',
     typeof hostile === 'object' && hostile.items.length === 1 && hostile.items[0].title === ''
       && hostile.items[0].tags.join() === 'ok' && hostile.items[0].category === null
