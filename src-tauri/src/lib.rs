@@ -907,6 +907,7 @@ pub fn run() {
             vault::register_vaults,
             vault::ensure_vault_dirs,
             vault::create_vault_dirs,
+            vault::discard_new_vault_dirs,
             vault::default_vault_dir,
             vault::new_vault_base_dir,
             vault::ensure_backup_dir,

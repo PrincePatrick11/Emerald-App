@@ -33,6 +33,7 @@ import {
   invalidateVaultCache,
   joinPath,
   newVaultRecord,
+  discardNewVaultDirs,
 } from './vaultManager';
 import { imageRefsInHtml, isStoredImage } from './images';
 import { clearSearchTextCache } from './searchText';
@@ -1744,7 +1745,7 @@ export async function importDatabase(
     const vaultId = vaultRecord.id;
 
     // 2. Register vault (writes to vaults.json)
-    await addVault(vaultRecord);
+    const createdRoot = await addVault(vaultRecord);
     invalidateVaultCache();
 
     // Before switching into the folder: then the new vault opens right away with
@@ -1764,9 +1765,12 @@ export async function importDatabase(
     // the answer were "keep editing", the old vault would stay active —
     // and step 4 would fill it instead of the new one.
     // If the user cancels at the new vault's password, the import is
-    // cancelled — and the just-created empty vault is removed again.
+    // cancelled — and the just-created empty vault is removed again, with the
+    // folder this attempt made (only if it is still empty).
     const switched = await useVaultStore.getState().switchVault(vaultId, { editsResolved: true }).catch(async (err: unknown) => {
       if (keyErrorOf(err) === VAULT_KEY_CANCELLED) {
+        // Before removeVault: the command needs the id still registered.
+        await discardNewVaultDirs(vaultId, createdRoot).catch((e: unknown) => console.warn('[backup] could not clean up the new vault folder', e));
         await useVaultStore.getState().removeVault(vaultId).catch((e: unknown) => console.warn('[backup] could not remove the new vault', e));
       }
       throw err;

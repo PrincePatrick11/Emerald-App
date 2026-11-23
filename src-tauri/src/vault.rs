@@ -555,17 +555,62 @@ pub fn register_vaults(app: tauri::AppHandle, vaults: Vec<VaultEntry>) -> Result
 /// Creates a new vault's directory tree. Called once, when the vault enters
 /// `vaults.json` — not on every open. The only place that builds a vault
 /// directory; see [`images_dir`] and [`ensure_vault_dirs`] for why.
+///
+/// Returns whether the vault directory itself did not exist before — what
+/// [`discard_new_vault_dirs`] needs to know to remove only what this call made.
 #[tauri::command]
-pub fn create_vault_dirs(app: tauri::AppHandle, vault_id: String) -> Result<(), String> {
+pub fn create_vault_dirs(app: tauri::AppHandle, vault_id: String) -> Result<bool, String> {
     let dir = vault_dir(&app, &vault_id)?;
-    std::fs::create_dir_all(dir.join(IMAGES_SUBDIR)).map_err(|e| e.to_string())?;
-    std::fs::create_dir_all(dir.join(ICONS_SUBDIR)).map_err(|e| e.to_string())?;
-    // `backups/` belongs from the start, not only from the first export — that
-    // way the structure of a vault folder is always the same. For vaults outside
-    // the allowed roots it stays empty without consequence (the export does not
-    // offer it there, see `ensure_backup_dir`), and an empty `backups/` does not
-    // stand in the way of deleting the folder.
-    std::fs::create_dir_all(dir.join(BACKUP_SUBDIR)).map_err(|e| e.to_string())
+    let created_root = !dir.exists();
+    create_vault_tree(&dir)?;
+    Ok(created_root)
+}
+
+/// The subfolders [`create_vault_tree`] builds and [`discard_vault_tree`] takes back.
+/// `backups/` belongs from the start, not only from the first export — that
+/// way the structure of a vault folder is always the same. For vaults outside
+/// the allowed roots it stays empty without consequence (the export does not
+/// offer it there, see `ensure_backup_dir`), and an empty `backups/` does not
+/// stand in the way of deleting the folder.
+const VAULT_SUBDIRS: [&str; 3] = [IMAGES_SUBDIR, ICONS_SUBDIR, BACKUP_SUBDIR];
+
+fn create_vault_tree(dir: &Path) -> Result<(), String> {
+    for sub in VAULT_SUBDIRS {
+        std::fs::create_dir_all(dir.join(sub)).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+/// Takes back what [`create_vault_dirs`] built when the vault never got a
+/// database (the import into a new vault was cancelled at the password).
+///
+/// Only the empty skeleton goes: the settings file the import wrote is
+/// removed by name, the three subfolders with plain `remove_dir`, which refuses
+/// anything that has content. The vault folder itself goes only if
+/// `remove_root` says this attempt created it, and then again only if it is
+/// empty by now. A folder that was there before, or holds anything else,
+/// stays. Errs only for an unregistered id; past that, never an error:
+/// leaving something behind is the safe outcome.
+#[tauri::command]
+pub fn discard_new_vault_dirs(app: tauri::AppHandle, vault_id: String, remove_root: bool) -> Result<(), String> {
+    discard_vault_tree(&vault_dir(&app, &vault_id)?, remove_root);
+    Ok(())
+}
+
+fn discard_vault_tree(dir: &Path, remove_root: bool) {
+    // A vault with a database is not a skeleton.
+    if dir.join(DB_FILE).exists() {
+        return;
+    }
+    for name in [SETTINGS_FILE, SETTINGS_TEMP_FILE] {
+        std::fs::remove_file(dir.join(name)).ok();
+    }
+    for sub in VAULT_SUBDIRS {
+        std::fs::remove_dir(dir.join(sub)).ok();
+    }
+    if remove_root {
+        std::fs::remove_dir(dir).ok();
+    }
 }
 
 /// Checks a vault's directory before its database is opened, and makes sure the
@@ -1111,6 +1156,37 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         dir
+    }
+
+    #[test]
+    fn discarding_removes_an_empty_skeleton_and_the_folder_if_asked() {
+        let root = scratch().join("v");
+        create_vault_tree(&root).unwrap();
+        write(&root.join(SETTINGS_FILE), "{}");
+        discard_vault_tree(&root, true);
+        assert!(!root.exists());
+    }
+
+    #[test]
+    fn discarding_keeps_the_folder_when_not_asked() {
+        let root = scratch().join("v");
+        create_vault_tree(&root).unwrap();
+        discard_vault_tree(&root, false);
+        assert!(root.is_dir());
+        assert_eq!(std::fs::read_dir(&root).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn discarding_leaves_foreign_content_and_databases_alone() {
+        let root = scratch().join("v");
+        create_vault_tree(&root).unwrap();
+        write(&root.join(BACKUP_SUBDIR).join("x.txt"), "x");
+        discard_vault_tree(&root, true);
+        assert!(root.join(BACKUP_SUBDIR).join("x.txt").is_file());
+        write(&root.join(DB_FILE), "db");
+        write(&root.join(SETTINGS_FILE), "{}");
+        discard_vault_tree(&root, true);
+        assert!(root.join(SETTINGS_FILE).is_file());
     }
 
     fn write(path: &Path, body: &str) {

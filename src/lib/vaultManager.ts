@@ -410,12 +410,15 @@ export async function newVaultRecord(
  * and the `add-vault` backup import. Creating the directory here means
  * `getDb()` never has to, which is what lets it treat a missing directory as
  * the error it is instead of silently starting an empty vault.
+ *
+ * Resolves to whether this call created the vault folder itself (see
+ * {@link discardNewVaultDirs}).
  */
-export async function addVault(vault: Vault): Promise<void> {
+export async function addVault(vault: Vault): Promise<boolean> {
   const data = await loadVaultsFile();
   await saveVaultsFile({ ...data, vaults: [...data.vaults, vault] });
   try {
-    await invoke('create_vault_dirs', { vaultId: vault.id });
+    return await invoke<boolean>('create_vault_dirs', { vaultId: vault.id });
   } catch (err) {
     // Registration has to happen first — `create_vault_dirs` resolves the
     // id against the registry and does not know an unregistered vault.
@@ -426,6 +429,16 @@ export async function addVault(vault: Vault): Promise<void> {
     await saveVaultsFile(data);
     throw err;
   }
+}
+
+/**
+ * Takes back the empty folder structure of a vault that never got a database
+ * (see `discard_new_vault_dirs`). `createdRoot` is what {@link addVault}
+ * returned: only then may the vault folder itself go, and even then only if
+ * it is empty. Call it while the vault is still registered.
+ */
+export function discardNewVaultDirs(id: string, createdRoot: boolean): Promise<void> {
+  return invoke('discard_new_vault_dirs', { vaultId: id, removeRoot: createdRoot });
 }
 
 export interface VaultPatch {
