@@ -91,7 +91,6 @@
     "templateDeleted": "Plantilla eliminada",
     "languageDeleted": "Idioma eliminado",
     "imageDeleted": "Imagen eliminada",
-    "wordDeleted": "Palabra eliminada",
     "dashboardDeleted": "Panel eliminado"
   },
   "createItem": {
@@ -1305,7 +1304,6 @@
     "defaultName": "Nuevo idioma",
     "name": "Nombre",
     "namePlaceholder": "Nombre del idioma",
-    "stats": "Tamaño",
     "wordCount": "{{count}} palabra",
     "wordCount_other": "{{count}} palabras",
     "textWordCount": "{{count}} palabra",

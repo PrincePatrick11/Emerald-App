@@ -91,7 +91,6 @@
     "templateDeleted": "Template deleted",
     "languageDeleted": "Language deleted",
     "imageDeleted": "Image deleted",
-    "wordDeleted": "Word deleted",
     "dashboardDeleted": "Dashboard deleted"
   },
   "createItem": {
@@ -1305,7 +1304,6 @@
     "defaultName": "New language",
     "name": "Name",
     "namePlaceholder": "Name of the language",
-    "stats": "Size",
     "wordCount": "{{count}} word",
     "wordCount_other": "{{count}} words",
     "textWordCount": "{{count}} word",

@@ -61,13 +61,11 @@ export type CollectionId = (typeof COLLECTION_IDS)[number];
 
 /**
  * Libraries whose entries open as a page of their own (`{ type, id }`).
- * Such a page is always in edit mode, gets its own tab and
- * needs the right sidebar.
+ * Such a page gets its own tab and needs the right sidebar; all three save
+ * only on "Done" (`LibraryPageFrame`, `useDraftPage`).
  *
- * Two of them — custom blocks and templates — only save on "Done"
- * (`LibraryPageFrame`, `useDraftPage`). The lexicon's language page does not:
- * it saves every row immediately and has no draft. What this list
- * governs is only the three things above, and that holds for all three.
+ * Custom blocks and templates are always in edit mode. A language of the
+ * lexicon opens to read and is edited with "Edit" (`mode: 'edit'`), like an entry.
  */
 const LIBRARY_VIEW_IDS = ['blocks', 'templates', 'lexicon'] as const;
 export type LibraryViewId = (typeof LIBRARY_VIEW_IDS)[number];

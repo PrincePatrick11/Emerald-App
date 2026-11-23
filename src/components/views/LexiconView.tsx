@@ -8,7 +8,8 @@ import { usePersistedFlag } from '../../hooks/usePersistedFlag';
 import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
 import CollapsibleGroupHeader from '../ui/CollapsibleGroupHeader';
 import BlockGlyph from '../blocks/BlockGlyph';
-import LanguagePage from '../lexicon/LanguagePage';
+import { LanguageEditor, LanguagePage } from '../lexicon/LanguagePage';
+import { useLanguageDraftStore } from '../../store/draftStore';
 import TranslatePanel from '../lexicon/TranslatePanel';
 import type { Language } from '../../types';
 import { createItem } from '../../lib/createItem';
@@ -18,7 +19,8 @@ import CollectionDashboard, { useCollectionState } from './CollectionDashboard';
 /**
  * The rail view "Lexicon", a collection like the others: the languages,
  * a click opens one as a page of its own
- * (`{ type: 'lexicon', id }`), where its words are. Below it the translate field — it works with all languages and therefore
+ * (`{ type: 'lexicon', id }`), where its words are — to read, and with
+ * "Edit" (`mode: 'edit'`) to edit like an entry. Below it the translate field — it works with all languages and therefore
  * belongs next to the list, not on a single language page.
  *
  * Deleting moves a language to the trash (with undo); its vocabulary
@@ -30,6 +32,7 @@ export default function LexiconView() {
   const restoreLanguage = useLexiconStore((s) => s.restoreLanguage);
   const activeView = useUIStore((s) => s.activeView);
   const setActiveView = useUIStore((s) => s.setActiveView);
+  const clearDraft = useLanguageDraftStore((s) => s.clearDraft);
 
   // An id without a language (deleted, another vault in the remembered tab) falls back to the list.
   const selected = activeView.id ? languages.find((l) => l.id === activeView.id) ?? null : null;
@@ -39,15 +42,28 @@ export default function LexiconView() {
   const create = () => createItem('lexicon');
 
   const remove = useLibraryItemRemove({
-    viewType: 'lexicon', remove: deleteLanguage, restore: restoreLanguage, undoKey: 'undo.languageDeleted', logTag: 'LexiconView',
+    viewType: 'lexicon', remove: deleteLanguage, restore: restoreLanguage, clearDraft, undoKey: 'undo.languageDeleted', logTag: 'LexiconView',
   });
+
+  if (selected && activeView.mode === 'edit') {
+    return (
+      <LanguageEditor
+        key={selected.id}
+        language={selected}
+        onClose={backToList}
+        onDone={() => setActiveView({ type: 'lexicon', id: selected.id })}
+        onDelete={() => void remove(selected.id)}
+        isNew={activeView.isNew}
+      />
+    );
+  }
 
   return selected ? (
     <LanguagePage
       key={selected.id}
       language={selected}
       onClose={backToList}
-      onDelete={() => void remove(selected.id)}
+      onEdit={() => setActiveView({ type: 'lexicon', id: selected.id, mode: 'edit' })}
     />
   ) : (
     <LanguageList onCreate={() => void create()} onDelete={(language) => void remove(language.id)} />
@@ -66,6 +82,8 @@ function LanguageList({ onCreate, onDelete }: {
   const languages = useLexiconStore((s) => s.languages);
   const entries = useLexiconStore((s) => s.entries);
   const duplicateLanguage = useLexiconStore((s) => s.duplicateLanguage);
+  // An edit left in a background tab keeps its draft in the store; here only the indication of it.
+  const drafts = useLanguageDraftStore((s) => s.drafts);
   const openInNewTabAction = useOpenInNewTabAction();
   const state = useCollectionState('lexicon');
   const [collapsed, toggleCollapsed] = usePersistedFlag('lexicon-list-collapsed');
@@ -99,7 +117,9 @@ function LanguageList({ onCreate, onDelete }: {
             )}
           </span>
         ),
-        view: { type: 'lexicon', id: language.id },
+        trailing: language.id in drafts && <span className="text-xs italic text-subtle flex-shrink-0">{t('editor.unsaved')}</span>,
+        // A language with an edit left open goes straight back to it.
+        view: language.id in drafts ? { type: 'lexicon', id: language.id, mode: 'edit' } : { type: 'lexicon', id: language.id },
       })}
       contextActions={(language) => [
         openInNewTabAction({ type: 'lexicon', id: language.id }),

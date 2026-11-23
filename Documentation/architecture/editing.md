@@ -10,7 +10,7 @@ The Properties panel is gated by `activeView.mode === 'edit'`: while viewing, ea
 
 `ActiveView.isNew` marks an entry just created by a "New" action and not yet confirmed with Done. It is session-only: `stripSessionFlags` (`src/lib/tabs.ts`) drops it before a view enters any history — restored tabs (`normalizeSavedTab`) and a tab's back/forward history (`pushHistory`, `normalizeSavedHistory`, see [Navigation History](navigation.md#navigation-history)). Otherwise a restart or Back could make Cancel treat an entry that outlived its creation session as discardable.
 
-Cancel on a still-`isNew` entry runs the page's own Delete: the entry goes to the Trash with the usual undo toast, so nothing typed is lost outright. This holds for every entry, and for templates and blocks: "New template" / "New block" open the page with `isNew`, `useDraftPage` gets `onCancelNew` (the page's delete), and Done keeps the page. Tasks have no Cancel: Escape on a task that was just created and never named (`freshTaskIds` in `TasksView`, session-only) puts it in the Trash with Undo.
+Cancel on a still-`isNew` entry runs the page's own Delete: the entry goes to the Trash with the usual undo toast, so nothing typed is lost outright. This holds for every entry, and for templates, blocks and languages: "New template" / "New block" / "New language" open the page with `isNew`, `useDraftPage` gets `onCancelNew` (the page's delete), and Done keeps the page. Tasks have no Cancel: Escape on a task that was just created and never named (`freshTaskIds` in `TasksView`, session-only) puts it in the Trash with Undo.
 
 ### Reverting a confirmed entry
 
@@ -57,7 +57,7 @@ Cancel writes the baseline back — title, content, tags, category, icon, cover 
 
 ## Right Sidebar Action Bar
 
-`RightSidebar.tsx` renders a `RightSidebarActionBar` pinned above the scrollable Properties content. It reads `uiStore.editActions` (set via `setEditActions`): in edit mode it shows Done/Delete/Cancel, in view mode Edit. An entry whose loaded sigil locks it keeps the Edit button in place, disabled, with a tooltip (`editor.lockedBySigil`) on a wrapper `<span>`, because a disabled tone `Button` takes no pointer events.
+`RightSidebar.tsx` renders a `RightSidebarActionBar` pinned above the scrollable Properties content. It reads `uiStore.editActions` (set via `setEditActions`): in edit mode it shows Done/Delete/Cancel, in view mode Edit (`EditModeBar`, which a language's read view uses too). An entry whose loaded sigil locks it keeps the Edit button in place, disabled, with a tooltip (`editor.lockedBySigil`) on a wrapper `<span>`, because a disabled tone `Button` takes no pointer events.
 
 Each entry view registers its handlers through `useEditActions(active, handlers)` (`src/hooks/useEditActions.ts`):
 

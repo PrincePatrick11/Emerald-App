@@ -22,7 +22,7 @@ A vault is a directory holding:
 - `icons/` — sealed uploaded icons, 128px, named and sealed like the images but never listed in "Images" ([Icons](../database.md#icons))
 - `backups/` — where the export dialog opens and where automatic backups go unless another folder was picked. Nothing that deletes, replaces or backs up the vault touches it: deleting a vault's files leaves it (and the folder with it, if it holds anything), an import's Replace swaps rows only, and a raw backup packs named files, never this folder
 - `settings.json` — the vault's settings, see [Vault Settings](#vault-settings); the only file in the folder that is not encrypted
-- `drafts.json` — only while a block or template page holds unsaved edits; sealed
+- `drafts.json` — only while a block, template or language page holds unsaved edits; sealed
 - `emerald.db.import` — transient: a backup import `VACUUM INTO`s a working copy here while it fills and checks it, then removes it whether the import succeeds or fails. A copy left by a crash is cleared before the next import (`discard_import_staging`, see [DB Backup / Restore](../database.md#db-backup--restore-vaultemerald)).
 - `emerald.db.raw` — transient: the database of a raw backup being imported, unpacked and read under the backup's own key, removed as soon as its content is read (`discard_raw_backup_db`).
 - `emerald.db.snapshot` — transient: the consistent copy of the open database a raw backup packs, removed once it is in the file.

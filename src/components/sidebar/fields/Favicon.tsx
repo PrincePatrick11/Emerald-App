@@ -39,8 +39,8 @@ interface FaviconProps {
  * remove) in one row.
  *
  * Returns only this row, without a label; the callers bring that
- * themselves: `IconField` (a language's page) its heading. The edit sidebar of
- * entries and library pages uses `MediaPropertyRow` instead. For editing only; reading
+ * themselves (the dashboard settings). The edit sidebar of entries and
+ * library pages uses `MediaPropertyRow` instead. For editing only; reading
  * goes through `FaviconGlyph`.
  *
  * The actions are tone-coded `Button`s in the dense 24px size, as the

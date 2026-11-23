@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Check, Trash2, X } from 'lucide-react';
+import { Check, Pencil, Trash2, X } from 'lucide-react';
+import Button from './Button';
 
 /**
  * The 56px bar at the top of the right sidebar. It draws a line below it: it
@@ -53,6 +54,35 @@ export function EditActionBar({ onDone, onDelete, onCancel, busy, locked }: {
       <button type="button" className="edit-bar-icon" disabled={locked} title={t('editor.cancel')} aria-label={t('editor.cancel')} onClick={onCancel}>
         <X size={14} />
       </button>
+    </SidebarActionBar>
+  );
+}
+
+/**
+ * "Edit": the bar of every read view that can be edited — an entry
+ * (RightSidebar) and a language of the lexicon. `lockedTitle` disables it and
+ * says why (an entry locked by a loaded sigil).
+ */
+export function EditModeBar({ onEdit, lockedTitle }: { onEdit: () => void; lockedTitle?: string }) {
+  const { t } = useTranslation();
+  const locked = lockedTitle !== undefined;
+  return (
+    <SidebarActionBar>
+      {/* The tooltip hangs on a wrapper: a locked tone button lets no
+          mouse reach it (`disabled:pointer-events-none`). */}
+      <span className="flex flex-1 min-w-0" title={lockedTitle}>
+        <Button
+          tone="amber"
+          fill
+          disabled={locked}
+          title={locked ? undefined : t('editor.edit')}
+          aria-label={t('editor.edit')}
+          onClick={onEdit}
+        >
+          <Pencil size={14} />
+          <span className="truncate">{t('editor.edit')}</span>
+        </Button>
+      </span>
     </SidebarActionBar>
   );
 }

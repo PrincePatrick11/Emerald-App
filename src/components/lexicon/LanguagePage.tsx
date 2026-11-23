@@ -1,111 +1,132 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Trash2 } from 'lucide-react';
+import { BookA, CaseSensitive, Smile } from 'lucide-react';
 import { useLexiconStore } from '../../store/lexiconStore';
+import { useLanguageDraftStore } from '../../store/draftStore';
+import { useDraftPage } from '../../hooks/useDraftPage';
 import { useShrunkIcon } from '../../hooks/useShrunkIcon';
-import { DEFAULT_LANGUAGE_ICON, entriesOfLanguage } from '../../lib/lexicon';
-import Button from '../ui/Button';
+import { formatEntryDate } from '../../lib/formatDate';
+import { DEFAULT_LANGUAGE_ICON, entriesOfLanguage, isFilledPair, languageDraftOf, wordDraftOf } from '../../lib/lexicon';
 import LibraryPageFrame from '../ui/LibraryPageFrame';
-import PropertiesEditView from '../sidebar/fields/PropertiesEditView';
-import IconField from '../sidebar/fields/IconField';
+import { PropertiesSection } from '../sidebar/fields/EntryReadSections';
+import { EditSidebarBody, MediaPropertyRow } from '../sidebar/fields/EditProperties';
+import { SidebarPropertyRow } from '../sidebar/fields/SidebarSection';
+import { FaviconGlyph } from '../sidebar/fields/Favicon';
 import VocabularyTable from './VocabularyTable';
 import AlphabetTable from './AlphabetTable';
-import type { Language } from '../../types';
+import type { AlphabetPair, Language } from '../../types';
 
-/** How long to wait after the last keystroke before the name is saved. */
-const SAVE_DELAY_MS = 500;
-
-interface Props {
-  language: Language;
-  onClose: () => void;
-  onDelete: () => void;
+/** The two counts in the properties: how many words, how many character pairs. */
+function CountRows({ words, alphabet }: { words: number; alphabet: readonly AlphabetPair[] }) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <SidebarPropertyRow icon={<BookA size={14} />} label={t('lexicon.vocabulary')} value={String(words)} />
+      <SidebarPropertyRow icon={<CaseSensitive size={14} />} label={t('lexicon.alphabet')} value={String(alphabet.filter(isFilledPair).length)} />
+    </>
+  );
 }
 
 /**
- * A language's page: name as title, below it its vocabulary and its
- * alphabet. In the sidebar icon and size.
- *
- * On the same `LibraryPageFrame` as the page of a custom block and that
- * of a template, but without their draft mode: here every row is saved
- * immediately, so there is nothing to take back. Instead of Done/Delete/
- * Cancel the bar carries only Delete.
+ * A language's read view (`{ type: 'lexicon', id }`): name as heading, the
+ * date of the last change top right, below it its vocabulary and its
+ * alphabet. In the sidebar "Edit" and the properties — like an entry.
  */
-export default function LanguagePage({ language, onClose, onDelete }: Props) {
+export function LanguagePage({ language, onClose, onEdit }: {
+  language: Language;
+  onClose: () => void;
+  onEdit: () => void;
+}) {
   const { t } = useTranslation();
   const entries = useLexiconStore((s) => s.entries);
-  const updateLanguage = useLexiconStore((s) => s.updateLanguage);
-  const setIcon = useShrunkIcon((icon) => void updateLanguage(language.id, { icon }), 'LanguagePage');
-
-  const words = entriesOfLanguage(entries, language.id);
-  const [name, setName] = useDebouncedField(
-    language.name,
-    (value) => void updateLanguage(language.id, { name: value }),
-  );
+  const words = entriesOfLanguage(entries, language.id).map(wordDraftOf);
 
   return (
     <LibraryPageFrame
       backLabel={t('nav.lexicon')}
       onBack={onClose}
-      name={name}
+      read={{ onEdit, meta: <span>{formatEntryDate(language.updated_at)}</span> }}
+      name={language.name}
       nameLabel={t('lexicon.name')}
       namePlaceholder={t('lexicon.namePlaceholder')}
-      onNameChange={setName}
-      actions={(
-        <>
-          <span className="flex-1" />
-          <Button tone="danger" compact title={t('editor.delete')} aria-label={t('editor.delete')} onClick={onDelete}>
-            <Trash2 size={14} />
-          </Button>
-        </>
-      )}
       sidebar={(
-        <PropertiesEditView>
-          <IconField value={language.icon} onChange={(icon) => void setIcon(icon)} fallback={DEFAULT_LANGUAGE_ICON} />
-
-          <div>
-            <p className="label-xs mb-2">{t('lexicon.stats')}</p>
-            <p className="text-xs text-subtle">
-              {t('lexicon.wordCount', { count: words.length })}
-              {' · '}
-              {t('lexicon.letterCount', { count: language.alphabet.length })}
-            </p>
-          </div>
-        </PropertiesEditView>
+        <EditSidebarBody>
+          <PropertiesSection>
+            <SidebarPropertyRow icon={<Smile size={14} />} label={t('properties.icon')} value={<FaviconGlyph value={language.icon} className="w-4 h-4 text-sm" />} />
+            <CountRows words={words.length} alphabet={language.alphabet} />
+          </PropertiesSection>
+        </EditSidebarBody>
       )}
     >
-      <VocabularyTable languageId={language.id} entries={words} />
-      <AlphabetTable language={language} />
+      <VocabularyTable words={words} />
+      <AlphabetTable alphabet={language.alphabet} />
     </LibraryPageFrame>
   );
 }
 
 /**
- * A field that only saves its value after a typing pause.
- *
- * For a language's name: it belongs to the row, not to a draft, and
- * writing every character immediately would mean issuing half a dozen UPDATEs
- * per word. The local state is only updated when the value has changed
- * from outside; otherwise each of its own saves would yank the cursor
- * away.
+ * A language while editing (`{ type: 'lexicon', id, mode: 'edit' }`): name,
+ * icon, words and alphabet as one draft (`useDraftPage`), saved with "Done"
+ * and dropped with "Cancel" — both lead back to the read view. Above the
+ * title "Editing…", on the tab the dot, as with an entry; leaving with
+ * changes any other way asks.
  */
-function useDebouncedField(value: string, onCommit: (value: string) => void) {
-  const [draft, setDraft] = useState(value);
-  // The caller passes in a fresh function on every render; if it were in
-  // the dependencies, the wait would start over on every render.
-  const commit = useRef(onCommit);
-  commit.current = onCommit;
+export function LanguageEditor({ language, onClose, onDone, onDelete, isNew }: {
+  language: Language;
+  /** Back to the list (the link above the title); asks if something changed. */
+  onClose: () => void;
+  /** Back to the read view, after "Done" or "Cancel". */
+  onDone: () => void;
+  onDelete: () => void;
+  /** Just created with "New": "Cancel" moves it to the trash (`onDelete`). */
+  isNew?: boolean;
+}) {
+  const { t } = useTranslation();
+  const entries = useLexiconStore((s) => s.entries);
+  const saveLanguage = useLexiconStore((s) => s.saveLanguage);
+  // The ids of the words the page opened with — the only ones "Done" may delete (`wordChanges`).
+  const openedWith = useRef<string[]>([]);
+  const { base, draft, patch, dirty, busy, finish, cancel } = useDraftPage({
+    store: useLanguageDraftStore,
+    viewType: 'lexicon',
+    id: language.id,
+    label: (current) => current.name.trim() || t('lexicon.defaultName'),
+    saved: languageDraftOf(language, entries),
+    save: (id, changes) => saveLanguage(id, changes, openedWith.current),
+    onClose: onDone,
+    onCancelNew: isNew ? onDelete : undefined,
+    logTag: 'LanguageEditor',
+  });
+  openedWith.current = base.words.map((word) => word.id);
+  const setIcon = useShrunkIcon((icon) => patch({ icon }), 'LanguageEditor');
 
-  // A new value from outside (language switch, undo) sets the field; its own
-  // save returns the same value and leaves the cursor alone.
-  useEffect(() => {
-    setDraft((current) => (current === value ? current : value));
-  }, [value]);
-
-  useEffect(() => {
-    if (draft === value) return;
-    const timer = window.setTimeout(() => commit.current(draft), SAVE_DELAY_MS);
-    return () => window.clearTimeout(timer);
-  }, [draft, value]);
-
-  return [draft, setDraft] as const;
+  return (
+    <LibraryPageFrame
+      backLabel={t('nav.lexicon')}
+      onBack={onClose}
+      draft={{ dirty, busy, onDone: () => void finish(), onCancel: cancel, onDelete, status: 'editing' }}
+      name={draft.name}
+      nameLabel={t('lexicon.name')}
+      namePlaceholder={t('lexicon.namePlaceholder')}
+      onNameChange={(name) => patch({ name })}
+      sidebar={(
+        <EditSidebarBody>
+          <PropertiesSection>
+            <MediaPropertyRow
+              rowIcon={<Smile size={14} />}
+              label={t('properties.icon')}
+              kind="icon"
+              value={draft.icon}
+              onChange={(icon) => void setIcon(icon)}
+              fallback={DEFAULT_LANGUAGE_ICON}
+            />
+            <CountRows words={draft.words.length} alphabet={draft.alphabet} />
+          </PropertiesSection>
+        </EditSidebarBody>
+      )}
+    >
+      <VocabularyTable words={draft.words} onChange={(words) => patch({ words })} />
+      <AlphabetTable alphabet={draft.alphabet} onChange={(alphabet) => patch({ alphabet })} />
+    </LibraryPageFrame>
+  );
 }

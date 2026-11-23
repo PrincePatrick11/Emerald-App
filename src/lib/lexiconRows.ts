@@ -1,6 +1,7 @@
 import type Database from './sqlite';
 import { fromRow, type DbRow } from './row';
-import { alphabetToJson } from './lexicon';
+import { WORD_FIELDS, alphabetToJson, isEmptyWord, type WordDraft } from './lexicon';
+import { stampFor } from './stamp';
 import type { Language, LexiconEntry } from '../types';
 
 /**
@@ -36,11 +37,7 @@ export async function insertLanguageRow(db: Database, language: Language): Promi
   );
 }
 
-export async function insertEntryRow(db: Database, entry: LexiconEntry): Promise<void> {
-  await db.execute(...insertEntryStatement(entry));
-}
-
-/** The INSERT of a word — for `insertEntryRow` and for many at once (`db.batch`). */
+/** The INSERT of a word, for `db.batch`. */
 export function insertEntryStatement(entry: LexiconEntry): [string, unknown[]] {
   return [
     `INSERT INTO lexicon_entries
@@ -51,6 +48,49 @@ export function insertEntryStatement(entry: LexiconEntry): [string, unknown[]] {
       entry.sort_order, entry.created_at, entry.updated_at,
     ],
   ];
+}
+
+/**
+ * What "Done" on a language page writes for its word list, worked out against
+ * the words of the language as stored (`stored`): a draft word with an unknown
+ * id is inserted at the end (`firstOrder` onwards), a changed one updated, an
+ * empty one dropped. Only ids in `removable` — the words the page started
+ * with — are ever deleted: a word that arrived since (a merge import) is not
+ * the user's to lose just because their draft never saw it.
+ */
+export function wordChanges({ languageId, stored, words, removable, firstOrder, now }: {
+  languageId: string;
+  stored: readonly LexiconEntry[];
+  words: readonly WordDraft[];
+  removable: ReadonlySet<string>;
+  firstOrder: number;
+  now: string;
+}): { statements: [string, unknown[]][]; changed: LexiconEntry[]; added: LexiconEntry[]; removed: Set<string> } {
+  const byId = new Map(stored.map((e) => [e.id, e]));
+  const kept = words.filter((word) => !isEmptyWord(word));
+  const keptIds = new Set(kept.map((word) => word.id));
+  const statements: [string, unknown[]][] = [];
+  const changed: LexiconEntry[] = [];
+  const added: LexiconEntry[] = [];
+  let order = firstOrder;
+  for (const word of kept) {
+    const before = byId.get(word.id);
+    if (!before) {
+      const entry: LexiconEntry = { ...word, language_id: languageId, sort_order: order++, created_at: now, updated_at: now };
+      statements.push(insertEntryStatement(entry));
+      added.push(entry);
+    } else if (WORD_FIELDS.some((key) => word[key] !== before[key])) {
+      const entry: LexiconEntry = { ...before, ...word, updated_at: stampFor(before.updated_at) };
+      statements.push([
+        'UPDATE lexicon_entries SET term=$1, translation=$2, pronunciation=$3, note=$4, updated_at=$5 WHERE id=$6',
+        [entry.term, entry.translation, entry.pronunciation, entry.note, entry.updated_at, entry.id],
+      ]);
+      changed.push(entry);
+    }
+  }
+  const removed = new Set([...byId.keys()].filter((id) => removable.has(id) && !keptIds.has(id)));
+  for (const id of removed) statements.push(['DELETE FROM lexicon_entries WHERE id=$1', [id]]);
+  return { statements, changed, added, removed };
 }
 
 /** A language by ID — also from the trash, unlike the store, which only holds the active ones. */

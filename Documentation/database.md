@@ -208,7 +208,7 @@ The details of pictures in "Images", the place of their own next to tags and cat
 
 ### lexicon_entries
 
-The words of a language. `ON DELETE CASCADE` on `language_id` means permanently deleting a language takes its words along — from the trash view, "Empty trash" and the retention purge, which lists `languages` and never this table. There is no `deleted_at`: deleting a word is immediate, with an undo toast that writes the same row back under its own id (`lexiconStore`'s `deleteEntry`/`restoreEntry`) — single vocabulary rows in the Trash would be noise.
+The words of a language. `ON DELETE CASCADE` on `language_id` means permanently deleting a language takes its words along — from the trash view, "Empty trash" and the retention purge, which lists `languages` and never this table. There is no `deleted_at`: a word is deleted when the language page's "Done" saves the draft (`lexiconStore.saveLanguage`, `wordChanges` in `lexiconRows.ts`) — only words the page opened with, so words a merge import added in the meantime stay — and "Cancel" is the way back; single vocabulary rows in the Trash would be noise.
 
 | Column | Type | Notes |
 |---|---|---|
@@ -388,7 +388,7 @@ The image commands (`save_image`, `copy_image_file`, `read_image_as_base64`, `li
 
 ## Multi-Vault System
 
-A vault is a **directory** holding `emerald.db` (SQLCipher), `vault.key`, `images/`, `backups/`, `settings.json` (the vault's own settings, read and written by `read_vault_settings`/`write_vault_settings`) and, while a block or template page holds unsaved edits, `drafts.json`. Vault metadata lives outside SQLite in `{appDataDir}/vaults.json`. The directory layout, `vaults.json`'s shape, first-launch behaviour and the default location for new vaults are described in [Vault Layout](architecture/storage.md#vault-layout); what matters for the database:
+A vault is a **directory** holding `emerald.db` (SQLCipher), `vault.key`, `images/`, `backups/`, `settings.json` (the vault's own settings, read and written by `read_vault_settings`/`write_vault_settings`) and, while a block, template or language page holds unsaved edits, `drafts.json`. Vault metadata lives outside SQLite in `{appDataDir}/vaults.json`. The directory layout, `vaults.json`'s shape, first-launch behaviour and the default location for new vaults are described in [Vault Layout](architecture/storage.md#vault-layout); what matters for the database:
 
 - `getDb()` opens the database by vault id (`Database.load(vaultId)` in `src/lib/sqlite.ts`); Rust resolves the path, so folder names with `?`, `#` or `%` need no encoding. It throws `NO_ACTIVE_VAULT` rather than fall back to another vault, and Rust refuses to open a vault whose key is not unlocked — the gate in front of `getDb()` is described in [`architecture/encryption.md`](architecture/encryption.md#the-unlock-gate). All data is encrypted at rest; there is no unencrypted database.
 - Every write to `vaults.json` calls `register_vaults`, mirroring `id → path` into Rust. Storage commands resolve a vault *id* against that registry and never accept a path — see [`security.md`](security.md).

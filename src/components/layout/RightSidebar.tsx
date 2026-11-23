@@ -1,21 +1,19 @@
 import { useTranslation } from 'react-i18next';
 import { entryBlockSummary } from '../../lib/blocks/entrySummary';
-import { Pencil } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
 import { findEntry, useEntryStore } from '../../store/entryStore';
 import { COLLECTION_IDS, type ViewId } from '../../lib/modules';
 import BlockSidebarArea, { BlockAddActions } from '../blocks/BlockSidebarArea';
 import EntryPropertiesPanel from '../sidebar/panels/EntryPropertiesPanel';
-import Button from '../ui/Button';
-import SidebarColumn, { EditActionBar, SidebarActionBar } from '../ui/SidebarColumn';
+import SidebarColumn, { EditActionBar, EditModeBar } from '../ui/SidebarColumn';
 
 /**
  * Views without entries. They never get the entry action bar: a
  * deep link from the search (`{ type: 'tags' | 'categories', id }`) carries an
  * id, and would otherwise get the entry action bar with an
  * "Edit" button in it, which sets `mode: 'edit'` on a view without an editor.
- * The page of a custom block or a template (`{ type: 'blocks' |
- * 'templates', id }`) brings its own bar and portals it into
+ * The page of a custom block, a template or a language (`{ type: 'blocks' |
+ * 'templates' | 'lexicon', id }`) brings its own bar and portals it into
  * the same host as a dashboard.
  */
 const VIEWS_WITHOUT_ENTRIES: ReadonlySet<ViewId> = new Set<ViewId>(['dashboard', ...COLLECTION_IDS]);
@@ -66,23 +64,10 @@ function RightSidebarActionBar() {
   const locked = content !== undefined && !!entryBlockSummary(activeView.id, content).sigil?.lockEntry;
 
   return (
-    <SidebarActionBar>
-      {/* The tooltip hangs on a wrapper: a locked tone button lets no
-          mouse reach it (`disabled:pointer-events-none`). */}
-      <span className="flex flex-1 min-w-0" title={locked ? t('editor.lockedBySigil') : undefined}>
-        <Button
-          tone="amber"
-          fill
-          disabled={locked}
-          title={locked ? undefined : t('editor.edit')}
-          aria-label={t('editor.edit')}
-          onClick={() => setActiveView({ ...activeView, mode: 'edit' })}
-        >
-          <Pencil size={14} />
-          <span className="truncate">{t('editor.edit')}</span>
-        </Button>
-      </span>
-    </SidebarActionBar>
+    <EditModeBar
+      onEdit={() => setActiveView({ ...activeView, mode: 'edit' })}
+      lockedTitle={locked ? t('editor.lockedBySigil') : undefined}
+    />
   );
 }
 

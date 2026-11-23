@@ -5,7 +5,7 @@ import { guardKey, useLeaveGuardStore } from '../store/leaveGuardStore';
 interface Options<T extends { name: string }> {
   store: DraftStore<T>;
   /** The view the page belongs to — for the guard (`leaveGuardStore`). */
-  viewType: 'blocks' | 'templates';
+  viewType: 'blocks' | 'templates' | 'lexicon';
   id: string;
   /** What the draft is called in the question when leaving. */
   label: (draft: T) => string;
@@ -13,7 +13,7 @@ interface Options<T extends { name: string }> {
   saved: T;
   /** Saves the changed fields — exactly those, nothing else. */
   save: (id: string, patch: Partial<T>) => Promise<unknown>;
-  /** Back to the list. */
+  /** Where "Done" and "Cancel" lead: back to the list, or the language page's read view. */
   onClose: () => void;
   /**
    * Only for a page that was just created with "New": what "Cancel" does — put
@@ -30,11 +30,11 @@ function comparable<T extends { name: string }>(value: T, key: keyof T): string 
 
 /**
  * The draft of a page that only saves with "Done" (custom blocks,
- * templates): on open it comes from the draft store or the saved state,
+ * templates, a language while editing): on open it comes from the draft store or the saved state,
  * on every change it goes back into the store — an open tab keeps its work,
  * even when the view unmounts. "Done" writes only the fields that changed
  * compared to the state at open, and stays on the page on an error;
- * "Cancel" discards. Both lead back to the list.
+ * "Cancel" discards. Both then call `onClose`.
  *
  * Anyone who leaves the page with a draft any other way is asked
  * (`leaveGuardStore`) — as with an entry being edited. Only switching to
@@ -111,5 +111,5 @@ export function useDraftPage<T extends { name: string }>({ store, viewType, id, 
     return () => useLeaveGuardStore.getState().clearGuard(key);
   }, [viewType, id, store]);
 
-  return { draft, setDraft, patch, dirty, busy, finish, leave, cancel };
+  return { base, draft, setDraft, patch, dirty, busy, finish, leave, cancel };
 }

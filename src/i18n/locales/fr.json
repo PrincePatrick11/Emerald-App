@@ -91,7 +91,6 @@
     "templateDeleted": "Modèle supprimé",
     "languageDeleted": "Langue supprimée",
     "imageDeleted": "Image supprimée",
-    "wordDeleted": "Mot supprimé",
     "dashboardDeleted": "Tableau de bord supprimé"
   },
   "createItem": {
@@ -1305,7 +1304,6 @@
     "defaultName": "Nouvelle langue",
     "name": "Nom",
     "namePlaceholder": "Nom de la langue",
-    "stats": "Taille",
     "wordCount": "{{count}} mot",
     "wordCount_other": "{{count}} mots",
     "textWordCount": "{{count}} mot",

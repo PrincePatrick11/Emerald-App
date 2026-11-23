@@ -102,6 +102,47 @@ export function alphabetToJson(pairs: readonly AlphabetPair[]): string {
   return JSON.stringify(pairs.map((p) => ({ from: p.from, to: p.to })));
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Draft of a language page
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** A word as the language page edits it: the four fields and its id. */
+export type WordDraft = Pick<LexiconEntry, 'id' | 'term' | 'translation' | 'pronunciation' | 'note'>;
+
+/**
+ * What the language page edits between "Edit" and "Done": name, icon, the
+ * alphabet (empty rows included — they are dropped only on saving) and the
+ * words in display order. A word with an id the store does not know yet is new.
+ */
+export interface LanguageDraft {
+  name: string;
+  icon: string;
+  alphabet: AlphabetPair[];
+  words: WordDraft[];
+}
+
+export const WORD_FIELDS = ['term', 'translation', 'pronunciation', 'note'] as const;
+
+/** A stored word as the page edits it — just its id and four fields. */
+export function wordDraftOf(entry: LexiconEntry): WordDraft {
+  return { id: entry.id, term: entry.term, translation: entry.translation, pronunciation: entry.pronunciation, note: entry.note };
+}
+
+/** The saved state of a language as a draft — what "Edit" starts from. */
+export function languageDraftOf(language: Language, entries: readonly LexiconEntry[]): LanguageDraft {
+  return {
+    name: language.name,
+    icon: language.icon,
+    alphabet: language.alphabet.map(({ from, to }) => ({ from, to })),
+    words: entriesOfLanguage(entries, language.id).map(wordDraftOf),
+  };
+}
+
+/** A word nobody typed anything into is not saved: like an empty alphabet row, it never existed. */
+export function isEmptyWord(word: WordDraft): boolean {
+  return WORD_FIELDS.every((key) => word[key].trim() === '');
+}
+
 /**
  * The character table as a lookup, longest sequence first.
  *

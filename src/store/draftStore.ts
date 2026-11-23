@@ -8,6 +8,8 @@ import type { VaultFileRead } from '../lib/vaultSettings';
 import { tagNameKey } from '../lib/tagRefs';
 import { storedImageNamesIn } from '../lib/schema';
 import { isRecord } from '../lib/helpers';
+import type { LanguageDraft } from '../lib/lexicon';
+import type { ActiveView } from '../types';
 
 /** What the page of a custom block edits — exactly what `updateDefinition` accepts. */
 export type DefinitionDraft = Required<BlockDefinitionPatch>;
@@ -44,7 +46,7 @@ export interface DraftState<T> {
 export type DraftStore<T> = UseBoundStore<StoreApi<DraftState<T>>>;
 
 /** The kinds of drafts — also the view type of their page and their key in `drafts.json`. */
-type DraftKind = 'blocks' | 'templates';
+type DraftKind = 'blocks' | 'templates' | 'lexicon';
 
 /** Brings what was in the file into the shape of a draft — field by field, like `fromRow` does for a row. */
 type Normalize<T> = (raw: Record<string, unknown>) => T;
@@ -61,8 +63,12 @@ const stores: { kind: DraftKind; store: DraftStore<unknown>; normalize: Normaliz
  * writes with a delay, could not promise that), and the content of a vault
  * stays in its folder.
  */
-/** 2: template drafts carry tag IDs instead of names (a 1 is converted on read). */
-const DRAFTS_VERSION = 2;
+/**
+ * 2: template drafts carry tag IDs instead of names (a 1 is converted on read).
+ * 3: language drafts (`lexicon`); a 2 has none and is read as it is — but a
+ * build that only knows 2 leaves a 3 alone instead of dropping them.
+ */
+const DRAFTS_VERSION = 3;
 const PERSIST_DELAY_MS = 400;
 
 
@@ -165,7 +171,7 @@ async function readDraftsFile(vaultId: string): Promise<{ drafts: Record<string,
     if (read.kind !== 'found') return { drafts: {}, foreign: false };
     const parsed: unknown = JSON.parse(read.contents);
     if (!isRecord(parsed)) return { drafts: {}, foreign: false };
-    if (parsed.version === DRAFTS_VERSION) return { drafts: parsed, foreign: false };
+    if (parsed.version === DRAFTS_VERSION || parsed.version === 2) return { drafts: parsed, foreign: false };
     if (parsed.version === 1) return { drafts: await withTemplateTagIds(parsed), foreign: false };
     return { drafts: {}, foreign: typeof parsed.version === 'number' && parsed.version > DRAFTS_VERSION };
   } catch (err) {
@@ -221,12 +227,17 @@ export async function detachDrafts(): Promise<void> {
 
 /**
  * The unsaved drafts of the pages that save only with "Done" —
- * custom blocks and templates, one store each. In the store rather than in the view,
+ * custom blocks, templates and the lexicon's languages, one store each. In the store rather than in the view,
  * because MainArea unmounts the view when switching to another module — an
  * open tab would otherwise silently lose its work. The lists read their
  * "Unsaved" hint from it.
  */
-function createDraftStore<T>(kind: DraftKind, normalize: Normalize<T>): DraftStore<T> {
+function createDraftStore<T>(
+  kind: DraftKind,
+  normalize: Normalize<T>,
+  /** Whether a view of this kind is the page that edits — a language also has a read view, which holds nothing. */
+  edits: (view: ActiveView) => boolean = () => true,
+): DraftStore<T> {
   const store = create<DraftState<T>>((set) => ({
     drafts: {},
     saveDraft: (id, entry) => set((s) => ({ drafts: { ...s.drafts, [id]: entry } })),
@@ -240,7 +251,7 @@ function createDraftStore<T>(kind: DraftKind, normalize: Normalize<T>): DraftSto
   store.subscribe(schedulePersist);
   stores.push({ kind, store: store as DraftStore<unknown>, normalize });
   // For background tabs: a draft means unsaved changes (`leaveGuardStore`).
-  registerEditProbe((view) => view.type === kind && !!view.id && view.id in store.getState().drafts);
+  registerEditProbe((view) => view.type === kind && !!view.id && edits(view) && view.id in store.getState().drafts);
   return store;
 }
 
@@ -260,6 +271,21 @@ export const useTemplateDraftStore = createDraftStore<TemplateDraft>('templates'
   content: text(raw.content),
   tags: Array.isArray(raw.tags) ? raw.tags.filter((tag): tag is string => typeof tag === 'string') : [],
 }));
+
+const records = (value: unknown) => (Array.isArray(value) ? value.filter(isRecord) : []);
+
+export const useLanguageDraftStore = createDraftStore<LanguageDraft>('lexicon', (raw) => ({
+  name: text(raw.name),
+  icon: text(raw.icon),
+  alphabet: records(raw.alphabet).map((pair) => ({ from: text(pair.from), to: text(pair.to) })),
+  words: records(raw.words)
+    // The same harmless-id check the draft ids pass, whatever the kind.
+    .filter((word) => isDefinitionId(word.id))
+    .map((word) => ({
+      id: text(word.id), term: text(word.term), translation: text(word.translation),
+      pronunciation: text(word.pronunciation), note: text(word.note),
+    })),
+}), (view) => view.mode === 'edit');
 
 /**
  * Every stored file name an open draft holds — an icon chosen there, a picture

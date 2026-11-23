@@ -4,13 +4,12 @@
  * without its language and every view always needs both — the dashboard
  * counts them, the language page lists them, the translate field reads them.
  *
- * Saving is immediate, not only with "Done": a vocabulary row is a
- * pair of two fields, not a draft. The language page therefore needs no
- * `draftStore` like the blocks and templates pages.
+ * Saving happens with "Done" on the language page, like an entry: the page
+ * edits a draft (`useLanguageDraftStore`) of name, icon, alphabet and words,
+ * and `saveLanguage` writes what changed in one go.
  *
  * Deleting: a language moves to the trash (soft delete, its vocabulary
- * stays attached to it), a single vocabulary item is gone immediately — with
- * undo via `undoStore`, which writes it back under the same ID.
+ * stays attached to it and comes back with it).
  *
  * Import rule as in `blockDefinitionStore`: no content stores.
  */
@@ -21,15 +20,14 @@ import { generateId, nowIso } from '../lib/helpers';
 import { needsWrite, stampFor } from '../lib/stamp';
 import { fromRow, type DbRow } from '../lib/row';
 import { serialized, serialKey } from '../lib/serialize';
-import { DEFAULT_LANGUAGE_ICON, alphabetToJson } from '../lib/lexicon';
+import { DEFAULT_LANGUAGE_ICON, alphabetToJson, isFilledPair, type LanguageDraft } from '../lib/lexicon';
 import {
-  insertEntryRow, insertEntryStatement, insertLanguageRow, languageById, nextEntrySortOrder, nextLanguageSortOrder,
+  insertEntryStatement, insertLanguageRow, languageById, nextEntrySortOrder, nextLanguageSortOrder, wordChanges,
 } from '../lib/lexiconRows';
 import i18n from '../i18n';
 import type { Language, LexiconEntry } from '../types';
 
 type LanguagePatch = Partial<Pick<Language, 'name' | 'icon' | 'alphabet'>>;
-export type EntryPatch = Partial<Pick<LexiconEntry, 'term' | 'translation' | 'pronunciation' | 'note'>>;
 
 interface LexiconState {
   /** Active languages in display order. */
@@ -39,18 +37,18 @@ interface LexiconState {
 
   fetchLexicon: () => Promise<void>;
   createLanguage: (name: string, init?: Omit<LanguagePatch, 'name'>) => Promise<Language>;
-  updateLanguage: (id: string, patch: LanguagePatch) => Promise<void>;
+  /**
+   * "Done" on the language page: writes the changed parts of its draft in one
+   * batch. With `words`: new ids are inserted, changed words updated, empty
+   * ones dropped, and those of `removable` (the words the page opened with)
+   * that are missing deleted — see `wordChanges`.
+   */
+  saveLanguage: (id: string, changes: Partial<LanguageDraft>, removable?: readonly string[]) => Promise<void>;
   duplicateLanguage: (id: string) => Promise<Language | undefined>;
   /** Soft delete. The vocabulary stays with the language and comes back with it. */
   deleteLanguage: (id: string) => Promise<void>;
   restoreLanguage: (id: string) => Promise<void>;
   permanentlyDeleteLanguage: (id: string) => Promise<void>;
-
-  addEntry: (languageId: string, init?: EntryPatch) => Promise<LexiconEntry>;
-  updateEntry: (id: string, patch: EntryPatch) => Promise<void>;
-  /** Gone immediately. `restoreEntry` undoes it with the returned row. */
-  deleteEntry: (id: string) => Promise<LexiconEntry | undefined>;
-  restoreEntry: (entry: LexiconEntry) => Promise<void>;
 }
 
 /** Languages and vocabulary write under one key: a delete affects both tables. */
@@ -106,21 +104,46 @@ export const useLexiconStore = create<LexiconState>((set, get) => ({
     return language;
   }),
 
-  updateLanguage: (id, patch) => serialized(WRITE_KEY, async () => {
+  saveLanguage: (id, changes, removable = []) => serialized(WRITE_KEY, async () => {
     const current = get().languages.find((l) => l.id === id);
-    if (!current || !needsWrite(current, patch)) return;
-    const updated: Language = {
-      ...current,
-      ...patch,
-      name: (patch.name ?? current.name).trim(),
-      updated_at: stampFor(current.updated_at),
-    };
+    if (!current) return;
     const db = await getDb();
-    await db.execute(
+
+    const words = changes.words
+      ? wordChanges({
+          languageId: id,
+          stored: get().entries.filter((e) => e.language_id === id),
+          words: changes.words,
+          removable: new Set(removable),
+          firstOrder: await nextEntrySortOrder(db, id),
+          now: nowIso(),
+        })
+      : null;
+    const statements = words?.statements ?? [];
+
+    const { words: _words, ...rest } = changes;
+    const patch: LanguagePatch = { ...rest };
+    if (patch.name !== undefined) patch.name = patch.name.trim();
+    if (patch.alphabet) patch.alphabet = patch.alphabet.filter(isFilledPair).map(({ from, to }) => ({ from, to }));
+    // A changed word counts as a change of its language: the list sorts by it.
+    if (statements.length === 0 && !needsWrite(current, patch)) return;
+    const updated: Language = { ...current, ...patch, updated_at: stampFor(current.updated_at) };
+    statements.push([
       'UPDATE languages SET name=$1, icon=$2, alphabet=$3, updated_at=$4 WHERE id=$5',
       [updated.name, updated.icon, alphabetToJson(updated.alphabet), updated.updated_at, id],
-    );
-    set((s) => ({ languages: s.languages.map((l) => (l.id === id ? updated : l)) }));
+    ]);
+    await db.batch(statements);
+    set((s) => {
+      const languages = s.languages.map((l) => (l.id === id ? updated : l));
+      if (!words) return { languages };
+      // Applied to the entries as they are now, not to a copy from before the awaits.
+      const changed = new Map(words.changed.map((e) => [e.id, e]));
+      const entries = [
+        ...s.entries.filter((e) => !words.removed.has(e.id)).map((e) => changed.get(e.id) ?? e),
+        ...words.added,
+      ];
+      return { languages, entries };
+    });
   }),
 
   duplicateLanguage: async (id) => {
@@ -168,56 +191,4 @@ export const useLexiconStore = create<LexiconState>((set, get) => ({
     // Reachable only from the trash. ON DELETE CASCADE takes the vocabulary along.
     await db.execute('DELETE FROM languages WHERE id=$1', [id]);
   },
-
-  addEntry: (languageId, init = {}) => serialized(WRITE_KEY, async () => {
-    const db = await getDb();
-    const now = nowIso();
-    const entry: LexiconEntry = {
-      id: generateId(),
-      language_id: languageId,
-      term: init.term ?? '',
-      translation: init.translation ?? '',
-      pronunciation: init.pronunciation ?? '',
-      note: init.note ?? '',
-      sort_order: await nextEntrySortOrder(db, languageId),
-      created_at: now,
-      updated_at: now,
-    };
-    await insertEntryRow(db, entry);
-    set((s) => ({ entries: [...s.entries, entry] }));
-    return entry;
-  }),
-
-  updateEntry: (id, patch) => serialized(WRITE_KEY, async () => {
-    const current = get().entries.find((e) => e.id === id);
-    if (!current || !needsWrite(current, patch)) return;
-    const updated: LexiconEntry = { ...current, ...patch, updated_at: stampFor(current.updated_at) };
-    const db = await getDb();
-    await db.execute(
-      `UPDATE lexicon_entries
-          SET term=$1, translation=$2, pronunciation=$3, note=$4, updated_at=$5
-        WHERE id=$6`,
-      [updated.term, updated.translation, updated.pronunciation, updated.note, updated.updated_at, id],
-    );
-    set((s) => ({ entries: s.entries.map((e) => (e.id === id ? updated : e)) }));
-  }),
-
-  deleteEntry: (id) => serialized(WRITE_KEY, async () => {
-    const entry = get().entries.find((e) => e.id === id);
-    if (!entry) return undefined;
-    const db = await getDb();
-    await db.execute('DELETE FROM lexicon_entries WHERE id=$1', [id]);
-    set((s) => ({ entries: s.entries.filter((e) => e.id !== id) }));
-    return entry;
-  }),
-
-  restoreEntry: (entry) => serialized(WRITE_KEY, async () => {
-    const db = await getDb();
-    // The language may be in the trash by now — the INSERT would then go
-    // through (the row still exists), but the vocabulary item would belong to a
-    // language the store does not hold. Better not at all.
-    if (!get().languages.some((l) => l.id === entry.language_id)) return;
-    await insertEntryRow(db, entry);
-    set((s) => ({ entries: [...s.entries, entry] }));
-  }),
 }));

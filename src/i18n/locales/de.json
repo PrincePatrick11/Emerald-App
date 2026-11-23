@@ -91,7 +91,6 @@
     "templateDeleted": "Vorlage gelöscht",
     "languageDeleted": "Sprache gelöscht",
     "imageDeleted": "Bild gelöscht",
-    "wordDeleted": "Vokabel gelöscht",
     "dashboardDeleted": "Dashboard gelöscht"
   },
   "createItem": {
@@ -1305,7 +1304,6 @@
     "defaultName": "Neue Sprache",
     "name": "Name",
     "namePlaceholder": "Name der Sprache",
-    "stats": "Umfang",
     "wordCount": "{{count}} Vokabel",
     "wordCount_other": "{{count}} Vokabeln",
     "textWordCount": "{{count}} Wort",

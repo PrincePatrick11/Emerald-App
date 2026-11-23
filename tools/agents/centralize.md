@@ -33,7 +33,7 @@ Where shared code lives in Emerald:
 
 - `src/components/ui/` — the shared component layer: `Button`, `Modal`, `ContextMenu`, `EmojiPicker`, `Dashboard` (with `EntryDashboard` and `CollectionDashboard` in `src/components/views/` on top of it — one list of entries, one display of every collection), `DashboardItem`, `EntryListTab`, `ListToolbar`, `FilterPanel`, `FilterList`, `EmptyState`, `EntryDetailFrame`, `LibraryPageFrame`, `RailButton`, `TabIconButton`, `TagInput`, `TemplateSelect`, `UndoToast`, and more; the `Catalogue` has the full list.
 
-- `src/components/sidebar/fields/` — shared property-panel building blocks reused by the one entry page and the collection pages (`EditProperties`, `TagsField`, `LinkedEntriesField`, `IconField`, …).
+- `src/components/sidebar/fields/` — shared property-panel building blocks reused by the one entry page and the collection pages (`EditProperties`, `TagsField`, `LinkedEntriesField`, `MediaPropertyRow`, …).
 
 - `src/lib/` — shared logic: `styleClasses.ts` (the established home for a repeated Tailwind chain — extend it rather than copying the chain again), `platform.ts` (the only permitted source of platform detection), `tabs.ts`, `helpers.ts`.
 

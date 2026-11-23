@@ -109,7 +109,7 @@ A block page edits a **draft**; only Done calls `updateDefinition`. The draft is
 Drafts are written along into the vault's `drafts.json` (debounced, `write_vault_drafts`), so a crash loses nothing that was typed.
 
 - `restoreDrafts(vaultId)` reads them back when a vault opens, through the parsers a database row goes through (`parseDefinitionElements`, …); the previous vault's drafts only leave memory.
-- `DRAFTS_VERSION` is 2: a version-1 file's template tag names are mapped to ids (see [Tags](modules.md#tags)); a newer file is left untouched and nothing is written for that vault this session.
+- `DRAFTS_VERSION` is 3 (language drafts, `lexicon`); a version-2 file is read as it is, a version-1 file's template tag names are mapped to ids (see [Tags](modules.md#tags)); a newer file is left untouched and nothing is written for that vault this session.
 - `flushDrafts()` writes what is pending and waits — before the window closes and before an update installs, so a discarded draft doesn't return after the restart.
 - A replace-mode restore calls `clearAllDrafts()` and then `flushDrafts()` (and closes every tab), or a stale draft would overwrite a freshly restored block on the next Done.
 

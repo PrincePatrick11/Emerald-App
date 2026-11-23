@@ -102,7 +102,7 @@ const creators: Record<CreatableViewId, (categoryId?: string) => Promise<ActiveV
   },
   lexicon: async () => {
     const language = await useLexiconStore.getState().createLanguage(i18n.t('lexicon.defaultName'));
-    return { type: 'lexicon', id: language.id };
+    return { type: 'lexicon', id: language.id, mode: 'edit', isNew: true };
   },
   templates: async () => {
     const template = await useTemplateStore.getState().createTemplate(i18n.t('templates.defaultName'));

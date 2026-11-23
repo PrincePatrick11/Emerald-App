@@ -313,12 +313,14 @@ The Lexicon is where you keep **languages** — Enochian, runes, a tongue of you
 
 **Languages.** The rail's Lexicon button opens the list of your languages as a [collection](#collections) — icon, name, and how many words and characters each holds — with the usual search, view (List / Cards / Timeline) and sort (date, name, most words) in the right sidebar. A row's context menu offers Open in new tab, Duplicate (copying the alphabet and every word) and Delete; deleting moves the language to the Trash with an undo toast, its words travelling with it both ways.
 
-**A language's page.** Clicking a language opens its page: a breadcrumb back to the list, its name as the title, and two sections.
+**A language's page.** Clicking a language opens it to read, like an entry: a breadcrumb back to the list, its name as the title, the date of the last change top right, and two sections.
 
-- **Words** — a table of Term, Translation, Pronunciation and Note. "+ Word" adds a row and puts the cursor in it; every field saves when you leave it (Enter does the same), so a long list can be typed straight through. A search field filters the table, and the × removes a row right away with an undo toast — a single word does not go to the Trash.
-- **Alphabet** — pairs of characters: yours on the left, the language's on the right. Several letters are allowed on either side ("th" → "ᚦ"), and the longest match wins. A pair with an empty left side is not kept.
+- **Words** — a table of Term, Translation, Pronunciation and Note, with a search field that filters it.
+- **Alphabet** — pairs of characters: yours on the left, the language's on the right. Several letters are allowed on either side ("th" → "ᚦ"), and the longest match wins.
 
-The right sidebar holds the language's icon (emoji or image) and its size in words and characters, next to the back and delete buttons.
+The right sidebar shows "Edit" and the properties: the icon and how many words and characters the language holds.
+
+**Editing a language** works like editing an entry: "Edit" turns the name and both tables into fields, the header says "editing…", the tab shows its dot, and the sidebar holds Done, Delete and Cancel. "+ Word" adds a row and puts the cursor in it, "+ Character" adds a pair, the × removes a row. Nothing is saved until Done; Cancel puts everything back as it was, including words added or removed. A word left completely empty and an empty character pair are dropped on Done. The icon (emoji or image) is chosen from the same icon row as an entry's. Leaving with changes any other way asks first — save, discard or keep editing; switching to another tab keeps the edit. "New language" opens straight into editing, and Cancel there moves the new language to the Trash, with Undo.
 
 **Translating.** Under the language list sits the **Translate** section: your text on the left, the translation on the right, updating as you type. Above it you pick the language, swap the direction (into the language or out of it), and choose what it translates from:
 
