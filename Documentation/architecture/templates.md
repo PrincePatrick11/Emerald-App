@@ -30,7 +30,7 @@ Creation is the only moment a start template applies by itself. Changing an entr
 
 `TemplatesView` is a collection (`CollectionDashboard`) of active templates under a collapsible `CollapsibleGroupHeader`, filtered by tag, with view and sort in `uiStore.collectionPrefs.templates` (per vault — see [Tabs and Workspace State](navigation.md#tabs-and-workspace-state)). A row shows icon, name and an "Unsaved" marker; clicking opens `{ type: 'templates', id }`.
 
-`TemplateEditor` renders that page on `LibraryPageFrame`, the shell it shares with `BlockDefinitionEditor` (back link, "Unsaved" marker, name-as-title input, `EditActionBar`/ `SidebarColumn` portalled into the right sidebar). Its draft lifecycle is `useDraftPage`:
+`TemplateEditor` renders that page on `LibraryPageFrame`, the shell it shares with `BlockDefinitionEditor` (back link, status marker, name-as-title input, `EditActionBar`/ `SidebarColumn` portalled into the right sidebar). The marker reads "Editing…" and turns into "Unsaved" once the draft has changes; the page's tab carries the editing dot throughout. Its draft lifecycle is `useDraftPage`:
 
 - The draft lives in a `DraftStore<T>` (`createDraftStore<T>()` in `store/draftStore.ts`, behind `useBlockDraftStore` and `useTemplateDraftStore`), so edits survive `MainArea` unmounting the view on a module switch.
 - "Done" writes only the fields that changed since the page opened (names compared trimmed), so a tag renamed meanwhile isn't overwritten.

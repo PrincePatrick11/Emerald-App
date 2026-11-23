@@ -90,6 +90,10 @@ function TabButton({ view, onSelect, onClose }: { view: ActiveView; onSelect: ()
     icon = <Icon size={14} />;
   }
 
+  // Blocks and templates have no read view: their page is always a draft —
+  // as long as the item still exists (a deleted one falls back to the list).
+  const editing = view.mode === 'edit' || !!definition || !!template;
+
   return (
     <button
       onClick={onSelect}
@@ -100,7 +104,7 @@ function TabButton({ view, onSelect, onClose }: { view: ActiveView; onSelect: ()
     >
       <span className="tab-icon flex-shrink-0">{icon}</span>
       <span className="truncate">{title}</span>
-      {view.mode === 'edit' && <span className="tab-edit-dot h-1.5 w-1.5 flex-shrink-0 rounded-full" title={t('tabBar.editing')} />}
+      {editing && <span className="tab-edit-dot h-1.5 w-1.5 flex-shrink-0 rounded-full" title={t('tabBar.editing')} />}
     </button>
   );
 }

@@ -21,11 +21,12 @@ interface LibraryPageDraft {
   onCancel: () => void;
   onDelete: () => void;
   /**
-   * The status above the title: `unsaved` (blocks, templates — always
-   * editing) shows "Unsaved" once something changed; `editing` (a language,
-   * which also has a read view) shows "Editing…" throughout, like an entry.
+   * The status above the title is "Editing…"; by default it turns into
+   * "Unsaved" once something changed (blocks, templates — always editing).
+   * `false` (a language, which also has a read view) keeps "Editing…"
+   * throughout, like an entry.
    */
-  status?: 'unsaved' | 'editing';
+  markUnsaved?: boolean;
 }
 
 /** The read view of a page that also has one (a language): heading instead of the title field, "Edit" in the bar. */
@@ -57,7 +58,7 @@ interface Props {
 /**
  * The frame of the library pages: a custom block, a template, a
  * language of the lexicon. Built like `EntryDetailFrame`: the name
- * as title (above it back link and "Unsaved"), below it the scrolling body,
+ * as title (above it back link and status), below it the scrolling body,
  * and in the sidebar at the top the bar with the actions above
  * the properties body.
  *
@@ -75,13 +76,17 @@ export default function LibraryPageFrame({
   const sidebarOpen = useUIStore((s) => s.rightSidebarOpen);
   const editLocked = useUIStore((s) => s.editLocked);
 
+  const showUnsaved = !!draft && draft.markUnsaved !== false && draft.dirty;
+
   return (
     <div className="h-full flex flex-col">
       <EntryHeaderRow
         back={{ label: backLabel, onClick: onBack }}
-        meta={draft?.status === 'editing'
-          ? <EntryStatus tone="accent">{t('editor.editing')}</EntryStatus>
-          : draft?.dirty ? <EntryStatus tone="warning">{t('editor.unsaved')}</EntryStatus> : read?.meta}
+        meta={!draft
+          ? read?.meta
+          : showUnsaved
+            ? <EntryStatus tone="warning">{t('editor.unsaved')}</EntryStatus>
+            : <EntryStatus tone="accent">{t('editor.editing')}</EntryStatus>}
       />
 
       {/* Only when the sidebar is closed: otherwise there would be no way to

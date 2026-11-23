@@ -104,7 +104,7 @@ export function LanguageEditor({ language, onClose, onDone, onDelete, isNew }: {
     <LibraryPageFrame
       backLabel={t('nav.lexicon')}
       onBack={onClose}
-      draft={{ dirty, busy, onDone: () => void finish(), onCancel: cancel, onDelete, status: 'editing' }}
+      draft={{ dirty, busy, onDone: () => void finish(), onCancel: cancel, onDelete, markUnsaved: false }}
       name={draft.name}
       nameLabel={t('lexicon.name')}
       namePlaceholder={t('lexicon.namePlaceholder')}
