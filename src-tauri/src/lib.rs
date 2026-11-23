@@ -910,7 +910,7 @@ pub fn run() {
             vault::discard_new_vault_dirs,
             vault::default_vault_dir,
             vault::new_vault_base_dir,
-            vault::ensure_backup_dir,
+            vault::ensure_export_dir,
             vault::probe_vault_dir,
             vault::delete_vault_files,
             vault::discard_import_staging,
@@ -976,7 +976,7 @@ mod app_data_write_tests {
     #[test]
     fn only_the_registry_and_the_vaults_folder_are_writable_in_the_app_data_dir() {
         let data = Path::new("/home/u/.local/share/emerald");
-        for allowed in ["vaults.json", "vaults/1a2b/backups/emerald-backup-2026-10-06.vault.emerald", "vaults/update.json"] {
+        for allowed in ["vaults.json", "vaults/1a2b/backups/emerald-backup-2026-10-06.vault.emerald", "vaults/1a2b/export/Journal_2026-11-23.pdf", "vaults/update.json"] {
             assert!(app_data_write_allowed(&data.join(allowed), data), "{allowed}");
         }
         for refused in [

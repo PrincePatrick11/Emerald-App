@@ -28,6 +28,7 @@ import type { Category } from '../types';
 import type { WriteOptions } from './stamp';
 import { displayTitle, hasOwnTitle } from './entryTitle';
 import { compressDataUrl } from './imageCompression';
+import { exportDefaultPath } from './vaultManager';
 import {
   definitionImageRefs, parseDefinitionElements, remapDefinitionDefaults, type LinkDefaultResolver,
 } from './blocks/definitions';
@@ -348,7 +349,7 @@ export async function exportTemplateAsEmerald(templateId: string): Promise<void>
  */
 export async function exportItemsAsEmerald(options: EmeraldExportOptions, defaultName: string): Promise<boolean> {
   const path = await save({
-    defaultPath: defaultName,
+    defaultPath: await exportDefaultPath(defaultName),
     filters: [{ name: 'Emerald', extensions: ['emerald'] }],
   });
   if (!path) return false;

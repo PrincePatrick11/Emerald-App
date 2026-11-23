@@ -10,6 +10,7 @@ import {
   type ExportFile, type ExportItem,
 } from './export';
 import type { ExportData } from './exportData';
+import { exportDefaultPath } from './vaultManager';
 
 // ── Interactive HTML export ─────────────────────────────────────────────────
 //
@@ -174,7 +175,7 @@ export async function buildInteractiveHtml(items: readonly ExportItem[], file: E
 export async function exportAsHTML(items: readonly ExportItem[], file: ExportFile = {}): Promise<boolean> {
   if (items.length === 0) throw new Error(i18n.t('emeraldExport.nothing'));
   const chosen = await save({
-    defaultPath: defaultFilename(items, file, 'html'),
+    defaultPath: await exportDefaultPath(defaultFilename(items, file, 'html')),
     filters: [{ name: 'HTML', extensions: ['html'] }],
   });
   if (!chosen) return false;

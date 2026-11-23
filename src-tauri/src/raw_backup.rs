@@ -20,7 +20,7 @@
 //! Database first, pictures after: a picture the copy names was stored before
 //! it. A re-encryption (password change) and the deletion of a vault's files
 //! wait for a running backup, and a backup for them (`reencrypt::RUNNING`).
-//! The vault's own `backups/` folder is never packed.
+//! The vault's own `backups/` and `export/` folders are never packed.
 
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
@@ -275,6 +275,8 @@ mod tests {
         std::fs::write(dir.join(vault::IMAGES_SUBDIR).join(name), sealed).unwrap();
         std::fs::create_dir_all(dir.join(vault::BACKUP_SUBDIR)).unwrap();
         std::fs::write(dir.join(vault::BACKUP_SUBDIR).join("old.vault.emerald"), b"older backup").unwrap();
+        std::fs::create_dir_all(dir.join(vault::EXPORT_SUBDIR)).unwrap();
+        std::fs::write(dir.join(vault::EXPORT_SUBDIR).join("entry.md"), b"# exported").unwrap();
         (dir, key)
     }
 
@@ -307,7 +309,7 @@ mod tests {
             assert!(names.iter().any(|n| n == name), "{name} in {names:?}");
         }
         assert!(names.iter().any(|n| n.starts_with("images/")));
-        assert!(!names.iter().any(|n| n.contains("backups") || n.contains("old.vault")), "{names:?}");
+        assert!(!names.iter().any(|n| n.contains("backups") || n.contains("old.vault") || n.contains("export") || n.contains("entry.md")), "{names:?}");
     }
 
     #[tokio::test]

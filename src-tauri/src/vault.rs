@@ -1,7 +1,8 @@
 //! Vault storage layout.
 //!
 //! A vault is a directory the user picked. Inside it live `emerald.db`, an
-//! `images/` folder, a `backups/` folder, and `settings.json`.
+//! `images/` folder, a `backups/` folder, an `export/` folder once something
+//! was exported, and `settings.json`.
 //! `vaults.json` in the app data directory
 //! maps vault ids to those directories; the frontend owns that file and
 //! mirrors it into [`VaultRegistry`] on every write.
@@ -37,9 +38,13 @@ pub const VAULTS_SUBDIR: &str = "vaults";
 /// The folder new vaults are offered in, inside the user's documents directory.
 pub const VAULT_HOME_DIR: &str = "Emerald Vaults";
 /// The vault's own backup folder: where the automatic backup writes while no
-/// folder of its own is chosen, and where the database export offers to
-/// write. Nothing that deletes, replaces or backs up a vault touches it.
+/// folder of its own is chosen. Nothing that deletes, replaces or backs up a
+/// vault touches it.
 pub const BACKUP_SUBDIR: &str = "backups";
+/// Where every export's save dialog opens ([`ensure_export_dir`]). Created on
+/// demand, not with the vault. Never packed by a raw backup or cleared by an
+/// import; deleting the vault's files removes it only while it is empty.
+pub const EXPORT_SUBDIR: &str = "export";
 /// The vault's own settings. The frontend owns its shape; Rust only moves the text.
 pub const SETTINGS_FILE: &str = "settings.json";
 /// Written first and renamed over [`SETTINGS_FILE`], so a crash mid-write
@@ -567,11 +572,12 @@ pub fn create_vault_dirs(app: tauri::AppHandle, vault_id: String) -> Result<bool
 }
 
 /// The subfolders [`create_vault_tree`] builds and [`discard_vault_tree`] takes back.
-/// `backups/` belongs from the start, not only from the first export — that
-/// way the structure of a vault folder is always the same. For vaults outside
-/// the allowed roots it stays empty without consequence (the export does not
-/// offer it there, see `ensure_backup_dir`), and an empty `backups/` does not
-/// stand in the way of deleting the folder.
+/// `backups/` belongs from the start, not only from the first automatic
+/// backup — that way the structure of a vault folder is always the same, and
+/// an empty `backups/` does not stand in the way of deleting the folder.
+/// `export/` is not among them: it is made on the first export (`ensure_export_dir`),
+/// which refuses vaults outside the allowed roots — made up front, it would
+/// stay a dead folder there.
 const VAULT_SUBDIRS: [&str; 3] = [IMAGES_SUBDIR, ICONS_SUBDIR, BACKUP_SUBDIR];
 
 fn create_vault_tree(dir: &Path) -> Result<(), String> {
@@ -635,25 +641,26 @@ pub fn default_vault_dir(app: tauri::AppHandle, vault_id: String) -> Result<Stri
         .into_owned())
 }
 
-/// The vault's `backups/` folder, created on demand — where the database
-/// export dialog opens by default. Deliberately *inside* the vault: the backup
-/// travels with the data it captures when the folder is copied elsewhere. And
-/// deliberately not part of what [`delete_vault_files`] removes — a backup is
-/// exactly the thing that should outlive the vault it was taken from.
+/// The vault's `export/` folder, created on demand — where every export's save
+/// dialog opens by default (PDF, Markdown, HTML, `.emerald`, `.vault.emerald`,
+/// canvas pictures). Deliberately *inside* the vault, so exports travel with
+/// the folder; and like [`BACKUP_SUBDIR`] never packed by a raw backup or
+/// cleared by an import, and removed by [`delete_vault_files`] only while empty.
 #[tauri::command]
-pub fn ensure_backup_dir(app: tauri::AppHandle, vault_id: String) -> Result<String, String> {
+pub fn ensure_export_dir(app: tauri::AppHandle, vault_id: String) -> Result<String, String> {
     let vault = vault_dir(&app, &vault_id)?;
     // As everywhere here: do not resurrect a vanished vault folder (see
     // `images_dir`), only create the subfolder in it.
     directory_state(&vault)?;
 
     // The dialog is only half the way: the file is then written by
-    // `write_file`, and that is limited to the fixed roots (see
+    // `write_file`, `write_emerald_file` or `export_image` (`export_pdf` checks
+    // less, so it never refuses what these accept), limited to the fixed roots (see
     // `resolve_allowed_roots` — vault directories deliberately do not extend
     // them). Offering a target for a vault outside — another drive, a folder
     // outside `~` — would mean offering one that the write command then refuses.
     // The `Err` ends up in the frontend's fallback (bare file name) before a dead
-    // `backups/` folder is created.
+    // `export/` folder is created.
     let allowed = crate::resolve_allowed_roots(&app)?;
     let canonical = std::fs::canonicalize(&vault).map_err(|e| e.to_string())?;
     if !crate::is_within_allowed_roots(&canonical, &allowed) {
@@ -662,9 +669,9 @@ pub fn ensure_backup_dir(app: tauri::AppHandle, vault_id: String) -> Result<Stri
     // The same for the write command's second rule: in the app data folder it
     // only accepts `vaults/`. A vault lying next to it there would otherwise be
     // offered a target that is then refused.
-    crate::check_app_data_write(&app, &canonical.join(BACKUP_SUBDIR))?;
+    crate::check_app_data_write(&app, &canonical.join(EXPORT_SUBDIR))?;
 
-    let dir = vault.join(BACKUP_SUBDIR);
+    let dir = vault.join(EXPORT_SUBDIR);
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     Ok(dir.to_string_lossy().into_owned())
 }
@@ -731,9 +738,9 @@ pub fn probe_vault_dir(path: String) -> Result<VaultProbe, String> {
 /// Documents.
 ///
 /// So only this vault's own artefacts are removed by name. Whatever else lies
-/// there — the `backups/` folder of the database export, a `desktop.ini`, in
+/// there — the `backups/` and `export/` folders, a `desktop.ini`, in
 /// `~/Documents` the rule rather than the exception — stays, and with it the
-/// directory: both directories go with plain `remove_dir`, which fails while
+/// directory: these subfolders and the vault directory itself go with plain `remove_dir`, which fails while
 /// anything is left inside, and that failure is the answer here, not an error.
 /// Returns whether the vault directory itself is gone, so the UI can say "the
 /// folder stayed".
@@ -806,11 +813,12 @@ fn delete_files(app: &tauri::AppHandle, vault_id: &str) -> Result<bool, String> 
     // With the files gone the key is worthless — the remembered one too.
     crate::keys::discard(app, vault_id);
 
-    // An *empty* `backups/` — the normal case without an export, since
-    // `create_vault_dirs` creates it too — should not prevent the folder from
-    // being removed. `remove_dir` fails as soon as a backup lies in it, and
-    // exactly then both stay.
-    std::fs::remove_dir(dir.join(BACKUP_SUBDIR)).ok();
+    // An *empty* `backups/` (`create_vault_dirs` creates it) or `export/`
+    // should not prevent the folder from being removed. `remove_dir` fails as
+    // soon as a file lies in it, and then that subfolder and the vault folder stay.
+    for sub in [BACKUP_SUBDIR, EXPORT_SUBDIR] {
+        std::fs::remove_dir(dir.join(sub)).ok();
+    }
 
     Ok(std::fs::remove_dir(&dir).is_ok())
 }

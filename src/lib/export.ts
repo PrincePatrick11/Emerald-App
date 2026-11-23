@@ -9,6 +9,7 @@ import { compressDataUrl } from './imageCompression';
 import type { ImageMode } from './emerald/manifest';
 import DOMPurify from 'dompurify';
 import type { ExportData } from './exportData';
+import { exportDefaultPath } from './vaultManager';
 import { useEntryStore } from '../store/entryStore';
 import { useTaskStore } from '../store/taskStore';
 import { useCategoryStore } from '../store/categoryStore';
@@ -436,7 +437,7 @@ export async function exportAsPDF(items: readonly ExportItem[], file: ExportFile
   if (items.length === 0) throw new Error(i18n.t('emeraldExport.nothing'));
   // Same UX as Markdown / Emerald: native save dialog first, then render.
   const chosen = await save({
-    defaultPath: defaultFilename(items, file, 'pdf'),
+    defaultPath: await exportDefaultPath(defaultFilename(items, file, 'pdf')),
     filters: [{ name: 'PDF', extensions: ['pdf'] }],
   });
   if (!chosen) return false;
@@ -559,7 +560,7 @@ export async function exportAsMarkdown(items: readonly ExportItem[], file: Expor
   const markdown = items.map((item) => markdownOf(item.data, td)).join('\n');
 
   const chosen = await save({
-    defaultPath: defaultFilename(items, file, 'md'),
+    defaultPath: await exportDefaultPath(defaultFilename(items, file, 'md')),
     filters: [{ name: 'Markdown', extensions: ['md'] }],
   });
   if (!chosen) return false;

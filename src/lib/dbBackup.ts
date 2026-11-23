@@ -28,10 +28,10 @@ import { getDb, runMigrations, sweepDanglingTaskLinks, VAULT_OUTDATED, VAULT_TOO
 import Database from './sqlite';
 import {
   addVault,
+  exportDefaultPath,
   getActiveDbFile,
   getActiveVaultId,
   invalidateVaultCache,
-  joinPath,
   newVaultRecord,
   discardNewVaultDirs,
 } from './vaultManager';
@@ -737,21 +737,9 @@ export async function exportDatabase(
   options: BackupOptions,
   protection: EmeraldProtection = { type: 'vaultKey' },
 ): Promise<boolean> {
-  // The dialog opens in the active vault's `backups/` folder — created
-  // if needed. If that fails (vault folder currently unreachable),
-  // it stays with the bare file name and the dialog opens wherever the
-  // operating system wants; the export itself does not depend on it.
-  // An unprotected copy is not offered the vault's own folder: whoever gets
-  // that folder must read nothing without the password.
-  const filename = vaultFileName();
-  // One chain, one catch: if `getActiveVaultId()` stood as its own await in the
-  // argument, its rejection would escape the `.catch` and take the export down with it.
-  const backupDir = protection.type === 'none' ? null : await getActiveVaultId()
-    .then((vaultId) => invoke<string>('ensure_backup_dir', { vaultId }))
-    .catch(() => null);
-
+  // The dialog opens in the active vault's `export/` folder, like every export.
   const savePath = await save({
-    defaultPath: backupDir ? joinPath(backupDir, filename) : filename,
+    defaultPath: await exportDefaultPath(vaultFileName()),
     filters: [{ name: 'Emerald', extensions: ['emerald'] }],
   });
   if (!savePath) return false;

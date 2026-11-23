@@ -291,6 +291,22 @@ export async function getActiveVaultId(): Promise<string> {
   return data.activeVaultId;
 }
 
+/**
+ * The `defaultPath` of every export's save dialog: `filename` inside the active
+ * vault's `export/` folder, created if needed (`ensure_export_dir`). If that
+ * fails — vault folder unreachable, or outside the folders the write commands
+ * accept — it stays with the bare file name and the dialog opens wherever the
+ * operating system wants; the export itself does not depend on it.
+ */
+export async function exportDefaultPath(filename: string): Promise<string> {
+  // One chain, one catch: a rejection of `getActiveVaultId()` must land in the
+  // fallback too, not take the export down with it.
+  const dir = await getActiveVaultId()
+    .then((vaultId) => invoke<string>('ensure_export_dir', { vaultId }))
+    .catch(() => null);
+  return dir ? joinPath(dir, filename) : filename;
+}
+
 /** See `_activeVaultIdSync`. Only for render paths that cannot await. */
 export function getActiveVaultIdSync(): string {
   return _activeVaultIdSync;
