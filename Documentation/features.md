@@ -34,6 +34,8 @@ There is one formatting toolbar, pinned to the top while scrolling, acting on th
 
 **Managing blocks in the sidebar.** While editing, a collapsible "Blocks" section below the Properties panel lists the entry's blocks: drag a row by its grip to reorder (no animation — the row jumps into place), the eye hides a block, and the "…" menu renames, shows the title as a small read-mode heading, duplicates or removes it. "Add block" (and, where templates apply, "Insert template") sit at the top of the sidebar body in edit mode, "Insert template" first, in the template editor too; "Add block" appends one. Clicking a row selects the block and jumps to it; its own settings, if any, open in a box right under the row.
 
+A block you add ("Add block", a "+" line between blocks) or duplicate is selected the same way, with its settings open, and the entry scrolls to it and flashes it. If the sidebar is open, its "Blocks" section opens to show the new row; if the sidebar is closed, the block is still selected, but the section stays as you left it. Inserting a template selects nothing.
+
 - A **hidden** block keeps everything in it — greyed out and marked while editing, absent in read mode.
 - A text block with no real content (only empty paragraphs or line breaks) is also absent from read mode, without being marked hidden; while editing it keeps its blank space so it can still be written into.
 - **Renaming** changes only what the block is called (frame, list, and the optional heading); an empty name goes back to the type's name.

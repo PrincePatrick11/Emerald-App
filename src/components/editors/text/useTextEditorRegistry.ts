@@ -62,7 +62,9 @@ export function useTextEditorRegistry(getOrder: () => string[]) {
       map.set(key, { editor, onFocus });
       if (focusOnMountRef.current === key) {
         focusOnMountRef.current = null;
-        editor.commands.focus('end');
+        // Without scrolling: the caller brings the new block into view itself
+        // (BlockStack's reveal); the editor's own jump would cut that scroll short.
+        editor.commands.focus('end', { scrollIntoView: false });
       }
     } else if (lastFocusedRef.current === key) {
       lastFocusedRef.current = null;
@@ -74,7 +76,7 @@ export function useTextEditorRegistry(getOrder: () => string[]) {
       lastFocusedRef.current && current && current !== previous?.editor ? current : targetEditor());
   }, [targetEditor]);
 
-  /** The editor `key` gets focus as soon as it exists; for freshly inserted ones. */
+  /** The editor `key` gets focus as soon as it exists, for freshly inserted ones; it does not scroll. */
   const focusOnMount = useCallback((key: string) => { focusOnMountRef.current = key; }, []);
 
   return { registerTextEditor, orderedEditors, targetEditor, toolbarEditor, focusOnMount };

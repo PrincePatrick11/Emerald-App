@@ -105,6 +105,8 @@ export default function BlockStack({
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
   const stackRef = useRef<HTMLDivElement>(null);
+  /** New per mount: the sidebar's state (selection, menus) belongs to this mount only. */
+  const [sessionId] = useState(generateId);
   // Every change dismisses the "Template applied" notice; Undo would otherwise
   // also empty whatever arose afterwards.
   const emit = useCallback(() => {
@@ -135,6 +137,13 @@ export default function BlockStack({
     setBlocks(blocksRef.current);
     // In read mode the content may have changed from outside (useExternalContentReset).
   }, [isEditing]);
+
+  // A selection belongs to one edit: the next one starts without.
+  useEffect(() => {
+    if (isEditing) return;
+    const { selection, select } = useBlockSessionStore.getState();
+    if (selection?.sessionId === sessionId) select(null);
+  }, [isEditing, sessionId]);
 
   const resetEpoch = useExternalContentReset(initialContent, isEditing, blocksRef, setBlocks, onChangeRef);
 
@@ -253,6 +262,26 @@ export default function BlockStack({
 
   const [menu, setMenu] = useState<{ x: number; y: number; actions: ContextMenuAction[] } | null>(null);
 
+  /**
+   * A block that arose by a gesture (add, duplicate) is selected in the
+   * sidebar, its settings expanded, and is scrolled to and highlighted once it
+   * has rendered.
+   */
+  const pendingRevealRef = useRef<string | null>(null);
+  const selectNew = (id: string) => {
+    // With the sidebar closed the block is still selected, but its section is
+    // not forced open later: someone may have collapsed it on purpose.
+    const revealInSidebar = useUIStore.getState().rightSidebarOpen;
+    useBlockSessionStore.getState().select({ sessionId, blockId: id, revealInSidebar });
+    pendingRevealRef.current = id;
+  };
+  useEffect(() => {
+    const id = pendingRevealRef.current;
+    if (id === null) return;
+    pendingRevealRef.current = null;
+    apiRef.current.reveal(id);
+  }, [blocks]);
+
   const insertAt = (index: number, presetId: string) => {
     const block = createFromPreset(presetId, definitions, fieldTextRef.current);
     if (!block) return;
@@ -260,6 +289,7 @@ export default function BlockStack({
     const next = [...blocksRef.current];
     next.splice(index, 0, block);
     commit(next);
+    selectNew(block.id);
   };
 
   const duplicate = (id: string) => {
@@ -273,6 +303,7 @@ export default function BlockStack({
     const next = blocksRef.current.map((b) => (b.id === source.id ? b : withChargesCoveringCopy(b, source.id, id2)));
     next.splice(index + 1, 0, withRenamedPartTargets({ ...source, id: id2, attrs: { ...source.attrs } }, source.id, id2));
     commit(next);
+    selectNew(id2);
   };
 
   const remove = (id: string) => commit(blocksRef.current.filter((b) => b.id !== id));
@@ -325,6 +356,7 @@ export default function BlockStack({
   const reveal = (id: string) => {
     const el = stackRef.current?.querySelector<HTMLElement>(`[data-block-item="${CSS.escape(id)}"]`);
     if (!el) return;
+    el.toggleAttribute('data-reveal-first', isFirstVisibleItem(el));
     scrollIntoViewCentered(el);
     flashReveal(el, REVEAL_CLASS, REVEAL_MS);
   };
@@ -410,7 +442,6 @@ export default function BlockStack({
       openTemplatePicker: () => live()?.openTemplatePicker(),
     };
   }, []);
-  const [sessionId] = useState(generateId);
   // The views pass `templateTarget` as a new object on every render; the session only needs "yes/no".
   const offersTemplates = !!templateTarget;
 
@@ -550,6 +581,20 @@ export default function BlockStack({
     </TextEditorHostContext.Provider>
     </BlockStackContext.Provider>
   );
+}
+
+/**
+ * Is nothing visible above this slot of the stack? The first block one can see
+ * starts at the scroll area's top edge, which would cut off the flash ring's
+ * overhang (`data-reveal-first` in index.css). Hidden and empty blocks before
+ * it keep their zero-height slot, so `:first-child` cannot tell. The attribute
+ * may stay after the flash; the CSS only reads it together with the flash class.
+ */
+function isFirstVisibleItem(el: Element): boolean {
+  for (let prev = el.previousElementSibling; prev; prev = prev.previousElementSibling) {
+    if (prev.getBoundingClientRect().height > 0) return false;
+  }
+  return true;
 }
 
 /** Does the block hold a charge (a charge on its own or the part of a custom block)? */

@@ -45,17 +45,40 @@ export interface BlockSession {
   api: BlockStackApi;
 }
 
+/**
+ * The block selected in the sidebar's management list, with its settings
+ * expanded below the row. `sessionId` ties it to one mount of the stack, so a
+ * selection never outlives a Cancel remount or an entry switch. `revealInSidebar`
+ * is a one-time request, set when the stack selected a new block while the
+ * sidebar was open: the sidebar opens its blocks section, scrolls the row into
+ * view and clears the flag.
+ */
+export interface BlockSelection {
+  sessionId: string;
+  blockId: string;
+  revealInSidebar: boolean;
+}
+
 interface BlockSessionState {
   session: BlockSession | null;
+  selection: BlockSelection | null;
   publish: (session: BlockSession) => void;
   /** Clears only if the session still belongs to this stack — a new one may already have taken over. */
   clear: (api: BlockStackApi) => void;
+  select: (selection: BlockSelection | null) => void;
 }
 
 export const useBlockSessionStore = create<BlockSessionState>((set, get) => ({
   session: null,
+  selection: null,
   publish: (session) => set({ session }),
   clear: (api) => {
-    if (get().session?.api === api) set({ session: null });
+    if (get().session?.api === api) set({ session: null, selection: null });
   },
+  select: (selection) => set({ selection }),
 }));
+
+/** The block selected in this session, if any. */
+export function useSelectedBlockId(sessionId: string): string | null {
+  return useBlockSessionStore((s) => (s.selection?.sessionId === sessionId ? s.selection.blockId : null));
+}

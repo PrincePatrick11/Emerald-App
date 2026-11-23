@@ -1,10 +1,11 @@
-import { useRef, useState, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check, Eye, EyeOff, CopyPlus, GripVertical, MoreHorizontal, Pencil, Plus, Puzzle, Type } from 'lucide-react';
 import ContextMenu, { type ContextMenuAction } from '../ui/ContextMenu';
 import SidebarSection, { SidebarItemRow } from '../sidebar/fields/SidebarSection';
 import { useUIStore } from '../../store/uiStore';
-import { useBlockSessionStore, type BlockSession } from '../../store/blockSessionStore';
+import { useBlockSessionStore, useSelectedBlockId, type BlockSession } from '../../store/blockSessionStore';
+import { usePersistedFlag } from '../../hooks/usePersistedFlag';
 import { useBlockDefinitionStore } from '../../store/blockDefinitionStore';
 import BlockGlyph from './BlockGlyph';
 import { usePointerReorder } from '../../hooks/usePointerReorder';
@@ -137,10 +138,30 @@ function BlockManager({ session }: { session: BlockSession }) {
   const { t } = useTranslation();
   const [menu, setMenu] = useState<{ x: number; y: number; actions: ContextMenuAction[] } | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // In the store rather than here: the stack selects a block it has just added.
+  const selectedId = useSelectedBlockId(session.sessionId);
+  const setSelectedId = (blockId: string | null) => useBlockSessionStore.getState()
+    .select(blockId === null ? null : { sessionId: session.sessionId, blockId, revealInSidebar: false });
   const { api } = session;
   // Without animation.
   const { listRef, visualItems, draggingId, startDrag } = usePointerReorder(session.blocks, (ordered) => api.reorder(ordered.map((b) => b.id)));
+
+  // A block the stack selected itself (just added): open the section if it
+  // was closed and bring its row with the settings into view.
+  const selection = useBlockSessionStore((s) => s.selection);
+  const [, , setSectionOpen] = usePersistedFlag(OPEN_KEY, true);
+  useEffect(() => {
+    if (!selection?.revealInSidebar || selection.sessionId !== session.sessionId) return;
+    // Use up the request: a later render or remount of this list (the sidebar
+    // closed and reopened while editing) must not jump again.
+    useBlockSessionStore.getState().select({ ...selection, revealInSidebar: false });
+    setSectionOpen(true);
+    requestAnimationFrame(() => {
+      listRef.current
+        ?.querySelector(`[data-block-row="${CSS.escape(selection.blockId)}"]`)
+        ?.scrollIntoView({ block: 'nearest' });
+    });
+  }, [selection, session.sessionId, setSectionOpen, listRef]);
 
   const openRowMenu = (e: MouseEvent, block: BlockInstance, meta: BlockTypeMeta | undefined) => {
     const showsTitle = showsTitleInRead(block, meta);
@@ -238,7 +259,7 @@ function ManagerRow({
   const glyph = blockIcon(block, meta) ?? Puzzle;
 
   return (
-    <div>
+    <div data-block-row={block.id}>
       <div
         onContextMenu={(e) => { e.preventDefault(); onOpenMenu(e); }}
         // 32px tall, 13px and 14px icons like the other rows of the sidebar.
