@@ -29,6 +29,8 @@ export interface EntryListTabProps<T> {
   /** What renaming starts with: the saved title, without "Untitled…". If absent, `getTitle`. */
   getEditTitle?: (item: T) => string;
   getDateStr?: (item: T) => string | null | undefined;
+  /** Short additions at the end of the date line (icon and value) — they keep their width, the date line gives way. */
+  getInfo?: (item: T) => ReactNode;
   getIcon?: (item: T) => ReactNode;
   isActive?: (item: T) => boolean;
   onOpen?: (item: T) => void;
@@ -56,7 +58,7 @@ function setScrollbarShown(nav: HTMLElement, shown: boolean) {
 }
 
 export default function EntryListTab<T>({
-  items, getId, getTitle, getEditTitle = getTitle, getDateStr, getIcon, isActive, onOpen, onOpenNewTab, onDragStart,
+  items, getId, getTitle, getEditTitle = getTitle, getDateStr, getInfo, getIcon, isActive, onOpen, onOpenNewTab, onDragStart,
   onRename, contextMenuActions, emptyMessage, renderRow,
 }: EntryListTabProps<T>) {
   const { t } = useTranslation();
@@ -212,6 +214,13 @@ export default function EntryListTab<T>({
 
               const title = getTitle(item);
               const dateStr = getDateStr?.(item);
+              const info = getInfo?.(item);
+              const dateLine = (dateStr || info) && (
+                <div className="entry-list-date text-xs flex items-center gap-2 min-w-0">
+                  {dateStr && <span className="truncate">{dateStr}</span>}
+                  {info}
+                </div>
+              );
               const icon = getIcon?.(item);
               const active = isActive?.(item) ?? false;
               const dragHandler = onDragStart;
@@ -229,7 +238,7 @@ export default function EntryListTab<T>({
                         onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setRenamingId(null); }}
                         className="w-full bg-transparent text-sm text-soft outline-none selectable truncate"
                       />
-                      {dateStr && <div className="entry-list-date text-xs">{dateStr}</div>}
+                      {dateLine}
                     </div>
                   </div>
                 );
@@ -256,7 +265,7 @@ export default function EntryListTab<T>({
                   {icon}
                   <div className="flex-1 min-w-0">
                     <div className="entry-list-title truncate">{title}</div>
-                    {dateStr && <div className="entry-list-date text-xs truncate">{dateStr}</div>}
+                    {dateLine}
                   </div>
                 </button>
               );

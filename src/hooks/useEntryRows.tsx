@@ -5,7 +5,9 @@ import { categoryLabel, lookupCategory } from '../lib/categories';
 import { entryDateOf } from '../lib/dashboards';
 import { entryIcon } from '../lib/entryIcon';
 import { displayTitle } from '../lib/entryTitle';
-import { formatEntryDate } from '../lib/formatDate';
+import { formatEntryDate, formatIsoDate, formatIsoDateShort } from '../lib/formatDate';
+import { entryBlockSummary } from '../lib/blocks/entrySummary';
+import type { ShownListInfoPart } from '../lib/blocks/listInfo';
 import { setDragItem } from '../lib/dragState';
 import { useCategoryStore } from '../store/categoryStore';
 import { useEntryStore } from '../store/entryStore';
@@ -25,8 +27,6 @@ interface EntryRowOptions {
   dashboardId?: string;
   /** The date the row shows — the one its list sorts by. */
   dateField: 'created' | 'updated';
-  /** More for the info line, after category and date (a dashboard: a sigil's target date). */
-  extraMeta?: (entry: Entry) => string | null | undefined;
 }
 
 /** What a row of an entry is, wherever a list shows it; the frame around it is the list's own. */
@@ -36,8 +36,12 @@ export interface EntryRows {
   title: (entry: Entry) => string;
   /** What renaming starts with: the stored title, without "Untitled …". */
   editTitle: (entry: Entry) => string;
-  /** Category · date, then `extraMeta`. */
+  /** Category · date, then what the entry's blocks add (`ListInfoPart`), written out. */
   meta: (entry: Entry) => string;
+  /** The narrow left list: category · date only, without what the blocks add… */
+  shortMeta: (entry: Entry) => string;
+  /** …and what the blocks add as icon and short value, the long form as tooltip — `null` without any. */
+  shortInfo: (entry: Entry) => ReactNode;
   /** The date the row shows, for sorting by the same. */
   date: (entry: Entry) => string;
   view: (entry: Entry) => ActiveView;
@@ -47,11 +51,16 @@ export interface EntryRows {
   actions: (entry: Entry, startRename: () => void) => ContextMenuAction[];
 }
 
+/** The value of a part, its date in the given form. */
+function infoValue(part: ShownListInfoPart, formatDate: (iso: string) => string): string {
+  return part.value.kind === 'date' ? formatDate(part.value.iso) : part.value.text;
+}
+
 /**
  * The one row of an entry — in the left list, on a dashboard and under a tag:
  * icon, title, the info line, where it opens and its context menu.
  */
-export function useEntryRows({ dashboardId, dateField, extraMeta }: EntryRowOptions): EntryRows {
+export function useEntryRows({ dashboardId, dateField }: EntryRowOptions): EntryRows {
   const { t } = useTranslation();
   const openInNewTabAction = useOpenInNewTabAction();
   const saveAsTemplateAction = useSaveAsTemplateAction();
@@ -65,6 +74,12 @@ export function useEntryRows({ dashboardId, dateField, extraMeta }: EntryRowOpti
   const view = (e: Entry) => entryView(e.id, dashboardId);
   const date = (e: Entry) => entryDateOf(e, dateField);
 
+  const info = (e: Entry) => entryBlockSummary(e.id, e.content).listInfo;
+  // No fallback to the raw category_id: for a deleted category the label is omitted.
+  const baseMeta = (e: Entry) => [categoryLabel(t, lookupCategory(catById, e.category_id)), formatEntryDate(date(e))];
+  // "Label: value" as a key: French puts a space before the colon.
+  const longInfo = (part: ShownListInfoPart) => t('common.labelValue', { label: t(part.labelKey), value: infoValue(part, formatIsoDate) });
+
   const duplicate = async (e: Entry) => {
     const copy = await duplicateEntry(e.id);
     if (copy) setActiveView(view(copy));
@@ -74,9 +89,18 @@ export function useEntryRows({ dashboardId, dateField, extraMeta }: EntryRowOpti
     icon: (e) => entryIcon(e, lookupCategory(catById, e.category_id), showMoonPhase),
     title: (e) => displayTitle(t, 'entry', e.title),
     editTitle: (e) => e.title,
-    // No fallback to the raw category_id: for a deleted category the label is omitted.
-    meta: (e) => [categoryLabel(t, lookupCategory(catById, e.category_id)), formatEntryDate(date(e)), extraMeta?.(e)]
-      .filter(Boolean).join(' · '),
+    meta: (e) => [...baseMeta(e), ...info(e).map(longInfo)].filter(Boolean).join(' · '),
+    shortMeta: (e) => baseMeta(e).filter(Boolean).join(' · '),
+    shortInfo: (e) => {
+      const parts = info(e);
+      if (parts.length === 0) return null;
+      return parts.map((part) => (
+        <span key={part.key} className="entry-list-info" title={longInfo(part)}>
+          <part.icon size={12} className="flex-shrink-0" aria-hidden />
+          {infoValue(part, formatIsoDateShort)}
+        </span>
+      ));
+    },
     date,
     view,
     rename: async (e, title) => {

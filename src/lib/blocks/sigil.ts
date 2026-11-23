@@ -1,3 +1,4 @@
+import { CalendarClock } from 'lucide-react';
 import { escapeHtml } from '../internalLinkHtml';
 import { generateId } from '../helpers';
 import { neutralizeSectionTags, parseBlocks, serializeBlocks } from './blockHtml';
@@ -8,6 +9,7 @@ import {
 import { createSigilDrawingBlock, isSigilDrawing, PAINT_BLOCK_TYPE } from './paint';
 import { readBlockData, withBlockData } from './blockJson';
 import { BLOCK_ATTR, type BlockInstance } from './types';
+import type { ListInfoPart } from './listInfo';
 
 /**
  * A sigil: calculator, drawing, charge.
@@ -197,6 +199,24 @@ export function serializeSigilCharge(block: BlockInstance, charge: Omit<SigilCha
   return withBlockData(block, data, date + technique);
 }
 
+/**
+ * The info line of lists: the charge's target date. Of several charges in an
+ * entry the first loaded one speaks, otherwise the first — a loaded one
+ * without a date therefore shows none, even if an unloaded one has one.
+ */
+export function chargeListInfo(block: BlockInstance, element: ElementDef, model: FieldsModel): ListInfoPart[] {
+  if (!isSigilElement(element)) return [];
+  const charge = parseSigilCharge(sigilPartBlock(block, element, model));
+  if (charge.broken) return [];
+  return [{
+    key: 'sigil.targetDate',
+    rank: charge.loaded ? 0 : 1,
+    icon: CalendarClock,
+    labelKey: 'creation.targetDate',
+    value: charge.revealDate ? { kind: 'date', iso: charge.revealDate } : null,
+  }];
+}
+
 /** Does the charge currently conceal: loaded, and the target date has not been reached (or there is none). */
 export function chargeConceals(charge: Pick<SigilCharge, 'loaded' | 'revealDate'>, today: string): boolean {
   return charge.loaded && (!charge.revealDate || charge.revealDate > today);
@@ -275,8 +295,6 @@ export function sigilUnits(blocks: readonly BlockInstance[]): SigilUnit[] {
 /* ---------------- State of the entry ---------------- */
 
 export interface SigilState {
-  /** The target date of the first loaded charge, otherwise of the first — what the card in the list shows. */
-  revealDate: string | null;
   /** A loaded charge with the "whole entry" lock: no editing, no change from read mode. */
   lockEntry: boolean;
   /**
@@ -353,7 +371,7 @@ export function withChargesCoveringCopy(block: BlockInstance, oldId: string, new
   });
 }
 
-const NO_SIGIL: SigilState = { revealDate: null, lockEntry: false, concealed: new Map(), locked: new Set() };
+const NO_SIGIL: SigilState = { lockEntry: false, concealed: new Map(), locked: new Set() };
 
 /** Of two charges that conceal the same block, the longer one applies — "until unloaded" is the longest. */
 function laterReveal(a: string | null, b: string | null): string | null {
@@ -389,8 +407,7 @@ export function sigilState(blocks: readonly BlockInstance[], today: string): Sig
         : charge.revealDate);
     }
   }
-  const shown = charges.find((c) => c.loaded) ?? charges[0];
-  return { revealDate: shown.revealDate, lockEntry, concealed, locked };
+  return { lockEntry, concealed, locked };
 }
 
 /** The element IDs of the concealed parts of this field block. */

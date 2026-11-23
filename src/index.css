@@ -394,6 +394,15 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     color: var(--text-subtle);
   }
 
+  /* What a block adds to the left list's date line (a sigil's target date): icon and short value, never cut. */
+  .entry-list-info {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
   /* Next to the rail, the list on the left needs little margin of its own — the rail
      brings its 6px of room along. Search icon and row icons sit 14px after the
      rail on one line, directly under the menu icon of the title bar (there

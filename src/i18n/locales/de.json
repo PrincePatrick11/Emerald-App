@@ -1,5 +1,6 @@
 {
   "common": {
+    "labelValue": "{{label}}: {{value}}",
     "saveFailed": "Änderung konnte nicht gespeichert werden – sie wurde zurückgenommen.",
     "delete": "Löschen",
     "confirmSure": "Sicher?",

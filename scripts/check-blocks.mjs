@@ -380,7 +380,8 @@ console.log('\n4d. Custom blocks: copies\n');
   check('a copy from before keeps working with its old markers',
     parseFields({ ...filled, attrs: { ...filled.attrs, 'data-block-origin': 'def-1', 'data-block-rev': '1' } }).values['e-result'] === 'gut');
 
-  check('a summary without sigil blocks is empty', entryBlockSummary('x', content).sigil === null);
+  const plainSummary = entryBlockSummary('x', content);
+  check('a summary without sigil blocks is empty', plainSummary.sigil === null && plainSummary.listInfo.length === 0);
 
   check('definition columns: broken JSON yields the defaults',
     parseDefinitionElements('{kaputt').length === 0 && parseDefinitionDisplay('nope').showTitle === true &&
@@ -784,7 +785,7 @@ console.log('\n4h. Sigils as parts of custom blocks\n');
   const before = sigilState(back, '2029-12-31');
   check('a loaded charge as a part hides and locks the parts, locks the entry',
     before.concealed.has(sigilPartId(block.id, 'calc')) && before.concealed.has(sigilPartId(block.id, 'draw'))
-      && before.lockEntry && before.revealDate === '2030-01-01', before);
+      && before.lockEntry, before);
   const content = serializeBlocks(back);
   const hidden = withoutConcealed(content, '2029-12-31');
   check('search and .emerald do not see hidden parts — the rest of the block stays',
@@ -817,8 +818,14 @@ console.log('\n4h. Sigils as parts of custom blocks\n');
 
   const summary = entryBlockSummary('sigil-part', content, '2029-12-31');
   check('the summary knows the sigil in the part (lock, target date)',
-    summary.sigil?.lockEntry === true && !!summary.sigil.revealDate
+    summary.sigil?.lockEntry === true
       && !('image' in summary.sigil), summary.sigil);
+  check('the charge puts its target date into the info line of lists',
+    summary.listInfo.length === 1 && summary.listInfo[0].key === 'sigil.targetDate'
+      && summary.listInfo[0].value.iso === '2030-01-01', summary.listInfo);
+  const hiddenSigil = serializeBlocks(parseBlocks(content).map((b) => (b.type === 'core.fields' ? { ...b, attrs: { ...b.attrs, [BLOCK_ATTR.hidden]: '1' } } : b)));
+  check('a hidden sigil block still shows its target date in lists',
+    entryBlockSummary('sigil-hidden', hiddenSigil, '2029-12-31').listInfo[0]?.value.iso === '2030-01-01');
   const dupId = 'dup-block';
   const targeted = setPart(parseBlocks(unloaded)[1], 'charge', (p) => serializeSigilCharge(p, {
     ...parseSigilCharge(p), targets: [sigilPartId(block.id, 'calc'), 'fremd-block'],

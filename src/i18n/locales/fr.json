@@ -1,5 +1,6 @@
 {
   "common": {
+    "labelValue": "{{label}} : {{value}}",
     "saveFailed": "Impossible d’enregistrer la modification ; elle a été annulée.",
     "delete": "Supprimer",
     "confirmSure": "Sûr ?",

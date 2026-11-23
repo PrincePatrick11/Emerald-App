@@ -75,17 +75,38 @@ export function formatTimeDistance(date: string | Date): string {
   return formatDistanceToNow(new Date(date), { locale: activeLocale });
 }
 
-/**
- * An ISO date (`YYYY-MM-DD`) in the long form of the app language. Built as a local
- * date — the ISO string directly would mean UTC midnight and thus, west of
- * Greenwich, the previous day. An impossible date (31 February) is left
- * raw instead of silently rolling over into March.
- */
+/** An ISO date (`YYYY-MM-DD`) in the long form of the app language — raw if impossible (`isoLocalDate`). */
 export function formatIsoDateLong(iso: string): string {
+  const date = isoLocalDate(iso);
+  return date ? formatEntryDateLong(date) : iso;
+}
+
+/** The same in the medium form of the lists (`formatEntryDate`). */
+export function formatIsoDate(iso: string): string {
+  const date = isoLocalDate(iso);
+  return date ? formatEntryDate(date) : iso;
+}
+
+/**
+ * The same as short as it gets, for the narrow left list: day and month
+ * ("Dec 12", de "12. Dez."), the year only when it is not this one.
+ */
+export function formatIsoDateShort(iso: string): string {
+  const date = isoLocalDate(iso);
+  if (!date) return iso;
+  const year = date.getFullYear() === new Date().getFullYear() ? undefined : 'numeric';
+  return new Intl.DateTimeFormat(activeLocale.code, { day: 'numeric', month: 'short', year }).format(date);
+}
+
+/**
+ * An ISO date as a local date — the ISO string directly would mean UTC
+ * midnight and thus, west of Greenwich, the previous day. An impossible date
+ * (31 February) gives `null` instead of silently rolling over into March.
+ */
+function isoLocalDate(iso: string): Date | null {
   const [y, m, d] = iso.split('-').map(Number);
   const date = new Date(y, m - 1, d);
-  if (!y || date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d) return iso;
-  return formatEntryDateLong(date);
+  return !y || date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d ? null : date;
 }
 
 /** Weekday like `Date.getDay()`: 0 = Sunday. */

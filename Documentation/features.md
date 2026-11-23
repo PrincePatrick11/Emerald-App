@@ -100,7 +100,7 @@ Practice tracks magical workings: rituals in progress, ongoing practices, servit
 
 **Status, end date and version are yours to build.** Practice entries have no fixed status fields: a block of your own in the Blocks view (say, Active — yes/no, End date, Version) is added via "Add block", and a yes/no field can be toggled straight from read mode. Filtering the list by block values is planned.
 
-**Icon and Cover Image.** Practice entries use the same icon rule and cover image as Knowledge entries (see [Knowledge](#knowledge)). A row shows "category · last changed"; a sigil with a target date appends "Target date: …", in rows and cards alike.
+**Icon and Cover Image.** Practice entries use the same icon rule and cover image as Knowledge entries (see [Knowledge](#knowledge)). A row shows "category · last changed"; a sigil with a target date appends "Target date: …" in rows, cards and under a tag, and the left list shows it short with an icon (the full text as tooltip) — even when the sigil block is hidden.
 
 ### Sigil Workflow
 

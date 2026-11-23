@@ -115,6 +115,7 @@ function AllList() {
       // Reuse the list's own subtitle so an entry never shows one date here and
       // another there; the task label is what "All" adds on top.
       getDateStr={(r) => [r.src.kindLabel(r.item), r.src.cfg.getDateStr?.(r.item)].filter(Boolean).join(' · ')}
+      getInfo={(r) => r.src.cfg.getInfo?.(r.item)}
       getIcon={(r) => r.src.cfg.getIcon?.(r.item)}
       isActive={(r) => r.src.cfg.isActive?.(r.item) ?? false}
       onOpen={(r) => r.src.cfg.onOpen?.(r.item)}
@@ -149,7 +150,9 @@ function useEntriesConfig(entries: readonly Entry[], dashboardId: string): Entry
     getId: (e) => e.id,
     getTitle: rows.title,
     getEditTitle: rows.editTitle,
-    getDateStr: rows.meta,
+    // Narrow: what the blocks add comes as icon and short value after it.
+    getDateStr: rows.shortMeta,
+    getInfo: rows.shortInfo,
     getIcon: (e) => {
       const icon = rows.icon(e);
       return isImageIcon(icon)

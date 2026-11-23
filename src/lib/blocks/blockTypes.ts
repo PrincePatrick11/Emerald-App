@@ -4,6 +4,7 @@ import { FIELDS_BLOCK_TYPE } from './fields';
 import { ALTAR_BLOCK_TYPE, CANVAS_BLOCK_TYPE } from './canvas';
 import { PAINT_BLOCK_TYPE } from './paint';
 import { AltarIcon } from '../altarIcon';
+import { fieldsListInfo, type ListInfoProvider } from './listInfo';
 
 /**
  * The registry of block types — the pure part (metadata). Which component
@@ -33,6 +34,8 @@ export interface BlockTypeMeta {
   /** Show the title in read mode unless the instance says otherwise.
    *  Text flows without a heading, field and tool blocks carry one. */
   defaultShowTitle: boolean;
+  /** What a block of this type adds to its entry's info line in lists — none if missing. */
+  listInfo?: ListInfoProvider;
 }
 
 // A Map instead of an object: the type comes from stored content, and
@@ -58,6 +61,7 @@ const BLOCK_TYPES = new Map<string, BlockTypeMeta>([
     dataVersion: 1,
     // A single field carries its label in the row anyway.
     defaultShowTitle: false,
+    listInfo: fieldsListInfo,
   }],
   [CANVAS_BLOCK_TYPE, {
     id: CANVAS_BLOCK_TYPE,
@@ -102,3 +106,6 @@ export function resolveBlockType(block: BlockInstance): BlockTypeMeta | undefine
   const version = Number(block.attrs[BLOCK_ATTR.version] ?? 1);
   return Number.isFinite(version) && version <= meta.dataVersion ? meta : undefined;
 }
+
+/** What every block type adds to the info line in lists — for the summary's pre-check. */
+export const LIST_INFO_PROVIDERS: readonly ListInfoProvider[] = [...BLOCK_TYPES.values()].flatMap((meta) => meta.listInfo ?? []);

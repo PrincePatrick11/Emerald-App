@@ -7,10 +7,8 @@ import { useCollapsedSet } from '../../hooks/useCollapsedSet';
 import { useDashboardEntries } from '../../hooks/useDashboardEntries';
 import { useDashboardPrefs } from '../../hooks/useDashboardPrefs';
 import { useEntryItems, useEntryRows } from '../../hooks/useEntryRows';
-import { entryBlockSummary } from '../../lib/blocks/entrySummary';
 import { dashboardDateField } from '../../lib/dashboards';
 import { categoriesUsedBy, categoryLabel, hasUncategorized, lookupCategory } from '../../lib/categories';
-import { formatEntryDate } from '../../lib/formatDate';
 import { sortItems } from '../../lib/sortItems';
 import { isCardView } from '../../lib/viewMode';
 import { countByCategory, groupByCategory, groupByMonth, UNCATEGORIZED_KEY } from '../../lib/groupBy';
@@ -52,15 +50,7 @@ export default function EntryDashboard({ dashboard, title, newLabel, onNew, empt
   const scope = `dashboard:${dashboard?.id ?? 'all'}` as const;
   const dateField = dashboardDateField(dashboard);
   const [{ view, sort, grouping }, setPrefs] = useDashboardPrefs(dashboard, dateField);
-  const rows = useEntryRows({
-    dashboardId: dashboard?.id,
-    dateField,
-    // A sigil with a target date appends it — row and card alike.
-    extraMeta: (e) => {
-      const revealDate = entryBlockSummary(e.id, e.content).sigil?.revealDate;
-      return revealDate ? `${t('creation.targetDate')}: ${formatEntryDate(revealDate)}` : null;
-    },
-  });
+  const rows = useEntryRows({ dashboardId: dashboard?.id, dateField });
   const dateOf = rows.date;
   const { render, menu } = useEntryItems(rows, entries);
   const [search, setSearch] = useSessionState(`${scope}.search`, '');

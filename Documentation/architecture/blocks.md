@@ -20,6 +20,8 @@ The rows are the only record. "Images" and the image cleanup ask `block_refs`; f
 
 Two halves, mirroring `modules.ts`/`moduleViews.ts`: `src/lib/blocks/` is pure (no React, stores or TipTap) because the database path, the checks under Node and export use it; `src/components/blocks/blockViews.ts` maps a type to its component and is imported only by `BlockStack`, since the text block pulls in TipTap.
 
+**What a block adds to the info line of lists.** A registry entry may carry `listInfo` (`ListInfoProvider`, `lib/blocks/listInfo.ts`): a cheap `mayContribute(content)` pre-check on the raw content and `parts(block, today)`, which returns `ListInfoPart`s — a key, a rank, an icon, a label key and a value (a date, a text, or `null` for "holds the key, shows nothing"). `entryBlockSummary` parses only content that some type's pre-check lets through, asks every block (a hidden one only if its type sets `evenWhenHidden`), and keeps per key the part with the lowest rank, the first among equals. The long form is the shared key `common.labelValue` ("Label: value", French with a space before the colon). No list names a block type: `useEntryRows` writes the parts out after category and date ("Target date: Dec 12, 2026") in dashboard rows and cards and under a tag, and the narrow left list shows them short — icon and value (`formatIsoDateShort`), the long form as tooltip. The fields block hands the question on to its field kinds (`ELEMENT_LIST_INFO`: the kind's name is its pre-check marker, each kind sets its own `evenWhenHidden`, archived fields add nothing); today only the charge answers: its target date, the first loaded charge before the others, shown for a hidden sigil block too.
+
 ### The block stack
 
 **One owner for document-wide listeners.** With several text blocks, a `document`-level listener per editor would let every request hit every block, so `BlockStack` is the host of the entry's text editors ([`editors.md`](editors.md#text-editor)): toolbar, link picker, chip-click navigation, OS file drops, pointer drops from the left list and `DragGhost` exist once per entry. The stack itself handles the three `lib/links.ts` link requests: append goes to the last-focused text block, else the last; reveal/remove try each block in order, then link fields.
@@ -75,8 +77,9 @@ The right sidebar and the main area are sibling trees, so `BlockStack` publishes
 
 - `concealed`: `Map<blockId, revealDate | null>`; on overlap the later date wins, `null` beating any date;
 - `locked`: every block id a loaded charge covers, concealed or not (read-only while editing);
-- `lockEntry`: some loaded charge locks the whole entry;
-- `revealDate`: for cards and lists only — the first loaded charge's, else the first charge's.
+- `lockEntry`: some loaded charge locks the whole entry.
+
+What lists show of a charge (its target date) is not part of this state but comes from its `listInfo` (see [Registry](#registry)).
 
 **Units.** A part is a **virtual block** with id `<blockId>:<elementId>` (`sigilPartId`) and its element kind as type: `sigilPartBlock` builds it from the fields model (element value as `data-block`, slot HTML as `html`), `withSigilPart` writes it back. `sigilUnits(blocks)` yields every sigil paint block and every part (`SigilUnit[]`), and everything downstream — `sigilState`, `entrySummary`, `withoutConcealed`, PDF/Markdown export — goes through it, so a sigil on its own and one inside a user-built block behave identically. `withoutElementContent`/`withElementValue` blank a concealed part's content or write back a charge part's state. `mayHoldSigil`/`mayHoldCharge` are string pre-filters that skip parsing; they match bare kind names, since an imported part's JSON may quote them differently.
 

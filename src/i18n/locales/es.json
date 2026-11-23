@@ -1,5 +1,6 @@
 {
   "common": {
+    "labelValue": "{{label}}: {{value}}",
     "saveFailed": "No se pudo guardar el cambio; se ha deshecho.",
     "delete": "Eliminar",
     "confirmSure": "¿Seguro?",
