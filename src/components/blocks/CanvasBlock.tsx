@@ -17,6 +17,7 @@ import { ALTAR_LIBRARY_TAG_ID, ALTAR_LIBRARY_TAG_NAME } from '../../lib/schema';
 import { acceptedImagePaths, fileBaseName, storeImageFromPath } from '../../lib/storeImage';
 import { getImageDragItem, setImageDragItem, subscribeImageDrag, type ImageDragItem } from '../../lib/imageDragState';
 import { useFileDrop } from '../../hooks/useFileDrop';
+import { useImportWindowStore } from '../../store/importWindowStore';
 import { useOwnSymbols } from '../../hooks/useOwnSymbols';
 import { pickPictures, useImagePickerStore } from '../../store/imagePickerStore';
 import { discardRenders, useImageStore } from '../../store/imageStore';
@@ -322,9 +323,10 @@ export default function CanvasBlock({ block, isEditing, onBlockChange, onPersist
   // Files from the disk let go over the canvas: into "Images", under their
   // file name (with the strip's tag), and onto the canvas where they were
   // let go, side by side. The text editors around leave them alone
-  // (`data-file-drop`). While the strip's add dialog is open, they go there.
+  // (`data-file-drop`). While the strip's add dialog is open, they go there; while the import window is open, they are its.
   const pickerOpen = useImagePickerStore((s) => !!s.request);
-  const { dragOver } = useFileDrop(editable && !pickerOpen, (paths, point) => {
+  const importOpen = useImportWindowStore((s) => s.open);
+  const { dragOver } = useFileDrop(editable && !pickerOpen && !importOpen, (paths, point) => {
     if (adding) {
       setDropped((list) => [...list, ...paths]);
       return;

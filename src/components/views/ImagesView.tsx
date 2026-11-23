@@ -15,6 +15,7 @@ import ImageTile from '../images/ImageTile';
 import ImageEditModal from '../images/ImageEditModal';
 import AddImagesModal from '../images/AddImagesModal';
 import { isImportPath } from '../../lib/importPaths';
+import { useImportWindowStore } from '../../store/importWindowStore';
 import CollectionDashboard, { useCollectionState } from './CollectionDashboard';
 
 type ImageItem = PictureItem;
@@ -41,8 +42,9 @@ export default function ImagesView() {
   useNewFormRequest(() => setAdding(true));
 
   // Files dropped anywhere over the view go into the add dialog, opening it.
-  // Files the import window takes are its own (`useImportDrop`).
-  const { dragOver } = useFileDrop(!editing, (all) => {
+  // Files the import window takes are its own (`useImportDrop`); while it is open, every drop is.
+  const importOpen = useImportWindowStore((s) => s.open);
+  const { dragOver } = useFileDrop(!editing && !importOpen, (all) => {
     const paths = all.filter((path) => !isImportPath(path));
     if (paths.length === 0) return;
     setDropped((list) => [...list, ...paths]);
