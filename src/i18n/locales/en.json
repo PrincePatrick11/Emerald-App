@@ -1298,8 +1298,17 @@
       "dismiss": "Dismiss"
     },
     "defaultTemplate": "Default template",
-    "defaultTemplateHint": "What a new entry starts with when its category has no start template of its own. Start templates are set on the category, under Categories.",
-    "defaultNone": "None — start empty"
+    "defaultTemplateHint": "What a new entry starts with when its category has no start template of its own.",
+    "defaultNone": "None — start empty",
+    "categoryStart": "Category start templates",
+    "categoryStartHint": "What a new entry in a category starts with. You can also set this on the category, under Categories.",
+    "categoryStartOnDefault": "On the default template: {{names}}",
+    "categoryStartNoneOnDefault": "Every category has a start template of its own.",
+    "startsIn": "Starts in",
+    "startsInHint": "A new entry in these categories starts with this template.",
+    "startsInOther": "Now: {{name}}",
+    "startsInNoCategories": "No categories yet",
+    "categoryStartEmpty": "Starting empty (no default template set): {{names}}"
   },
   "lexicon": {
     "languages": "Languages",

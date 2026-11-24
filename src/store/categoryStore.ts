@@ -31,6 +31,13 @@ interface CategoryState {
   updateCategory: (id: string, name: string, emoji: string) => Promise<void>;
   /** The template new entries of the category start with — `null`: the vault's default. Built-ins too. */
   setStartTemplate: (id: string, templateId: string | null) => Promise<void>;
+  /**
+   * Applies a template page's toggles: `add` start with the template from now
+   * on, `remove` go back to the default — only those still starting with it,
+   * so a category given another template meanwhile keeps that one. In one
+   * transaction.
+   */
+  setTemplateCategories: (templateId: string, change: { add: string[]; remove: string[] }) => Promise<void>;
   /** Soft delete. `false` if the category is built in. */
   deleteCategory: (id: string) => Promise<boolean>;
   /** The id of the category the content now sits in — its own, or the same-named one it merged into. */
@@ -143,6 +150,26 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     const db = await getDb();
     await db.execute('UPDATE categories SET template_id=$1 WHERE id=$2', [templateId, id]);
     set((s) => ({ categories: s.categories.map((c) => (c.id === id ? { ...c, template_id: templateId } : c)) }));
+  },
+
+  setTemplateCategories: async (templateId, changes) => {
+    // A draft kept across a tab switch may name a category moved to the Trash meanwhile: leave it alone.
+    const live = new Set(get().categories.map((c) => c.id));
+    const add = changes.add.filter((id) => live.has(id));
+    const remove = changes.remove.filter((id) => live.has(id));
+    if (add.length === 0 && remove.length === 0) return;
+    const db = await getDb();
+    await db.batch([
+      ...add.map((id) => ['UPDATE categories SET template_id=$1 WHERE id=$2', [templateId, id]] as const),
+      ...remove.map((id) => ['UPDATE categories SET template_id=NULL WHERE id=$1 AND template_id=$2', [id, templateId]] as const),
+    ]);
+    set((s) => ({
+      categories: s.categories.map((c) => {
+        if (add.includes(c.id)) return { ...c, template_id: templateId };
+        if (remove.includes(c.id) && c.template_id === templateId) return { ...c, template_id: null };
+        return c;
+      }),
+    }));
   },
 
   deleteCategory: async (id) => {

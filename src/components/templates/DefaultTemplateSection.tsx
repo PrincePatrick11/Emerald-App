@@ -7,7 +7,7 @@ import { useSettingsStore } from '../../store/settingsStore';
 /**
  * Below the template list: the vault's default template — what a new entry
  * starts with when its category has no start template of its own (those are
- * set on the category, under Categories). A vault setting
+ * set in the section below, or on the category). A vault setting
  * (`templates.defaultTemplateId`), so it travels with the backup.
  */
 export default function DefaultTemplateSection() {

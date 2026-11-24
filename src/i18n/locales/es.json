@@ -1298,8 +1298,17 @@
       "dismiss": "Cerrar aviso"
     },
     "defaultTemplate": "Plantilla predeterminada",
-    "defaultTemplateHint": "Con qué empieza una entrada nueva cuando su categoría no tiene plantilla inicial propia. Las plantillas iniciales se eligen en la categoría, en Categorías.",
-    "defaultNone": "Ninguna: empezar vacía"
+    "defaultTemplateHint": "Con qué empieza una entrada nueva cuando su categoría no tiene plantilla inicial propia.",
+    "defaultNone": "Ninguna: empezar vacía",
+    "categoryStart": "Plantillas iniciales de las categorías",
+    "categoryStartHint": "Con qué empieza una entrada nueva en una categoría. También puedes elegirlo en la categoría, en Categorías.",
+    "categoryStartOnDefault": "Con la plantilla predeterminada: {{names}}",
+    "categoryStartNoneOnDefault": "Cada categoría tiene su propia plantilla inicial.",
+    "startsIn": "Empieza en",
+    "startsInHint": "Una entrada nueva en estas categorías empieza con esta plantilla.",
+    "startsInOther": "Ahora: {{name}}",
+    "startsInNoCategories": "Aún no hay categorías",
+    "categoryStartEmpty": "Inicio vacío (sin plantilla predeterminada): {{names}}"
   },
   "lexicon": {
     "languages": "Idiomas",

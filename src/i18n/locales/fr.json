@@ -1298,8 +1298,17 @@
       "dismiss": "Fermer"
     },
     "defaultTemplate": "Modèle par défaut",
-    "defaultTemplateHint": "Ce par quoi commence une nouvelle entrée quand sa catégorie n’a pas de modèle de départ propre. Les modèles de départ se choisissent sur la catégorie, sous Catégories.",
-    "defaultNone": "Aucun — commencer vide"
+    "defaultTemplateHint": "Ce par quoi commence une nouvelle entrée quand sa catégorie n’a pas de modèle de départ propre.",
+    "defaultNone": "Aucun — commencer vide",
+    "categoryStart": "Modèles de départ des catégories",
+    "categoryStartHint": "Ce par quoi commence une nouvelle entrée dans une catégorie. Tu peux aussi le choisir sur la catégorie, sous Catégories.",
+    "categoryStartOnDefault": "Avec le modèle par défaut : {{names}}",
+    "categoryStartNoneOnDefault": "Chaque catégorie a son propre modèle de départ.",
+    "startsIn": "Commence dans",
+    "startsInHint": "Une nouvelle entrée dans ces catégories commence avec ce modèle.",
+    "startsInOther": "Actuel : {{name}}",
+    "startsInNoCategories": "Pas encore de catégories",
+    "categoryStartEmpty": "Départ vide (aucun modèle par défaut) : {{names}}"
   },
   "lexicon": {
     "languages": "Langues",

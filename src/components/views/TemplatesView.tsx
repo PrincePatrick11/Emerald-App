@@ -14,6 +14,7 @@ import { useOpenInNewTabAction } from '../../hooks/useOpenInNewTabAction';
 import BlockGlyph from '../blocks/BlockGlyph';
 import TemplateEditor from '../templates/TemplateEditor';
 import DefaultTemplateSection from '../templates/DefaultTemplateSection';
+import CategoryStartTemplatesSection from '../templates/CategoryStartTemplatesSection';
 import { createItem } from '../../lib/createItem';
 import { useLibraryItemRemove } from '../../hooks/useLibraryItemRemove';
 
@@ -21,7 +22,8 @@ import { useLibraryItemRemove } from '../../hooks/useLibraryItemRemove';
  * The rail view "Templates", built like "Blocks": the list of templates in the
  * shared dashboard scaffold, a click opens the template as a page of its own
  * (`{ type: 'templates', id }`). Below it the vault's default template
- * (`DefaultTemplateSection`). Deleting moves a template to the trash (with
+ * (`DefaultTemplateSection`) and every category's start template
+ * (`CategoryStartTemplatesSection`). Deleting moves a template to the trash (with
  * undo) — entries created from it stay as they are.
  */
 export default function TemplatesView() {
@@ -129,7 +131,7 @@ function TemplateList({ onCreate, onDelete }: {
           onToggleCollapse={toggleCollapsed}
         />
       }
-      contentFooter={<DefaultTemplateSection />}
+      contentFooter={<><DefaultTemplateSection /><CategoryStartTemplatesSection /></>}
     />
   );
 }

@@ -66,10 +66,19 @@ export function resolveStartTemplate(
   defaultTemplateId: string | null,
 ): Template | null {
   for (const id of [category?.template_id ?? null, defaultTemplateId]) {
-    const hit = id ? templates.find((t) => t.id === id) : undefined;
+    const hit = activeTemplate(templates, id);
     if (hit) return hit;
   }
   return null;
+}
+
+/**
+ * The template behind a stored id while it is active (`templates` holds only
+ * the active ones) — one in the Trash or gone counts as none, the rule
+ * `resolveStartTemplate` applies.
+ */
+export function activeTemplate(templates: readonly Template[], id: string | null | undefined): Template | undefined {
+  return id ? templates.find((t) => t.id === id) : undefined;
 }
 
 /** A charge target (block ID or `<block ID>:<element ID>`) mapped to the new block ID. */

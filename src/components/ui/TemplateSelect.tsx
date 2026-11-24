@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import Dropdown from './Dropdown';
 import { useTemplateStore } from '../../store/templateStore';
 import { templateLabel } from '../../lib/blocks/blockAttrs';
+import { activeTemplate } from '../../lib/blocks/templates';
 
 /**
  * A template picker built on `Dropdown`, like `CategorySelect`: "none"
@@ -10,7 +11,8 @@ import { templateLabel } from '../../lib/blocks/blockAttrs';
  * the picker shows what a new entry would really start with.
  */
 export default function TemplateSelect({ label, noneLabel, value, onChange, portal = false }: {
-  label: string;
+  /** Chip prefix; none for a picker that sits next to its own label. */
+  label?: string;
   noneLabel: string;
   value: string | null;
   onChange: (id: string | null) => void;
@@ -22,6 +24,6 @@ export default function TemplateSelect({ label, noneLabel, value, onChange, port
     { value: '', label: noneLabel },
     ...templates.map((tpl) => ({ value: tpl.id, label: templateLabel(t, tpl) })),
   ];
-  const shown = value && templates.some((tpl) => tpl.id === value) ? value : '';
+  const shown = activeTemplate(templates, value)?.id ?? '';
   return <Dropdown label={label} value={shown} options={options} onChange={(id) => onChange(id || null)} portal={portal} />;
 }

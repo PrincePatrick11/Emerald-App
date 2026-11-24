@@ -1298,8 +1298,17 @@
       "dismiss": "Hinweis schließen"
     },
     "defaultTemplate": "Standardvorlage",
-    "defaultTemplateHint": "Womit ein neuer Eintrag beginnt, wenn seine Kategorie keine eigene Startvorlage hat. Startvorlagen stellst du an der Kategorie ein, unter Kategorien.",
-    "defaultNone": "Keine — leer beginnen"
+    "defaultTemplateHint": "Womit ein neuer Eintrag beginnt, wenn seine Kategorie keine eigene Startvorlage hat.",
+    "defaultNone": "Keine — leer beginnen",
+    "categoryStart": "Startvorlagen der Kategorien",
+    "categoryStartHint": "Womit ein neuer Eintrag in einer Kategorie beginnt. Dasselbe stellst du auch an der Kategorie ein, unter Kategorien.",
+    "categoryStartOnDefault": "Mit der Standardvorlage: {{names}}",
+    "categoryStartNoneOnDefault": "Jede Kategorie hat eine eigene Startvorlage.",
+    "startsIn": "Startet in",
+    "startsInHint": "Ein neuer Eintrag in diesen Kategorien beginnt mit dieser Vorlage.",
+    "startsInOther": "Jetzt: {{name}}",
+    "startsInNoCategories": "Noch keine Kategorien",
+    "categoryStartEmpty": "Leerer Start (keine Standardvorlage eingestellt): {{names}}"
   },
   "lexicon": {
     "languages": "Sprachen",

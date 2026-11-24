@@ -39,4 +39,10 @@ Templates have no description; the picker matches the name only. `useShrunkIcon`
 
 ### Start and default template in the interface
 
-A category's start template is chosen in its dialog under Categories (`CategoryEditModal`: "Default template" or a template), saved on Save; a start template in the Trash stays stored unless another one is picked, so it comes back with its category. The built-in categories have only the template to change there. The default template is a `TemplateSelect` below the template list (`DefaultTemplateSection`, a `DashboardSection`), shown while there are templates, and applies at once. `TemplateSelect` shows a template in the Trash as none, the rule `resolveStartTemplate` applies.
+A category's start template is chosen in three places, all writing `categories.template_id` through `categoryStore`, so each shows the others' changes at once:
+
+- its dialog under Categories (`CategoryEditModal`: "Default template" or a template), saved on Save; the built-in categories have only the template to change there;
+- `CategoryStartTemplatesSection` below the default template in `TemplatesView`: a `TemplateSelect` per category (`setStartTemplate`), applied at once, shown while there are templates and categories, with a note naming the categories on the default template, or starting empty while none is set;
+- "Starts in" on a template's page (`TemplateCategoriesField`): shows the live state with the page's own toggles on top; those are part of the page's draft (`TemplateDraft.categories`, `{ add, remove }`), so a change made elsewhere meanwhile shows too, and Done writes only what was toggled (`setTemplateCategories`, one transaction) — an unticked category is only cleared while it still starts with this template, and a category in the Trash is never touched.
+
+A start template in the Trash stays stored unless another one is picked, so it comes back with its category. The default template is a `TemplateSelect` below the template list (`DefaultTemplateSection`, a `DashboardSection`), shown while there are templates, and applies at once. `TemplateSelect` shows a template in the Trash as none, the rule `resolveStartTemplate` applies.

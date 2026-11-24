@@ -14,8 +14,23 @@ import type { ActiveView } from '../types';
 /** What the page of a custom block edits — exactly what `updateDefinition` accepts. */
 export type DefinitionDraft = Required<BlockDefinitionPatch>;
 
-/** What the page of a template edits — what `updateTemplate` accepts. */
-export type TemplateDraft = Required<TemplatePatch>;
+/**
+ * Which categories a template's page has ticked (`add`) or unticked
+ * (`remove`) as starting with it, as changes on top of the live
+ * `categories.template_id` — so what changes elsewhere meanwhile shows, and
+ * only what was toggled on the page is written. Kept sorted, so toggling
+ * back and forth compares equal.
+ */
+export interface TemplateCategoryChanges {
+  add: string[];
+  remove: string[];
+}
+
+/**
+ * What the page of a template edits: what `updateTemplate` accepts, and the
+ * start-template changes of the categories — saved with "Done" like the rest.
+ */
+export type TemplateDraft = Required<TemplatePatch> & { categories: TemplateCategoryChanges };
 
 /**
  * An open draft: the state on opening (`base`) and the edit
@@ -264,12 +279,20 @@ export const useBlockDraftStore = createDraftStore<DefinitionDraft>('blocks', (r
   display: parseDefinitionDisplay(raw.display),
 }));
 
+const stringIds = (value: unknown) => (Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : []);
+
+/** A draft written before the field existed (or of another shape) has no changes. */
+function categoryChanges(raw: unknown): TemplateCategoryChanges {
+  return isRecord(raw) ? { add: stringIds(raw.add), remove: stringIds(raw.remove) } : { add: [], remove: [] };
+}
+
 export const useTemplateDraftStore = createDraftStore<TemplateDraft>('templates', (raw) => ({
   name: text(raw.name),
   icon: text(raw.icon),
   title: text(raw.title),
   content: text(raw.content),
   tags: Array.isArray(raw.tags) ? raw.tags.filter((tag): tag is string => typeof tag === 'string') : [],
+  categories: categoryChanges(raw.categories),
 }));
 
 const records = (value: unknown) => (Array.isArray(value) ? value.filter(isRecord) : []);

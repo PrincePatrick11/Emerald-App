@@ -17,13 +17,15 @@ export interface FilterChip {
 }
 
 /** One row of a filter list — also the row of a single choice from a list (a category's start template). */
-export function FilterRow({ active, onClick, lead, label, count, hint }: {
+export function FilterRow({ active, onClick, lead, label, count, hint, detail }: {
   active: boolean;
   onClick: () => void;
   lead: ReactNode;
   label: string;
   count?: number;
   hint?: string;
+  /** A quiet note after the label, e.g. what the row would replace. */
+  detail?: string;
 }) {
   return (
     // 30px tall (leading-5 + 2×5px) like the primary button at the top of the sidebar
@@ -37,6 +39,7 @@ export function FilterRow({ active, onClick, lead, label, count, hint }: {
     >
       <span className="w-4 flex-shrink-0 flex items-center justify-center leading-none">{lead}</span>
       <span className="flex-1 min-w-0 truncate">{label}</span>
+      {detail && <span className="flex-shrink min-w-0 max-w-[50%] truncate text-[11px] text-subtle">{detail}</span>}
       {count !== undefined && (
         <span className={`filter-row-count text-[11px] tabular-nums${count === 0 ? ' filter-row-count--zero' : ''}`}>{count}</span>
       )}
