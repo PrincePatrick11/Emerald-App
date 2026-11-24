@@ -41,6 +41,8 @@ mod emerald_seal;
 mod emerald_file;
 /// The automatic backup: which vaults, how often, where to, and its schedule.
 mod auto_backup;
+/// The file the user chose for the import — in its dialog or by a drop —, readable wherever it lies.
+mod chosen_file;
 /// The in-app updater: variable source, check, installation.
 mod updates;
 /// Lets the MCP server in `tools/mcp` drive the app where the webview has no
@@ -326,16 +328,20 @@ async fn export_image(app: tauri::AppHandle, path: String, data_url: String) -> 
 
 /// Reads a text file and returns its contents as a UTF-8 string.
 /// Only .md, .json, and .txt extensions are permitted; `.emerald` files are
-/// read through `emerald_file::read_emerald_file`.
+/// read through `emerald_file::read_emerald_file`. A Markdown file is the
+/// import's, so the file the user chose for it may lie outside the roots
+/// (`chosen_file`).
 #[tauri::command]
 async fn read_file(app: tauri::AppHandle, path: String) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let ext = ext_for_path(&path);
-        if !matches!(ext.as_str(), "md" | "json" | "txt") {
-            return Err("unsupported file type".to_string());
-        }
+        let file = match ext.as_str() {
+            "md" => chosen_file::guarded_import_read(&app, &path)?,
+            "json" | "txt" => guarded_read_path(&app, &path)?,
+            _ => return Err("unsupported file type".to_string()),
+        };
 
-        std::fs::read_to_string(guarded_read_path(&app, &path)?).map_err(|e| e.to_string())
+        std::fs::read_to_string(file).map_err(|e| e.to_string())
     })
     .await
     .map_err(|e| e.to_string())?
@@ -850,13 +856,20 @@ pub fn run() {
         .manage(auto_backup::AutoBackup::default())
         .manage(updates::PendingUpdate::default())
         .manage(CloseWatch::default())
-        .on_window_event(|window, event| {
-            if let tauri::WindowEvent::CloseRequested { .. } = event {
+        .manage(chosen_file::ChosenFile::default())
+        .on_window_event(|window, event| match event {
+            tauri::WindowEvent::CloseRequested { .. } => {
                 // Only the main window asks; the hidden PDF window has no listener.
                 if window.label() == "main" && window.state::<CloseWatch>().requested(std::time::Instant::now()) {
                     window.destroy().ok();
                 }
             }
+            // The operating system's drop, before the page hears of it: the
+            // import's file among it is one the user chose.
+            tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) if window.label() == "main" => {
+                chosen_file::note_drop(window.app_handle(), paths);
+            }
+            _ => {}
         });
 
     #[cfg(feature = "devbridge")]
@@ -886,6 +899,7 @@ pub fn run() {
             auto_backup::auto_backup_settings,
             auto_backup::set_auto_backup_settings,
             auto_backup::back_up_vault_now,
+            chosen_file::pick_import_file,
             emerald_file::open_raw_backup_db,
             emerald_file::discard_raw_backup_db,
             keys::vault_create_key,

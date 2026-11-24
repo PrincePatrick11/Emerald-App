@@ -97,9 +97,10 @@ export interface OpenedArchive {
  * the last one did not fit: an own password, or — for a file under a vault
  * key no open vault has — that vault's password or recovery key. `null`: the
  * question was cancelled. Errors with a text of their own come as
- * {@link EmeraldNotice}.
+ * {@link EmeraldNotice}. `stop`: asked before every question — `true` ends
+ * the opening with `null` instead, as a cancel would.
  */
-export async function openArchiveAsking(path: string): Promise<OpenedArchive | null> {
+export async function openArchiveAsking(path: string, stop?: () => boolean): Promise<OpenedArchive | null> {
   let secret: BackupSecret | null = null;
   // Which question: a file's own password, or a vault's password or recovery key.
   let asking: 'emerald' | 'backup' = 'emerald';
@@ -122,6 +123,7 @@ export async function openArchiveAsking(path: string): Promise<OpenedArchive | n
           throw notice ? new EmeraldNotice(notice) : err;
         }
       }
+      if (stop?.()) return null;
       try {
         const answer = askBackupSecret(error, asking);
         question = lastBackupSecretQuestion();

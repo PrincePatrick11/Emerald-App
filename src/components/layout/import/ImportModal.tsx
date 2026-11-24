@@ -10,6 +10,7 @@ import { SettingsStatus } from '../settings/SettingsSection';
 import { Checklist, Part } from '../menuParts';
 import { useVaultImport } from './useVaultImport';
 import { useImportWindowStore } from '../../../store/importWindowStore';
+import { useBackupSecretStore } from '../../../store/backupSecretStore';
 import { useFileDrop } from '../../../hooks/useFileDrop';
 import { useDashboardStore } from '../../../store/dashboardStore';
 import { useCategoryStore } from '../../../store/categoryStore';
@@ -101,6 +102,8 @@ function ImportBody() {
   // of the first, and the first, ending, would close it under the second.
   const openSeq = useRef(0);
   const openingRef = useRef(false);
+  // A drop that came while a file was opening (see below) — it ends that opening.
+  const queuedDropRef = useRef<string[] | null>(null);
   /** Opens a file; whether it is now the window's. */
   async function openPath(path: string): Promise<boolean> {
     if (busy || openingRef.current) return false;
@@ -110,7 +113,7 @@ function ImportBody() {
     setNote('');
     setOpening(true);
     try {
-      const next = await openImportFile(path);
+      const next = await openImportFile(path, () => queuedDropRef.current !== null);
       if (seq !== openSeq.current) {
         if (next) closeImportSource(next);
         return false;
@@ -119,7 +122,8 @@ function ImportBody() {
       if (next) replaceSource(next);
       return !!next;
     } catch (err) {
-      if (seq !== openSeq.current) return false;
+      // Overtaken by a drop: Rust now lets only that file be read, so this one may fail — no error for it.
+      if (seq !== openSeq.current || queuedDropRef.current) return false;
       setError(err instanceof EmeraldNotice ? err.message : `${t('emeraldImport.readFailed', { error: String(err) })}`);
       return false;
     } finally {
@@ -135,22 +139,47 @@ function ImportBody() {
   }
 
   // Files dropped onto the app window: the first one the window takes; the window says when there is none.
-  const handled = useRef(0);
-  useEffect(() => {
-    if (!dropped || dropped.seq === handled.current) return;
-    handled.current = dropped.seq;
-    if (busy) return;
-    const files = dropped.paths.filter(isImportPath);
+  function openDropped(paths: string[]) {
+    const files = paths.filter(isImportPath);
     if (files.length === 0) {
       setError(t('importWindow.notImportable'));
       return;
     }
     void openPath(files[0]).then((opened) => {
-      if (opened && dropped.paths.length > 1) setNote(t('importWindow.oneAtATime', { name: fileNameOf(files[0]) }));
+      if (opened && paths.length > 1) setNote(t('importWindow.oneAtATime', { name: fileNameOf(files[0]) }));
     });
+  }
+  // A drop while a file is still opening: the newest choice wins, as in Rust,
+  // which from now on lets only the dropped file be read outside the user's
+  // folders (`chosen_file.rs`). The opening's password question is cancelled
+  // — and not asked again, should an answer be under check right now — and the
+  // drop opens once the opening has ended. The ref is what the opening asks at
+  // the moment; the state re-runs the effect below once `opening` turns false.
+  const [queuedDrop, setQueuedDrop] = useState<string[] | null>(null);
+  const handled = useRef(0);
+  useEffect(() => {
+    if (!dropped || dropped.seq === handled.current) return;
+    handled.current = dropped.seq;
+    if (busy) return;
+    if (openingRef.current) {
+      if (dropped.paths.some(isImportPath)) {
+        queuedDropRef.current = dropped.paths;
+        setQueuedDrop(dropped.paths);
+        useBackupSecretStore.getState().cancel();
+      }
+      return;
+    }
+    openDropped(dropped.paths);
     // `openPath` reads the state of the moment; only a new drop counts.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dropped]);
+  useEffect(() => {
+    if (!queuedDrop || opening) return;
+    queuedDropRef.current = null;
+    setQueuedDrop(null);
+    openDropped(queuedDrop);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queuedDrop, opening]);
   // Only for the look of the zone: the drop itself comes through the store.
   const { dragOver } = useFileDrop(!busy, () => {});
 

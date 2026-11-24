@@ -490,7 +490,7 @@ The whole vault can be backed up and restored as one self-contained file (`.vaul
 
 **Import.**
 
-- The **import window** opens either kind; a file of entries goes its own way (see [Emerald Format](#emerald-format)). Import only reads from the user's own folders (see [`security.md`](security.md#path-confinement)): a file on another drive has to be copied there first, and the notice says so.
+- The **import window** opens either kind; a file of entries goes its own way (see [Emerald Format](#emerald-format)). A file chosen in the window's dialog or dragged into it is read wherever it lies — a backup on another drive or a USB stick comes in without being copied first (see [`security.md`](security.md#the-file-chosen-for-the-import)).
 - Choosing a backup first opens it. If it belongs to a vault that is unlocked right now, that is automatic. Otherwise Emerald asks for the password the backup was made with, or its recovery key from that time, and asks again after a wrong answer.
 - **Only backups of this version are restored** (format 7). A backup of an earlier version is refused with a notice that a converter will follow; one of a newer version asks for an update. Nothing is changed either way. `.emeralddb` files of earlier versions are not read at all.
 - A dialog shows the day of the backup and counts its contents. The same choices pick what to apply: one box per category the file holds entries of, with their number, "Uncategorized", then Tasks, Tags and Lexicon. Replace replaces only the entries of the categories the file brings.

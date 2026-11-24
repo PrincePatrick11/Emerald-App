@@ -1,11 +1,11 @@
-import { open as openDialog } from '@tauri-apps/plugin-dialog';
+import { invoke } from '@tauri-apps/api/core';
 import { closeArchive, EmeraldNotice, openArchiveAsking, type OpenedArchive } from './emerald/file';
 import type { EmeraldManifest } from './emerald/manifest';
 import type { ImportMode, OpenedVaultFile } from './dbBackup';
 import type { ImportTarget, MarkdownFile } from './emeraldFormat';
 import { asRecord, oneOf } from './helpers';
 import i18n from '../i18n';
-import { IMPORT_EXTENSIONS, isImportPath } from './importPaths';
+import { isImportPath } from './importPaths';
 
 /**
  * The import window's files: which ones it takes, opening one to see what it
@@ -14,13 +14,16 @@ import { IMPORT_EXTENSIONS, isImportPath } from './importPaths';
  * (a vault's content, a raw backup).
  */
 
-/** The open dialog with the endings the window takes. `null`: cancelled. */
-export async function pickImportFile(filterName: string): Promise<string | null> {
-  const picked = await openDialog({
-    filters: [{ name: filterName, extensions: [...IMPORT_EXTENSIONS] }],
-    multiple: false,
-  });
-  return (Array.isArray(picked) ? picked[0] : picked) ?? null;
+/**
+ * The open dialog with the endings the window takes (`isImportPath`).
+ * `null`: cancelled. Opened by Rust, which remembers the choice: the file the
+ * user picked may then be read wherever it lies — a backup on another drive —
+ * while a path the page names itself stays confined to the user's folders
+ * (`chosen_file.rs`). A dropped file is remembered the same way, from the
+ * operating system's event.
+ */
+export function pickImportFile(filterName: string): Promise<string | null> {
+  return invoke<string | null>('pick_import_file', { filterName });
 }
 
 /** The file's name, for the window. */
@@ -40,16 +43,17 @@ export type ImportSource =
 
 /**
  * Opens the file at `path` and finds out what it is — asking for a password
- * only when the file needs one. `null`: cancelled at the question. A file
+ * only when the file needs one. `null`: cancelled at the question, or `stop`
+ * said so before it would be asked (again). A file
  * that cannot be read is an `EmeraldNotice`.
  */
-export async function openImportFile(path: string): Promise<ImportSource | null> {
+export async function openImportFile(path: string, stop?: () => boolean): Promise<ImportSource | null> {
   if (!isImportPath(path)) throw new EmeraldNotice(i18n.t('importWindow.notImportable'));
   if (/\.md$/i.test(path)) {
     const { readMarkdownFile } = await import('./emeraldFormat');
     return { kind: 'markdown', path, markdown: await readMarkdownFile(path) };
   }
-  const opened = await openArchiveAsking(path);
+  const opened = await openArchiveAsking(path, stop);
   if (!opened) return null;
   try {
     if (opened.kind === 'items') {

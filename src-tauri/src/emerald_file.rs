@@ -1017,7 +1017,8 @@ pub async fn read_emerald_file(
 ) -> Result<OpenedFile, String> {
     tauri::async_runtime::spawn_blocking(move || {
         path_ok(&path)?;
-        let file = crate::guarded_read_path(&app, &path)?;
+        // The user's own choice may lie anywhere — a backup on another drive.
+        let file = crate::chosen_file::guarded_import_read(&app, &path)?;
         let secrets = Secrets {
             unlocked: app.state::<keys::VaultKeys>().all(),
             password: password.as_deref().map(String::as_str),

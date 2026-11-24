@@ -1428,7 +1428,7 @@
     "done": "Import abgeschlossen – Einträge: {{entries}}, Vorlagen: {{templates}}.",
     "readFailed": "Die Datei konnte nicht gelesen werden: {{error}}",
     "markdownDone": "Der Eintrag wurde importiert.",
-    "outside": "Emerald kann Dateien nur aus deinen eigenen Ordnern öffnen (Benutzerordner, Dokumente, Desktop, Downloads). Kopiere die Datei zuerst dorthin. Es wurde nichts verändert.",
+    "outside": "Emerald kann diese Datei nicht öffnen. Verknüpfungen öffnet Emerald nicht: Wähle die Datei selbst im Import-Fenster aus oder ziehe sie hinein. Es wurde nichts verändert.",
     "doneSkipped": "Import abgeschlossen – Einträge: {{entries}}, Vorlagen: {{templates}}, übersprungen, weil schon vorhanden: {{skipped}}."
   },
   "emeraldExport": {

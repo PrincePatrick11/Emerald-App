@@ -205,10 +205,11 @@ Everything that looks at the DOM is in `pagelib.js`, which `cdp.py` sends along 
   outside a file dialog confirm it or choose its path, so the bridge catches
   the page's dialog calls before a window opens and `dialog` answers those.
   The flow the app goes through is the same; the native window is not part of
-  it. The one dialog the Rust side opens, the folder picker for automatic
-  backups, asks the bridge as well (`devbridge::pick_folder`); another one
-  added there without that would be native and, on macOS, could only be
-  listed, cancelled or accepted as it stands.
+  it. The dialogs the Rust side opens - the folder picker for automatic
+  backups and the import window's file picker - ask the bridge as well
+  (`devbridge::pick_folder`, `devbridge::pick_file`); another one added there
+  without that would be native and, on macOS, could only be listed, cancelled
+  or accepted as it stands.
 - **One instance per checkout.** Two sessions on one checkout drive the same
   window. Without `lsof`, and always on Windows, a worktree stays on the ports
   its path gives, so two that land on the same pair share an instance. Two

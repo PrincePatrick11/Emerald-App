@@ -1428,7 +1428,7 @@
     "done": "Import finished – entries: {{entries}}, templates: {{templates}}.",
     "readFailed": "The file could not be read: {{error}}",
     "markdownDone": "The entry was imported.",
-    "outside": "Emerald can only open files from your own folders (home, Documents, Desktop, Downloads). Copy the file there first. Nothing was changed.",
+    "outside": "Emerald cannot open this file. Links and shortcuts are not opened: choose the file itself in the import window or drag it in. Nothing was changed.",
     "doneSkipped": "Import complete – entries: {{entries}}, templates: {{templates}}, skipped as already here: {{skipped}}."
   },
   "emeraldExport": {
