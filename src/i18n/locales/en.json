@@ -888,7 +888,12 @@
     "removeTag": "Remove tag",
     "addIcon": "Add icon",
     "changeIcon": "Change icon",
-    "removeIcon": "Remove icon"
+    "removeIcon": "Remove icon",
+    "cropIcon": "Crop icon",
+    "cropArea": "Crop area",
+    "cropZoom": "Zoom",
+    "cropHint": "Drag to move the picture, use the scroll wheel or the slider to zoom.",
+    "cropApply": "Apply"
   },
   "filters": {
     "all": "All",

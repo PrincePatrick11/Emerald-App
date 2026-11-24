@@ -10,6 +10,7 @@ import { imageSrc, saveImage } from '../../../lib/images';
 import { ImageTooLargeError, imageSizeLabel, prepareImageDataUrl, readIconFile } from '../../../lib/imageLimits';
 import { reportImageError } from '../../../store/imageNoticeStore';
 import { RowIcon } from './SidebarSection';
+import IconCropDialog from './IconCropDialog';
 
 /**
  * The building blocks of the edit sidebar, the counterpart to
@@ -114,6 +115,8 @@ export function MediaPropertyRow({ rowIcon, label, kind, value, onChange, onRemo
   const inputRef = useRef<HTMLInputElement>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; toggleEmoji?: () => void } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // A chosen icon picture waits here until it is cut to a square or the cut is cancelled.
+  const [cropping, setCropping] = useState<string | null>(null);
 
   const showNotice = (message: string) => {
     setNotice(message);
@@ -132,8 +135,10 @@ export function MediaPropertyRow({ rowIcon, label, kind, value, onChange, onRemo
       // A cover is a picture of the vault (`images/`, "Images"): stored here, its name goes into the row.
       const next = kind === 'icon' ? await readIconFile(file) : await saveImage(await prepareImageDataUrl(await readFileAsDataUrl(file)));
       // `null`: an icon in a rejected format (SVG too); say so, as with the cover image.
-      if (next) onChange(next);
-      else showNotice(t('common.unsupportedImageFormat'));
+      if (!next) { showNotice(t('common.unsupportedImageFormat')); return; }
+      // An icon is cut to a square first; a cover is stored already.
+      if (kind === 'icon') setCropping(next);
+      else onChange(next);
     } catch (err) {
       // Better to set nothing than an empty image: the previous value is better than none.
       if (kind === 'icon') {
@@ -199,6 +204,15 @@ export function MediaPropertyRow({ rowIcon, label, kind, value, onChange, onRemo
         ) : button()}
       </EditPropertyRow>
       {notice && <p className="pl-[9px] pr-3 text-xs text-danger">{notice}</p>}
+      {cropping && (
+        <IconCropDialog
+          key={cropping}
+          src={cropping}
+          onApply={(icon) => { setCropping(null); onChange(icon); }}
+          onCancel={() => setCropping(null)}
+          onUnreadable={() => showNotice(t('common.unsupportedImageFormat'))}
+        />
+      )}
       {menu && <ContextMenu align="right" minWidth={120} x={menu.x} y={menu.y} actions={actions(menu.toggleEmoji)} onClose={() => setMenu(null)} />}
     </>
   );

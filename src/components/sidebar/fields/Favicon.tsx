@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ImagePlus, Smile, X } from 'lucide-react';
 import { ACCEPTED_IMAGE_MIME, isImageIcon } from '../../../lib/helpers';
@@ -7,6 +7,7 @@ import EmojiPicker from '../../ui/EmojiPicker';
 import { readIconFile } from '../../../lib/imageLimits';
 import { reportImageError } from '../../../store/imageNoticeStore';
 import Button from '../../ui/Button';
+import IconCropDialog from './IconCropDialog';
 
 /**
  * Just the glyph, without selection. Default 20px, the size of a
@@ -51,6 +52,8 @@ export default function Favicon({ value, onChange, onRemove }: FaviconProps) {
   const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   const pickFile = () => inputRef.current?.click();
+  // A chosen picture waits here until it is cut to a square or the cut is cancelled.
+  const [cropping, setCropping] = useState<string | null>(null);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -58,7 +61,7 @@ export default function Favicon({ value, onChange, onRemove }: FaviconProps) {
     if (!file) return;
     try {
       const icon = await readIconFile(file);
-      if (icon) onChange?.(icon);
+      if (icon) setCropping(icon);
     } catch (err) {
       // Better to set nothing at all than an empty icon: an aborted read
       // has no result, and the previous value is better than none.
@@ -96,6 +99,14 @@ export default function Favicon({ value, onChange, onRemove }: FaviconProps) {
           </div>
         )}
       />
+      {cropping && (
+        <IconCropDialog
+          key={cropping}
+          src={cropping}
+          onApply={(icon) => { setCropping(null); onChange?.(icon); }}
+          onCancel={() => setCropping(null)}
+        />
+      )}
     </>
   );
 }

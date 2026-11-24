@@ -52,6 +52,7 @@ Version 0.2.0 is a fresh start: the database, backups and `.emerald` files have 
 - **Canvas, Altar and Painting blocks.** Pictures, shapes, text, symbols and drawings arranged freely, with handles, guides, rulers, layers, backgrounds, a right-click menu, undo and a list of elements; a Painting block with pens, layers and symmetry; export as PNG, JPEG or SVG. Altars are entries with an Altar block.
 - **A symbol library** of planets, zodiac, alchemy, runes, Ogham and sacred geometry, plus your own symbols, kept in the vault.
 - **Images, a place of their own,** with names, tags and notes; photos are stored at about a fifth of the size and uploaded icons are small files of their own.
+- **Cut a picture to an icon.** Choosing your own picture as an icon (entries, templates, blocks, languages, dashboards) first opens a small crop window: move the picture (drag or arrow keys) and zoom (slider, scroll wheel, + and −) until the part you want sits in the icon's frame, then Apply. Cancel keeps the previous icon. Only the square cut-out is kept, at most 128px; to change it, choose the picture again. An animated GIF becomes a still picture; existing icons and cover images are untouched.
 
 ### Security and vaults
 - **Every vault is encrypted** (SQLCipher; pictures and drafts sealed too). A password and a recovery key, "Remember on this device" via the system keychain, Lock now, Change password with progress and a check for free space.

@@ -90,7 +90,7 @@ Knowledge stores reference entries about anything relevant to your practice: rit
 
 **Categories.** An entry can belong to one category from the shared list — see [Categories](#categories) for how it works, including grouping and the category filter.
 
-**Icons.** Every entry takes its icon by one rule everywhere — dashboards, lists, tabs, the left list, link chips, exports: its own icon (an emoji or an image), else its moon phase (a journal entry, with the moon phase shown), else its category's emoji, else 📄. Image icons from remote `http(s)` addresses are not rendered; only uploaded icon files of the vault are.
+**Icons.** Every entry takes its icon by one rule everywhere — dashboards, lists, tabs, the left list, link chips, exports: its own icon (an emoji or an image), else its moon phase (a journal entry, with the moon phase shown), else its category's emoji, else 📄. Image icons from remote `http(s)` addresses are not rendered; only uploaded icon files of the vault are. A picture chosen as an icon — of an entry, a template, a block, a language or a dashboard — first opens a small cropping window: drag the picture (or move it with the arrow keys) and zoom with the slider, the scroll wheel or + and − until the part you want sits in the icon's frame, then Apply; Cancel keeps the icon as it was. Only the square cut-out is stored, at most 128px — an animated GIF becomes a still picture; to change it, choose the picture again.
 
 **Sort and view.** The Knowledge list starts sorted A–Z, as cards grouped by category; the sort and the view are the dashboard's own (see [All Entries and Dashboards](#all-entries-and-dashboards)).
 

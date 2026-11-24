@@ -3,7 +3,7 @@ import { isImageDataUrl, saveIcon } from '../lib/icons';
 
 /**
  * Puts an icon from the icon field (`Favicon`, `MediaPropertyRow`) into a
- * draft or record: a picture (a data URL from the file picker) is brought down
+ * draft or record: a picture (a data URL, cut to a square in `IconCropDialog`) is brought down
  * to 128px and stored as a file in the vault's `icons/` (`saveIcon`), and the
  * record gets its name; an emoji is taken as is. The last choice wins — an
  * emoji chosen while a picture is still being stored must not be overwritten

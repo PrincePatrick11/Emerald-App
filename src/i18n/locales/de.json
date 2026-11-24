@@ -888,7 +888,12 @@
     "removeTag": "Tag entfernen",
     "addIcon": "Icon hinzufügen",
     "changeIcon": "Icon ändern",
-    "removeIcon": "Icon entfernen"
+    "removeIcon": "Icon entfernen",
+    "cropIcon": "Icon zuschneiden",
+    "cropArea": "Bildausschnitt",
+    "cropZoom": "Zoom",
+    "cropHint": "Ziehen verschiebt das Bild, Mausrad oder Regler zoomen.",
+    "cropApply": "Übernehmen"
   },
   "filters": {
     "all": "Alle",

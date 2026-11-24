@@ -888,7 +888,12 @@
     "removeTag": "Retirer le tag",
     "addIcon": "Ajouter une icône",
     "changeIcon": "Changer l'icône",
-    "removeIcon": "Supprimer l'icône"
+    "removeIcon": "Supprimer l'icône",
+    "cropIcon": "Recadrer l'icône",
+    "cropArea": "Zone de recadrage",
+    "cropZoom": "Zoom",
+    "cropHint": "Faites glisser pour déplacer l'image ; la molette ou le curseur règlent le zoom.",
+    "cropApply": "Appliquer"
   },
   "filters": {
     "all": "Toutes",

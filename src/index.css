@@ -1268,7 +1268,8 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
   .right-sidebar-tab-idle:focus-visible,
   .right-sidebar-tab-active:focus-visible,
   .link-picker-tab-idle:focus-visible,
-  .link-picker-tab-active:focus-visible {
+  .link-picker-tab-active:focus-visible,
+  .icon-crop-stage:focus-visible {
     outline: none;
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent);
   }
@@ -1948,6 +1949,37 @@ button.sidebar-section-title:focus-visible {
   height: 18px;
   border-radius: 3px;
   object-fit: cover;
+}
+
+/* Cutting a picture to an icon (IconCropDialog): the picture on a sunk stage,
+   the icon frame in the middle, everything outside it dimmed by the frame's
+   own shadow. The frame's radius is the icon's: rounded-md on a 16–20px icon
+   is roughly 30%. */
+.icon-crop-stage {
+  position: relative;
+  margin-inline: auto;
+  overflow: hidden;
+  border-radius: var(--sheet-radius);
+  background-color: var(--well-sunk);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.icon-crop-stage:active { cursor: grabbing; }
+.icon-crop-stage img {
+  position: absolute;
+  max-width: none;
+  pointer-events: none;
+}
+.icon-crop-frame {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 28%;
+  outline: 1px solid color-mix(in srgb, var(--text-primary) 60%, transparent);
+  box-shadow: 0 0 0 999px var(--modal-scrim);
+  pointer-events: none;
 }
 
 /* Type as segments: inset track, the active segment in jade. Also the start
