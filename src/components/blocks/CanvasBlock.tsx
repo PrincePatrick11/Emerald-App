@@ -116,6 +116,9 @@ async function renderScene(scene: CanvasScene, types: CanvasTypes, background: C
   return data ? saveImage(data) : null;
 }
 
+/** JPEG export quality: visually the same as 0.95, a good quarter smaller. */
+const JPEG_EXPORT_QUALITY = 0.9;
+
 /** The scene as the export dialog asked: format, area, width, background; a JPEG on white. */
 async function exportedScene(scene: CanvasScene, types: CanvasTypes, options: CanvasExportOptions): Promise<string | null> {
   const background = options.background ? parseCanvasBackground(scene.background) : null;
@@ -132,7 +135,7 @@ async function exportedScene(scene: CanvasScene, types: CanvasTypes, options: Ca
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, flat.width, flat.height);
   ctx.drawImage(canvas, 0, 0);
-  return canvasToDataUrl(flat, 'image/jpeg', 0.95);
+  return canvasToDataUrl(flat, 'image/jpeg', JPEG_EXPORT_QUALITY);
 }
 
 /**
