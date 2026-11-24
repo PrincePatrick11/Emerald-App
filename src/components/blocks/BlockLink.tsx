@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next';
 import LinkedEntryPicker, { LinkedEntryChip, LinkItemIcon } from '../sidebar/fields/LinkedEntryPicker';
 import { useUIStore } from '../../store/uiStore';
 import { useLinkItems, useLinkTarget } from '../../hooks/useLinkItems';
-import { linkFromSlot } from '../../lib/blocks/fields';
+import { useCategoryStore } from '../../store/categoryStore';
+import { linkFromSlot, normalizeLinkCategoryFilter, passesLinkCategoryFilter, type LinkCategoryFilter } from '../../lib/blocks/fields';
 import { internalLinkChipHtml, toInternalLinkChip } from '../../lib/internalLinkHtml';
 import { isValidLinkTarget } from '../../lib/links';
 import { linkItemKey, type SuggestionItem } from '../../lib/linkItems';
@@ -23,22 +24,30 @@ const LINK_RESULT_LIMIT = 50;
  * Editing: the chosen entry with "×", otherwise the search. `onChange(null)`
  * removes it.
  */
-export function LinkEditor({ slot, onChange }: {
+export function LinkEditor({ slot, onChange, filter }: {
   slot: string | undefined;
   onChange: (html: string | null) => void;
+  /** Only targets of these categories are offered; a target already set stays. */
+  filter?: LinkCategoryFilter;
 }) {
   const { t } = useTranslation();
   const items = useLinkItems();
   const [query, setQuery] = useState('');
   const current = linkFromSlot(slot);
+  const categories = useCategoryStore((s) => s.categories);
+  // Ignore categories that are gone; a filter with nothing left is no filter.
+  const activeFilter = useMemo(
+    () => normalizeLinkCategoryFilter(filter, new Set(categories.map((c) => c.id))),
+    [filter, categories],
+  );
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
     return items
-      .filter((i) => i.label.toLowerCase().includes(q))
+      .filter((i) => passesLinkCategoryFilter(activeFilter, i.categoryId) && i.label.toLowerCase().includes(q))
       .sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''))
       .slice(0, LINK_RESULT_LIMIT);
-  }, [items, query]);
+  }, [items, query, activeFilter]);
 
   if (current) return <LinkTarget target={current} onRemove={() => onChange(null)} />;
   return (

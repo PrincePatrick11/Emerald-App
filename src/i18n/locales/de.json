@@ -253,6 +253,8 @@
       "removeField": "Feld entfernen",
       "prefill": "Vorbefüllen",
       "prefillHint": "Jede neue Kopie startet mit diesem Wert — bestehende Einträge behalten ihren.",
+      "linkCategories": "Kategorien",
+      "linkCategoriesHint": "Nur Einträge und Aufgaben dieser Kategorien werden angeboten, in jeder neuen Kopie. Ein bereits gesetzter Link bleibt stehen. Ohne Auswahl werden alle angeboten.",
       "calcMode": "Buchstabenbank",
       "calcModes": {
         "both": "Automatisch und manuell",

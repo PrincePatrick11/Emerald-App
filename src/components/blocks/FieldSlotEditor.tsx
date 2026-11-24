@@ -19,7 +19,7 @@ export default function FieldSlotEditor({ element, slot, onChange }: {
 }) {
   switch (element.kind) {
     case 'link':
-      return <LinkEditor slot={slot} onChange={onChange} />;
+      return <LinkEditor slot={slot} onChange={onChange} filter={element.linkCategories} />;
     case 'image':
       return <ImageEditor slot={slot} onChange={onChange} />;
     default:

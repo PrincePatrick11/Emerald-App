@@ -102,11 +102,44 @@ export interface ElementDef {
    * find target ID and file.
    */
   defaultValue?: ElementDefault;
+  /**
+   * Link only: the search offers just entries and tasks of these categories (and,
+   * with `includeUncategorized`, those without one). Missing = no filter.
+   * A link already set stays, whatever its category.
+   */
+  linkCategories?: LinkCategoryFilter;
   /** Sigil calculator only: which ways to the letter bank it offers — missing = both. */
   calcMode?: CalcMode;
   /** Sigil drawing only: colour and brush size with which drawing starts. */
   brushColor?: string;
   brushSize?: number;
+}
+
+export interface LinkCategoryFilter {
+  categoryIds: string[];
+  includeUncategorized: boolean;
+}
+
+/**
+ * The one rule for a stored filter: category IDs that are not in `known` (trashed, merged or
+ * purged since, or from another vault) are ignored, and a filter left with no category and
+ * without "uncategorized" is no filter at all (`undefined`).
+ */
+export function normalizeLinkCategoryFilter(
+  filter: LinkCategoryFilter | undefined,
+  known?: ReadonlySet<string>,
+): LinkCategoryFilter | undefined {
+  if (!filter) return undefined;
+  const categoryIds = known ? filter.categoryIds.filter((id) => known.has(id)) : filter.categoryIds;
+  return categoryIds.length > 0 || filter.includeUncategorized
+    ? { categoryIds, includeUncategorized: filter.includeUncategorized }
+    : undefined;
+}
+
+/** Whether a link target with this category (null = none) passes the filter; no filter passes all. */
+export function passesLinkCategoryFilter(filter: LinkCategoryFilter | undefined, categoryId: string | null | undefined): boolean {
+  if (!filter) return true;
+  return categoryId ? filter.categoryIds.includes(categoryId) : filter.includeUncategorized;
 }
 
 /** How the calculator arrives at the letter bank: from the intention, by hand, or both. */
@@ -232,6 +265,13 @@ function parseElement(raw: unknown): ElementDef | null {
   }
   if (typeof raw.hideWhenEmpty === 'boolean') element.hideWhenEmpty = raw.hideWhenEmpty;
   if (raw.archived === true) element.archived = true;
+  if (element.kind === 'link' && isRecord(raw.linkCategories)) {
+    const ids = Array.isArray(raw.linkCategories.categoryIds)
+      ? raw.linkCategories.categoryIds.filter((i): i is string => typeof i === 'string')
+      : [];
+    const filter = normalizeLinkCategoryFilter({ categoryIds: ids, includeUncategorized: raw.linkCategories.includeUncategorized === true });
+    if (filter) element.linkCategories = filter;
+  }
   if (element.kind === 'sigilCalc' && CALC_MODES.includes(raw.calcMode as CalcMode)) element.calcMode = raw.calcMode as CalcMode;
   if (element.kind === 'sigilCanvas') {
     if (typeof raw.brushColor === 'string' && /^#[0-9a-f]{6}$/i.test(raw.brushColor)) element.brushColor = raw.brushColor;

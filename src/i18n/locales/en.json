@@ -253,6 +253,8 @@
       "removeField": "Remove field",
       "prefill": "Prefill",
       "prefillHint": "Every new copy starts with this value — existing entries keep theirs.",
+      "linkCategories": "Categories",
+      "linkCategoriesHint": "Only entries and tasks of these categories are offered, in every new copy. A link already set stays. With none checked, everything is offered.",
       "calcMode": "Letter bank",
       "calcModes": {
         "both": "Automatic and manual",

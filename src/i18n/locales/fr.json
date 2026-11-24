@@ -253,6 +253,8 @@
       "removeField": "Retirer le champ",
       "prefill": "Pré-remplir",
       "prefillHint": "Chaque nouvelle copie commence avec cette valeur — les entrées existantes gardent la leur.",
+      "linkCategories": "Catégories",
+      "linkCategoriesHint": "Seules les entrées et tâches de ces catégories sont proposées, dans chaque nouvelle copie. Un lien déjà posé reste. Sans aucune case cochée, tout est proposé.",
       "calcMode": "Banque de lettres",
       "calcModes": {
         "both": "Automatique et manuel",

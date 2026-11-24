@@ -22,6 +22,8 @@ export interface SuggestionItem {
   label: string;
   /** Emoji of the entry's category, where there is one. */
   category?: string;
+  /** ID of the target's category — for filtering only; null/missing = uncategorized. */
+  categoryId?: string | null;
   /** Travels into the node attrs on insertion and thus into the stored HTML. */
   icon?: string;
   /**
@@ -92,6 +94,7 @@ export function buildLinkItems(s: LinkItemSources, t: TFunction): SuggestionItem
         targetKind: 'entry' as const,
         label: displayTitle(t, 'entry', e.title),
         category: cat?.emoji,
+        categoryId: cat?.id ?? null,
         ...splitIcon(entryIcon(e, cat, s.showMoonPhase), cat?.emoji || DEFAULT_ENTRY_ICON),
         categoryLabel: phase ? t(`moonPhase.${phase}`) : categoryLabel(t, cat),
         updatedAt: e.updated_at,
@@ -105,6 +108,7 @@ export function buildLinkItems(s: LinkItemSources, t: TFunction): SuggestionItem
         targetKind: 'task' as const,
         label: displayTitle(t, 'task', task.title),
         category: cat?.emoji,
+        categoryId: cat?.id ?? null,
         icon: cat?.emoji || DEFAULT_TASK_ICON,
         categoryLabel: categoryLabel(t, cat),
         updatedAt: task.updated_at,
