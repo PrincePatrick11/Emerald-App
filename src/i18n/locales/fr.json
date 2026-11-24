@@ -1009,7 +1009,6 @@
     "tagline": "L'espace de travail pour votre pratique magique.",
     "website": "Site web",
     "exportInclude": "Inclure",
-    "importDb": "Importer la base de données",
     "importedVault": "Vault importé",
     "includeTasks": "Tâches",
     "includeTags": "Tags",
@@ -1454,7 +1453,7 @@
     "count_other": "{{count}} entrées",
     "total_one": "{{count}} entrée au total",
     "total_other": "{{count}} entrées au total",
-    "wholeVault": "Le vault entier",
+    "wholeVault": "Base de données complète",
     "oneTemplate": "1 modèle",
     "bundleFilter": "Export",
     "scope": {

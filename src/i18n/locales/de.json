@@ -1009,7 +1009,6 @@
     "tagline": "Der Arbeitsbereich für deine magische Praxis.",
     "website": "Webseite",
     "exportInclude": "Einschließen",
-    "importDb": "Datenbank importieren",
     "importedVault": "Importierter Vault",
     "includeTasks": "Aufgaben",
     "includeTags": "Tags",
@@ -1454,7 +1453,7 @@
     "count_other": "{{count}} Einträge",
     "total_one": "{{count}} Eintrag insgesamt",
     "total_other": "{{count}} Einträge insgesamt",
-    "wholeVault": "Der ganze Vault",
+    "wholeVault": "Komplette Datenbank",
     "oneTemplate": "1 Vorlage",
     "bundleFilter": "Export",
     "scope": {

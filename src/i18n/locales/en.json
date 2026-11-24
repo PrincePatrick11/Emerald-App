@@ -1009,7 +1009,6 @@
     "tagline": "The workspace for your magickal practice.",
     "website": "Website",
     "exportInclude": "Include",
-    "importDb": "Import Database",
     "importedVault": "Imported Vault",
     "includeTasks": "Tasks",
     "includeTags": "Tags",
@@ -1454,7 +1453,7 @@
     "count_other": "{{count}} entries",
     "total_one": "{{count}} entry in total",
     "total_other": "{{count}} entries in total",
-    "wholeVault": "The whole vault",
+    "wholeVault": "Whole database",
     "oneTemplate": "1 template",
     "bundleFilter": "Export",
     "scope": {
