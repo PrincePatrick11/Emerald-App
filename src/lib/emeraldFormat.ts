@@ -22,7 +22,7 @@ import i18n from '../i18n';
 import { buildLinkItems, linkItemKey, linkItemsByKey } from './linkItems';
 import { extractInternalLinks, linkTargetKindOf, remapInternalLinks } from './internalLinkHtml';
 import { entryView } from '../store/entryViews';
-import { startCategoryOf, startTagsOf } from './createItem';
+import { dashboardShowing, startCategoryOf, startTagsOf } from './createItem';
 import type { SuggestionItem } from '../components/editors/text/SuggestionList';
 import type { Category } from '../types';
 import type { WriteOptions } from './stamp';
@@ -435,9 +435,9 @@ function placementOf(target: ImportTarget): { categoryId: string | null; tagIds:
   return { categoryId: null, tagIds: [] };
 }
 
-/** The dashboard an imported entry opens in: the target's, else "All entries". */
+/** The dashboard an imported entry opens in: the target's (if it can show it), else "All entries". */
 function dashboardOf(target: ImportTarget): string {
-  return target.kind === 'dashboard' ? target.id : 'all';
+  return target.kind === 'dashboard' ? dashboardShowing(target.id) : 'all';
 }
 
 /** What the import window decides for a file of entries and templates. */

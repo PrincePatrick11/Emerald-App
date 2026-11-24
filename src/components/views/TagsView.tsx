@@ -15,7 +15,7 @@ import { useDeepLink } from '../../hooks/useDeepLink';
 import { useNewFormRequest } from '../../hooks/useNewFormRequest';
 import { useOutsideClick } from '../../hooks/useOutsideClick';
 import { useEntryItems, useEntryRows } from '../../hooks/useEntryRows';
-import { generateId } from '../../lib/helpers';
+import { generateId, listOf } from '../../lib/helpers';
 import { sortItems } from '../../lib/sortItems';
 import { AUX_VIEWS } from '../../lib/modules';
 import CollapseChevron from '../ui/CollapseChevron';
@@ -105,7 +105,7 @@ function TagEditRow({
  * Entries carry tag IDs: counting, grouping and collapsing are done by ID.
  */
 export default function TagsView() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { tags, createTag, updateTag, deleteTag, restoreTag } = useTagStore(
     useShallow((s) => ({
       tags: s.tags,
@@ -196,10 +196,10 @@ export default function TagsView() {
     if (inImages(tag)) places.push(t('tags.placeImages'));
     if (inDashboards(tag)) {
       places.push(hint
-        ? t('tags.placeDashboardsNamed', { names: dashboardsByTag.get(tag.id)!.join(', ') })
+        ? t('tags.placeDashboardsNamed', { names: listOf(dashboardsByTag.get(tag.id)!, i18n.language) })
         : t('tags.placeDashboards'));
     }
-    return places.join(', ');
+    return listOf(places, i18n.language);
   };
 
   /** The entries of a tag the search leaves: all if its name matches, otherwise those whose title does. */

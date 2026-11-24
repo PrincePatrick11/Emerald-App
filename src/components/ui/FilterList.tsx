@@ -52,7 +52,7 @@ export function FilterRow({ active, onClick, lead, label, count, hint, detail }:
  * Multi-select: a click toggles a value on or off, "All" is
  * active as long as nothing is selected, and clears the selection.
  */
-export default function FilterList({ label, chips, selected, onToggle, onAll, allCount }: {
+export default function FilterList({ label, chips, selected, onToggle, onAll, allCount, allActive }: {
   label?: string;
   chips: FilterChip[];
   selected: string[];
@@ -60,6 +60,8 @@ export default function FilterList({ label, chips, selected, onToggle, onAll, al
   /** Shows the "All" row. */
   onAll?: () => void;
   allCount?: number;
+  /** Overrides "All" being active while nothing is selected: false when the empty selection means something else. */
+  allActive?: boolean;
 }) {
   const { t } = useTranslation();
   return (
@@ -67,7 +69,7 @@ export default function FilterList({ label, chips, selected, onToggle, onAll, al
       <div className="flex flex-col gap-px">
         {onAll && (
           <FilterRow
-            active={selected.length === 0}
+            active={allActive ?? selected.length === 0}
             onClick={onAll}
             lead={<Asterisk size={14} />}
             label={t('filters.all')}

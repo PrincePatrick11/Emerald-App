@@ -53,24 +53,11 @@ function jsonObject(raw: unknown): Record<string, unknown> {
 /** A filter from JSON (row or backup): unknown keys and non-ID values drop out. */
 export function parseDashboardFilter(raw: unknown): DashboardFilter {
   const value = jsonObject(raw);
-  // An empty list stays: a rule whose categories are all gone matches nothing —
-  // only a filter without the rule shows everything.
+  // An empty list stays: a rule whose categories or tags are all gone matches
+  // nothing — only a filter without the rule shows everything.
   const next: DashboardFilter = {};
   if (Array.isArray(value.categories)) next.categories = idList(value.categories);
-  const tags = idList(value.tags);
-  if (tags?.length) next.tags = tags;
-  return next;
-}
-
-/**
- * A filter without empty rules: an empty list would not mean "no rule" but
- * "nothing passes" for the categories — a dashboard with everything
- * deselected shows all entries, like "All entries".
- */
-export function normalizeFilter(filter: DashboardFilter): DashboardFilter {
-  const next: DashboardFilter = {};
-  if (filter.categories?.length) next.categories = filter.categories;
-  if (filter.tags?.length) next.tags = filter.tags;
+  if (Array.isArray(value.tags)) next.tags = idList(value.tags);
   return next;
 }
 
@@ -128,22 +115,41 @@ export function isBuiltinDashboard(value: unknown): value is BuiltinDashboard {
   return (BUILTIN_DASHBOARD_KEYS as readonly unknown[]).includes(value);
 }
 
+/** The IDs of the categories and tags that exist (not gone, not in the trash). */
+export interface LiveIds {
+  categories: ReadonlySet<string>;
+  tags: ReadonlySet<string>;
+}
+
 /**
- * Does the entry pass the filter? A missing rule does not narrow; a category
- * rule names categories, and one that names none that still exist (gone, or in
- * the trash — `live` lacks them) matches nothing. Also the export menu's
- * collection (`bulkEntries`).
+ * Does a filter rule have something left to match? A missing rule does not
+ * narrow; a rule that names none that still exist (gone, or in the trash)
+ * matches nothing.
+ */
+export function ruleAlive(rule: readonly string[] | undefined, live: ReadonlySet<string>): boolean {
+  return !rule || rule.some((id) => live.has(id));
+}
+
+/** Can the filter show any entry at all — or are the categories or tags it names all gone? */
+export function filterCanMatch(filter: DashboardFilter, live: LiveIds): boolean {
+  return ruleAlive(filter.categories, live.categories) && ruleAlive(filter.tags, live.tags);
+}
+
+/**
+ * Does the entry pass the filter? A missing rule does not narrow; a rule that
+ * names nothing that still exists (gone, or in the trash — `live` lacks them)
+ * matches nothing. Also the export menu's collection (`bulkEntries`).
  */
 export function matchesFilter(
   entry: Pick<Entry, 'category_id' | 'tags'>,
   filter: DashboardFilter,
-  live: ReadonlySet<string>,
+  live: LiveIds,
 ): boolean {
   if (filter.categories) {
     const id = entry.category_id;
-    if (id === null || !filter.categories.includes(id) || !live.has(id)) return false;
+    if (id === null || !filter.categories.includes(id) || !live.categories.has(id)) return false;
   }
-  if (filter.tags && filter.tags.length && !entry.tags.some((tag) => filter.tags!.includes(tag))) return false;
+  if (filter.tags && !entry.tags.some((tag) => filter.tags!.includes(tag) && live.tags.has(tag))) return false;
   return true;
 }
 
@@ -154,11 +160,11 @@ function compareEntries(sort: DashboardSort): (a: Entry, b: Entry) => number {
   return (a, b) => sign * a[key].localeCompare(b[key]) || (a.entry_number ?? 0) - (b.entry_number ?? 0);
 }
 
-/** The entries a dashboard shows, in its order. `live` is the IDs of the categories that exist (not in the trash). */
+/** The entries a dashboard shows, in its order. */
 export function dashboardEntries(
   entries: readonly Entry[],
   dashboard: Pick<Dashboard, 'filter' | 'sort'>,
-  live: ReadonlySet<string>,
+  live: LiveIds,
 ): Entry[] {
   return entries.filter((e) => matchesFilter(e, dashboard.filter, live)).sort(compareEntries(dashboard.sort));
 }

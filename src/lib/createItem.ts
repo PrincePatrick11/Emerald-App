@@ -12,7 +12,7 @@ import { dashboardById, useDashboardStore } from '../store/dashboardStore';
 import { entryView } from '../store/entryViews';
 import type { ActiveView } from '../types';
 import type { CreatableViewId } from './modules';
-import { firstCategoryOf, firstTagOf } from './dashboards';
+import { filterCanMatch, firstCategoryOf, firstTagOf } from './dashboards';
 import { useTagStore } from '../store/tagStore';
 
 /**
@@ -81,16 +81,30 @@ export function startTagsOf(dashboardId: string): string[] {
 }
 
 /**
+ * The dashboard a new entry made in `dashboardId` opens in: that one — unless its
+ * filter names only categories or tags that are gone. Such a dashboard shows
+ * nothing, so the entry would not appear in it: it opens in "All entries".
+ */
+export function dashboardShowing(dashboardId: string): string {
+  const dashboard = dashboardById(useDashboardStore.getState().dashboards, dashboardId);
+  const live = {
+    categories: new Set(useCategoryStore.getState().categories.map((c) => c.id)),
+    tags: new Set(useTagStore.getState().tags.map((tag) => tag.id)),
+  };
+  return !dashboard || filterCanMatch(dashboard.filter, live) ? dashboardId : 'all';
+}
+
+/**
  * A new entry in the dashboard `dashboardId` — in `categoryId` if given, else
  * in its first category, and with the first tag of its filter. It opens on the
- * entry page inside that dashboard.
+ * entry page inside that dashboard (`dashboardShowing`).
  */
 async function createInDashboard(dashboardId: string, categoryId?: string): Promise<ActiveView> {
   const entry = await useEntryStore.getState().createEntry({
     categoryId: categoryId ?? startCategoryOf(dashboardId),
     tagIds: startTagsOf(dashboardId),
   });
-  return newEntryView(dashboardId, entry);
+  return newEntryView(dashboardShowing(dashboardId), entry);
 }
 
 /** Creates the item and returns where it opens. */

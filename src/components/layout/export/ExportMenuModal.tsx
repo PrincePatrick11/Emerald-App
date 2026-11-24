@@ -101,16 +101,17 @@ function ExportMenuBody({ target }: { target: ExportTarget }) {
   const dashboard = dashboardOrAll(dashboards, prefs.dashboardId);
   // Remembered categories and tags that are gone since drop out, here and in the controls.
   const liveCategories = useMemo(() => new Set(categories.map((c) => c.id)), [categories]);
+  const liveTags = useMemo(() => new Set(tags.map((tag) => tag.id)), [tags]);
   const ownFilter = useMemo(
-    () => liveFilter(prefs.filter, liveCategories, new Set(tags.map((tag) => tag.id))),
-    [prefs.filter, liveCategories, tags],
+    () => liveFilter(prefs.filter, liveCategories, liveTags),
+    [prefs.filter, liveCategories, liveTags],
   );
   const filter = s.source === 'filter' ? freeFilter(ownFilter) : dashboard?.filter ?? {};
   const range = useMemo(() => periodRange(prefs.period, prefs.from, prefs.to), [prefs.period, prefs.from, prefs.to]);
   const bulkList = useMemo(
-    () => (scope === 'bulk' && !range.invalid ? bulkEntries(entries, filter, range, s.order, liveCategories) : []),
+    () => (scope === 'bulk' && !range.invalid ? bulkEntries(entries, filter, range, s.order, { categories: liveCategories, tags: liveTags }) : []),
     // `filter` is rebuilt every render; its parts are what counts.
-    [scope, entries, range, s.order, liveCategories, JSON.stringify(filter)],
+    [scope, entries, range, s.order, liveCategories, liveTags, JSON.stringify(filter)],
   );
   const isOut = (id: string) => advanced && excluded.has(id);
 

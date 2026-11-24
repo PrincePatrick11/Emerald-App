@@ -26,7 +26,7 @@ interface Group {
   tiles: Tile[];
 }
 
-/** Lower case and without accents: "kra" finds "Kräuter", "medi" "Méditation". */
+/** Lower case and without accents: "kra" finds "Kräuter", "medi" "Méditation". lang-ok */
 function fold(text: string): string {
   return text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
 }

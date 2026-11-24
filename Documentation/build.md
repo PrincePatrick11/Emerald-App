@@ -23,7 +23,7 @@ Three jobs, on every push to `main` or a version branch and on every pull reques
 2. `npm run check:i18n` — the four locale files carry the same keys and `{{placeholder}}`s, see [`internationalization.md`](internationalization.md)
 3. `npm run check:blocks` (`scripts/check-blocks.mjs`) — the stored block format in `src/lib/blocks/blockHtml.ts` round-trips and runs under Node without a DOM
 4. `npm run check:docs` (`scripts/check-docs.mjs`) — every relative link in `README.md`, `AGENTS.md`, `CONTRIBUTING.md`, `CHANGELOG.md`, `Documentation/` and `tools/` points to an existing file and, with `#anchor`, to an existing heading, and a repository path in backticks exists
-5. `npm run check:filter` (`scripts/check-dashboard-filter.mjs`) — a dashboard filter naming categories that no longer exist shows nothing; only one without the rule shows everything
+5. `npm run check:filter` (`scripts/check-dashboard-filter.mjs`) — a dashboard filter naming categories or tags that no longer exist (or are in the trash) shows nothing; only one without the rule shows everything
 6. `npm run check:english` (`scripts/check-english.mjs`) — no German in code comments, or anywhere in `scripts/` and the workflows. It looks for umlauts and typical words, so it can miss some; `lang-ok` on a line exempts German test data
 7. `npm run check:colors` (`scripts/check-colors.mjs`) — no raw Tailwind palette classes in `src/`; colours come from the theme tokens.
 8. `npm run build` — `tsc && vite build --configLoader runner`, so it carries the typecheck

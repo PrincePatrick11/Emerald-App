@@ -16,7 +16,7 @@ import { getDb } from '../lib/db';
 import { generateId, nowIso } from '../lib/helpers';
 import { fromRow, type DbRow } from '../lib/row';
 import { reportSaveError } from './saveNoticeStore';
-import { DEFAULT_DISPLAY, normalizeFilter } from '../lib/dashboards';
+import { DEFAULT_DISPLAY } from '../lib/dashboards';
 import type { Dashboard, DashboardDisplay, DashboardFilter, DashboardSort } from '../types';
 
 /** What can be changed on a dashboard. */
@@ -95,7 +95,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       ...patch,
       name: patch.name !== undefined ? patch.name.trim() : current.name,
       // "All entries" shows everything; nothing narrows it.
-      filter: current.builtin === 'all' ? {} : (patch.filter ? normalizeFilter(patch.filter) : current.filter),
+      filter: current.builtin === 'all' ? {} : (patch.filter ?? current.filter),
       updated_at: nowIso(),
     };
     // First in memory: sort and layout buttons answer at once.

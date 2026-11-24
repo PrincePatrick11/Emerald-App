@@ -11,7 +11,7 @@
  * remembered for the next time.
  */
 import { format, isValid, parseISO, startOfDay, startOfMonth, subDays } from 'date-fns';
-import { matchesFilter } from './dashboards';
+import { matchesFilter, type LiveIds } from './dashboards';
 import { asRecord, oneOf } from './helpers';
 import { FULL_BACKUP_OPTIONS, type BackupOptions } from './dbBackup';
 import { IMAGE_MODES, type ImageMode } from './emerald/manifest';
@@ -221,9 +221,9 @@ export function byCreated<T extends Pick<Entry, 'created_at' | 'entry_number'>>(
 
 /**
  * A collective export's entries: those the filter lets through, created within
- * the range, in the chosen order. `live` is the IDs of the categories that
- * exist, as for a dashboard's list (`dashboardEntries`). For the own filter
- * `liveFilter` has already dropped deleted categories, so one with none left
+ * the range, in the chosen order. `live` is the IDs of the categories and tags
+ * that exist, as for a dashboard's list (`dashboardEntries`). For the own filter
+ * `liveFilter` has already dropped deleted categories and tags, so one with none left
  * does not narrow.
  */
 export function bulkEntries(
@@ -231,7 +231,7 @@ export function bulkEntries(
   filter: DashboardFilter,
   range: { from: Date | null; to: Date | null },
   order: ExportOrder,
-  live: ReadonlySet<string>,
+  live: LiveIds,
 ): Entry[] {
   return byCreated(entries.filter((e) => matchesFilter(e, filter, live) && createdWithin(e, range)), order);
 }

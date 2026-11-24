@@ -104,3 +104,8 @@ export function safeFileBase(text: string): string {
 export function oneOf<T>(raw: unknown, options: readonly T[], fallback: T): T {
   return options.includes(raw as T) ? (raw as T) : fallback;
 }
+
+/** Items as a sentence part in the language's own way: "A, B and C", in the app language. */
+export function listOf(items: readonly string[], language: string): string {
+  return new Intl.ListFormat(language, { style: 'long', type: 'conjunction' }).format(items);
+}

@@ -10,7 +10,8 @@ import Favicon from '../sidebar/fields/Favicon';
 import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
 import { useShrunkIcon } from '../../hooks/useShrunkIcon';
 import { DEFAULT_CATEGORY_EMOJI, categoryLabel } from '../../lib/categories';
-import { dashboardLabel } from '../../lib/dashboards';
+import { dashboardLabel, ruleAlive } from '../../lib/dashboards';
+import { useTagStore } from '../../store/tagStore';
 import { useDashboardStore, dashboardById } from '../../store/dashboardStore';
 import { closeDashboardSettings, useDashboardSettingsStore } from '../../store/dashboardSettingsStore';
 import { deleteDashboardWithUndo } from '../../store/dashboardActions';
@@ -46,8 +47,14 @@ function DashboardSettingsModal({ dashboard, onClose }: { dashboard: Dashboard; 
   const shrinkIcon = useShrunkIcon(setIcon, 'DashboardSettingsModal');
   const pendingIcon = useRef<Promise<void>>(Promise.resolve());
   const chooseIcon = (value: string) => { pendingIcon.current = shrinkIcon(value); };
+  const liveTags = useTagStore((s) => s.tags);
   const [categoryIds, setCategoryIds] = useState<string[]>(dashboard.filter.categories ?? []);
   const [tags, setTags] = useState<string[]>(dashboard.filter.tags ?? []);
+  // A rule that names only categories or tags that are gone shows nothing — until the user changes that rule.
+  const [categoriesTouched, setCategoriesTouched] = useState(false);
+  const [tagsTouched, setTagsTouched] = useState(false);
+  const categoriesGone = !categoriesTouched && !ruleAlive(dashboard.filter.categories, new Set(categories.map((c) => c.id)));
+  const tagsGone = !tagsTouched && !ruleAlive(dashboard.filter.tags, new Set(liveTags.map((tag) => tag.id)));
   // Tags typed here are created on saving, not before.
   const [draftTags, setDraftTags] = useState<DraftTag[]>([]);
   const [newCategory, setNewCategory] = useState('');
@@ -58,26 +65,34 @@ function DashboardSettingsModal({ dashboard, onClose }: { dashboard: Dashboard; 
     // A dashboard of the user's own needs a name; a built-in falls back to its translated one.
     const nextName = name.trim() || (dashboard.builtin ? '' : dashboardLabel(t, dashboard));
     const finalTags = await commitDraftTags(tags, draftTags);
-    // A filter the user did not touch stays as it is: an emptied category list shows nothing, and saving a new name must not turn it into "all".
-    const same = (a: string[], b: string[]) => a.length === b.length && a.every((id, i) => id === b[i]);
-    const filterUnchanged = same(categoryIds, dashboard.filter.categories ?? []) && same(finalTags, dashboard.filter.tags ?? []);
+    // A rule the user did not touch stays as it is — even an emptied one, which shows nothing: saving a new name must not turn it into "all". A touched, empty rule is no rule.
+    const kept = (touched: boolean, ids: string[], stored: string[] | undefined) => (touched ? (ids.length ? ids : undefined) : stored);
+    const categoriesRule = kept(categoriesTouched, categoryIds, dashboard.filter.categories);
+    const tagsRule = kept(tagsTouched, finalTags, dashboard.filter.tags);
     await updateDashboard(dashboard.id, {
       name: nextName,
       icon,
-      ...(filterUnchanged ? {} : { filter: { categories: categoryIds, tags: finalTags } }),
+      ...(categoriesTouched || tagsTouched
+        ? { filter: { ...(categoriesRule && { categories: categoriesRule }), ...(tagsRule && { tags: tagsRule }) } }
+        : {}),
     });
     onClose();
   };
 
+  const changeCategories = (next: (prev: string[]) => string[]) => {
+    setCategoryIds(next);
+    setCategoriesTouched(true);
+  };
+
   const toggleCategory = (id: string) =>
-    setCategoryIds((prev) => (prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]));
+    changeCategories((prev) => (prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]));
 
   const createCategory = async () => {
     const trimmed = newCategory.trim();
     if (!trimmed) return;
     try {
       const created = await addCategory(trimmed, DEFAULT_CATEGORY_EMOJI);
-      setCategoryIds((prev) => (prev.includes(created.id) ? prev : [...prev, created.id]));
+      changeCategories((prev) => (prev.includes(created.id) ? prev : [...prev, created.id]));
       setNewCategory('');
       setCategoryError(null);
     } catch (err) {
@@ -121,12 +136,14 @@ function DashboardSettingsModal({ dashboard, onClose }: { dashboard: Dashboard; 
           <div>
             <p className="label-xs mb-1">{t('dashboards.filterCategories')}</p>
             <p className="text-xs text-subtle mb-2">{t('dashboards.filterCategoriesHint')}</p>
+            {categoriesGone && <p className="text-xs text-danger mb-2" role="alert">{t('dashboards.categoriesGone')}</p>}
             <div className="max-h-56 overflow-y-auto">
               <FilterList
                 chips={categories.map((c) => ({ value: c.id, label: categoryLabel(t, c), emoji: c.emoji }))}
                 selected={categoryIds}
                 onToggle={toggleCategory}
-                onAll={() => setCategoryIds([])}
+                onAll={() => changeCategories(() => [])}
+                allActive={categoriesGone ? false : undefined}
               />
             </div>
             <div className="flex items-center gap-2 mt-2">
@@ -147,7 +164,19 @@ function DashboardSettingsModal({ dashboard, onClose }: { dashboard: Dashboard; 
           <div>
             <p className="label-xs mb-1">{t('dashboards.filterTags')}</p>
             <p className="text-xs text-subtle mb-2">{t('dashboards.filterTagsHint')}</p>
-            <TagInput tags={tags} onChange={setTags} drafts={draftTags} onDraftsChange={setDraftTags} flush />
+            {tagsGone && (
+              <div className="mb-2">
+                <p className="text-xs text-danger mb-1.5" role="alert">{t('dashboards.tagsGone')}</p>
+                <Button small onClick={() => { setTags([]); setTagsTouched(true); }}>{t('dashboards.removeTagFilter')}</Button>
+              </div>
+            )}
+            <TagInput
+              tags={tags}
+              onChange={(next) => { setTags(next); setTagsTouched(true); }}
+              drafts={draftTags}
+              onDraftsChange={(next) => { setDraftTags(next); setTagsTouched(true); }}
+              flush
+            />
           </div>
         </>
       )}
