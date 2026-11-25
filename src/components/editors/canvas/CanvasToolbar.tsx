@@ -5,7 +5,7 @@ import { keys } from './shortcuts';
 import {
   AlignHorizontalDistributeCenter, AlignHorizontalJustifyCenter, AlignHorizontalJustifyEnd,
   AlignHorizontalJustifyStart, AlignVerticalDistributeCenter, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd,
-  AlignVerticalJustifyStart, ArrowDown, ArrowUp, BringToFront, Copy, Group, ImageDown, ImagePlus, Layers, Layers2, Lock, LockOpen, MousePointer2, Ruler, SendToBack, Trash2,
+  AlignVerticalJustifyStart, ArrowDown, ArrowUp, BringToFront, Copy, Group, ImagePlus, Layers, Layers2, Lock, LockOpen, MousePointer2, Ruler, SendToBack, Trash2,
   Ungroup, ZoomIn, ZoomOut,
 } from 'lucide-react';
 import { ToolbarBtn, ToolbarDivider, ToolbarGroup, ToolRail, ToolRailGroup, UndoRedoGroup } from '../shared/toolbarParts';
@@ -130,9 +130,6 @@ export default function CanvasToolbar({ controller: c, end }: { controller: Canv
         )}
         {f.layers && (
           <ToolbarBtn onClick={c.toggleList} active={c.listOpen} title={t('canvas.layers.title')}><Layers size={14} /></ToolbarBtn>
-        )}
-        {f.export && c.onExport && (
-          <ToolbarBtn onClick={c.onExport} title={t('canvas.export')}><ImageDown size={14} /></ToolbarBtn>
         )}
         {end}
       </div>

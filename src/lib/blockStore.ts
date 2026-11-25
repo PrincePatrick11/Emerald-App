@@ -1,6 +1,6 @@
 import type Database from './sqlite';
 import { blockSectionHtml, parseBlocks, serializeBlocks } from './blocks/blockHtml';
-import { blockRefs } from './blocks/blockRefs';
+import { blockRefs, blockTagsOf } from './blocks/blockRefs';
 import { fromBlockRow, toBlockRow, type StoredBlockRow } from './blocks/blockRows';
 import { isPositionKey, positionsFor } from './blocks/position';
 import { TEXT_BLOCK_TYPE, type BlockInstance } from './blocks/types';
@@ -249,6 +249,8 @@ interface BlockWrite {
   content: string;
   /** How many blocks are written (inserted, changed or moved) or removed. */
   changed: number;
+  /** The tags the blocks give their owner (`block_refs`, kind `tag`) — what the store keeps in memory beside its own tags. */
+  blockTags: string[];
   /** After the batch went through: remember the blocks as saved — or, if another write of the owner committed meanwhile, forget them (`committer`). */
   commit: () => void;
 }
@@ -285,8 +287,29 @@ export async function planBlockWrite(
     statements,
     content: contentOf(blocks),
     changed,
+    blockTags: blockTagsOf(blocks),
     commit: committer(owner, blocks, positions),
   };
+}
+
+/**
+ * The tags the blocks give each entry (`block_refs`, kind `tag`), read with
+ * the list — before any content is loaded. Only `ids` if given.
+ */
+export async function readBlockTags(db: Database, ids?: readonly string[]): Promise<Map<string, string[]>> {
+  const rows = await db.select<{ owner: string; tag: string }[]>(
+    `SELECT DISTINCT b.entry_id AS owner, r.target AS tag
+       FROM block_refs r JOIN blocks b ON b.row_id = r.block_row
+      WHERE r.target_kind = 'tag' AND b.entry_id IS NOT NULL${ids ? ' AND b.entry_id IN (SELECT value FROM json_each($1))' : ''}`,
+    ids ? [JSON.stringify(ids)] : [],
+  );
+  const out = new Map<string, string[]>();
+  for (const { owner, tag } of rows) {
+    const list = out.get(owner);
+    if (list) list.push(tag);
+    else out.set(owner, [tag]);
+  }
+  return out;
 }
 
 /**

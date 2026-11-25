@@ -164,6 +164,7 @@
     "actions": "Block-Aktionen",
     "dragToMove": "Ziehen zum Verschieben",
     "sidebarTitle": "Blöcke",
+    "actionsTitle": "Aktionen",
     "hide": "Ausblenden",
     "show": "Anzeigen",
     "hiddenHint": "Ausgeblendet — im Lesemodus nicht sichtbar",
@@ -297,6 +298,7 @@
     },
     "canvas": {
       "broken": "Diese Leinwand ließ sich nicht lesen. Sie bleibt, wie sie ist.",
+      "savePicture": "Als Bild speichern …",
       "empty": "Noch nichts auf der Leinwand.",
       "parts": "Verfügbar",
       "part": {
@@ -758,7 +760,6 @@
     "zoomIn": "Vergrößern",
     "zoomOut": "Verkleinern",
     "fit": "Einpassen",
-    "export": "Als Bild speichern …",
     "image": "Bild",
     "element": "Element",
     "layers": {

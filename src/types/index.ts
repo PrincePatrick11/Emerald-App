@@ -23,6 +23,12 @@ export interface Entry {
   updated_at: string;
   /** Tag IDs (`lib/tagRefs.ts`) — those of tags in the trash stay in place, invisible. */
   tags: string[];
+  /**
+   * Tag IDs the entry's blocks give it while they are there (`block_refs`,
+   * kind `tag`, `BlockProperties.tags`) — never in `entry_tags`. Count with
+   * `tags` in dashboard filters and the tags view (`entryTagIds`).
+   */
+  block_tags?: string[];
   deleted_at: string | null;
   /** Running number over all entries, unique. */
   entry_number?: number;

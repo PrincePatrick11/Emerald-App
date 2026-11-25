@@ -164,6 +164,7 @@
     "actions": "Actions du bloc",
     "dragToMove": "Glisser pour déplacer",
     "sidebarTitle": "Blocs",
+    "actionsTitle": "Actions",
     "hide": "Masquer",
     "show": "Afficher",
     "hiddenHint": "Masqué — invisible en mode lecture",
@@ -297,6 +298,7 @@
     },
     "canvas": {
       "broken": "Cette toile n’a pas pu être lue. Elle reste telle quelle.",
+      "savePicture": "Enregistrer comme image…",
       "empty": "Rien sur la toile pour l’instant.",
       "parts": "Proposé",
       "part": {
@@ -758,7 +760,6 @@
     "zoomIn": "Zoom avant",
     "zoomOut": "Zoom arrière",
     "fit": "Ajuster à la vue",
-    "export": "Enregistrer comme image…",
     "image": "Image",
     "element": "Élément",
     "layers": {

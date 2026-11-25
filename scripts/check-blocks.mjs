@@ -28,20 +28,23 @@ writeFileSync(
    export { parseFields, serializeFields, createFieldsBlock, isElementEmpty, isHiddenInRead, linkFromSlot, imageFromSlot } from '${root}/src/lib/blocks/fields';
    export { instantiateDefinition, parseDefinitionElements, parseDefinitionDisplay, remapDefinitionDefaults, definitionImageRefs } from '${root}/src/lib/blocks/definitions';
    export { entryBlockSummary } from '${root}/src/lib/blocks/entrySummary';
-   export { extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock, createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed, letterList, sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, withChargesCoveringOnly, withRenamedPartTargets } from '${root}/src/lib/blocks/sigil';
+   export { extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock, createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed, letterList, sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, withChargesCoveringOnly } from '${root}/src/lib/blocks/sigil';
    export { paintDocFromJson, paintDocToJson, emptyPaintDoc, isPaintDocEmpty, thinPoints, transformStroke, mergeDown, canMergeDown, strokeSamples, inPolygon, symmetricCopies, mirrorStroke, splitStroke } from '${root}/src/lib/paint/document';
    export { symbolFromDrawing } from '${root}/src/components/editors/canvas/symbols/fromDrawing';
    export { readUserSymbol } from '${root}/src/lib/userSymbols';
    export { group, ungroup, withGroups, moveInStack, copiesOf, align } from '${root}/src/components/editors/canvas/canvasActions';
    export { renderBlocksForExport } from '${root}/src/lib/blocks/exportRender';
-   export { createPaintBlock, isDrawingBlockType, PAINT_BLOCK_TYPE, parseDrawing, withDrawing, withDrawingImage, isSigilDrawing, drawingImage } from '${root}/src/lib/blocks/paint';
-   export { resolveBlockType } from '${root}/src/lib/blocks/blockTypes';
+   export { createPaintBlock, PAINT_BLOCK_TYPE, parseDrawing, withDrawing, withDrawingImage, isSigilDrawing, drawingImage } from '${root}/src/lib/blocks/paint';
+   export { resolveBlockType, registerBlockType, upgradeBlock, blockSearchText, blockStorageTag, blockActionsOf, withDuplicatedBlock, copiedBlock } from '${root}/src/lib/blocks/blockTypes';
+   export { readBlockSettings, withBlockSetting, RefReporter } from '${root}/src/lib/blocks/toolkit';
+   export { entryProperties } from '${root}/src/lib/blocks/entryProperties';
    export { createCanvasBlock, parseCanvasBlock, withCanvasScene, withCanvasParts, withCanvasStripTag, withoutCanvasFile, CANVAS_BLOCK_TYPE, ALTAR_BLOCK_TYPE } from '${root}/src/lib/blocks/canvas';
    export { resolveStartTemplate, instantiateTemplateBlocks, templateStart, mergeTemplateTags, areBlocksEmpty, fieldsWithTemplate, fieldsWithoutTemplate } from '${root}/src/lib/blocks/templates';
    export { internalLinkChipHtml } from '${root}/src/lib/internalLinkHtml';
    export { extractInternalLinks } from '${root}/src/lib/internalLinkHtml';
-   export { toBlockRow, fromBlockRow, blockPlainText, htmlPlainText } from '${root}/src/lib/blocks/blockRows';
-   export { blockRefs } from '${root}/src/lib/blocks/blockRefs';
+   export { toBlockRow, fromBlockRow } from '${root}/src/lib/blocks/blockRows';
+   export { htmlPlainText } from '${root}/src/lib/blocks/plainText';
+   export { blockRefs, blockTagsOf, linkedIdsOf, blockWithoutImage } from '${root}/src/lib/blocks/blockRefs';
    export { withoutImage } from '${root}/src/lib/imageUsage';
    export { keyBetween, evenKeys, positionsFor, isPositionKey } from '${root}/src/lib/blocks/position';
    export { blocksOfContent, planBlockWrite, clearSavedBlocks, contentOf } from '${root}/src/lib/blockStore';
@@ -76,13 +79,15 @@ const {
   group, ungroup, withGroups, moveInStack, copiesOf, align,
   symbolFromDrawing, readUserSymbol,
   sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, withChargesCoveringOnly,
-  remapDefinitionDefaults, definitionImageRefs, withRenamedPartTargets,
+  remapDefinitionDefaults, definitionImageRefs,
   resolveStartTemplate, instantiateTemplateBlocks,
   templateStart, mergeTemplateTags, areBlocksEmpty,
   fieldsWithTemplate, fieldsWithoutTemplate,
   createCanvasBlock, parseCanvasBlock, withCanvasScene, withCanvasParts, withCanvasStripTag, withoutCanvasFile, CANVAS_BLOCK_TYPE, ALTAR_BLOCK_TYPE,
-  createPaintBlock, isDrawingBlockType, PAINT_BLOCK_TYPE, resolveBlockType,
-  toBlockRow, fromBlockRow, blockPlainText, htmlPlainText, blockRefs, withoutImage, keyBetween, evenKeys, positionsFor, isPositionKey,
+  createPaintBlock, PAINT_BLOCK_TYPE, resolveBlockType,
+  registerBlockType, upgradeBlock, blockSearchText, blockStorageTag, blockActionsOf, withDuplicatedBlock, copiedBlock,
+  readBlockSettings, withBlockSetting, RefReporter, entryProperties, blockTagsOf, linkedIdsOf, blockWithoutImage,
+  toBlockRow, fromBlockRow, htmlPlainText, blockRefs, withoutImage, keyBetween, evenKeys, positionsFor, isPositionKey,
   blocksOfContent, planBlockWrite, clearSavedBlocks, contentOf,
   contentToBlocks, blocksToContent, parseManifest, renameStoredFiles, relinkWithinFile, gentlestImageMode, storedNameStem,
   EMERALD_FORMAT_VERSION,
@@ -734,7 +739,7 @@ console.log('\n4g2. The paint block\n');
   const saved = withDrawing(paint, render, emptyPaintDoc());
   const back = parseDrawing(parseBlocks(serializeBlocks([saved]))[0]);
   check('paint: a type of its own, known to the app, a drawing like the sigil\'s',
-    paint.type === PAINT_BLOCK_TYPE && !!resolveBlockType(paint) && isDrawingBlockType(paint.type) && !isDrawingBlockType('core.canvas'));
+    paint.type === PAINT_BLOCK_TYPE && !!resolveBlockType(paint));
   check('paint: picture and document survive the round trip', back.render === render && !!back.doc, back);
   const text = {
     title: () => 'Painting', date: (iso) => iso, number: String, targetDate: '', technique: '', loaded: '', notLoaded: '',
@@ -830,10 +835,18 @@ console.log('\n4h. Sigils as parts of custom blocks\n');
   const targeted = setPart(parseBlocks(unloaded)[1], 'charge', (p) => serializeSigilCharge(p, {
     ...parseSigilCharge(p), targets: [sigilPartId(block.id, 'calc'), 'fremd-block'],
   }));
-  const dup = withRenamedPartTargets({ ...targeted, id: dupId }, block.id, dupId);
+  const dup = copiedBlock({ ...targeted, id: dupId }, { ids: new Map([[block.id, dupId]]) });
   const dupCharge = sigilUnits([dup]).find((u) => u.block.type === 'sigilCharge');
   check('a duplicated block targets its own parts with its charge',
     parseSigilCharge(dupCharge.block).targets.join() === `${dupId}:calc,fremd-block`, parseSigilCharge(dupCharge.block));
+  {
+    // Duplicating through the stack: the copy right after, and a charge elsewhere that covers the original covers the copy.
+    const stack = withDuplicatedBlock([standaloneCharge, ...parseBlocks(unloaded)], block.id, dupId);
+    const outer = parseSigilCharge(chargeUnit(stack[0])).targets;
+    check('a duplicated block comes right after its original, and a charge covering it covers the copy',
+      stack.findIndex((b) => b.id === dupId) === stack.findIndex((b) => b.id === block.id) + 1
+        && outer.join() === `${sigilPartId(block.id, 'draw')},${sigilPartId(dupId, 'draw')}`, outer);
+  }
 
   const oddlyEncoded = content.replace(/&quot;/g, '&#34;');
   check('differently encoded content hides its parts all the same',
@@ -1012,15 +1025,17 @@ console.log('\nCanvas block\n');
   check('a new altar: the same canvas, with "Images" below', altar.parts.images && altar.parts.shapes, altar.parts);
   check('an altar without config still has "Images" below',
     parseCanvasBlock({ id: 'a', type: ALTAR_BLOCK_TYPE, html: '', attrs: {} }).parts.images);
-  check('"Images" below an altar start with the tag "Altar Library", a canvas\'s with all',
-    altar.stripTag === 'altar-library' && parsed.stripTag === '', [altar.stripTag, parsed.stripTag]);
+  check('"Images" below a new altar or canvas have no tag chosen; the altar type keeps its pictures under "Altar Library", a canvas has no storage',
+    altar.stripTag === null && parsed.stripTag === null
+      && blockStorageTag(createCanvasBlock(ALTAR_BLOCK_TYPE))?.id === 'altar-library' && blockStorageTag(fresh) === null,
+    [altar.stripTag, parsed.stripTag]);
   const allTags = withCanvasStripTag(createCanvasBlock(ALTAR_BLOCK_TYPE), '');
   const otherTag = withCanvasParts(withCanvasStripTag(allTags, 'venus'), { ...altar.parts, shapes: false });
   check('the strip\'s tag is kept: cleared stays cleared, another one survives a change of parts',
     parseCanvasBlock(allTags).stripTag === '' && parseCanvasBlock(otherTag).stripTag === 'venus'
       && !parseCanvasBlock(otherTag).parts.shapes, parseCanvasBlock(otherTag));
   check('a foreign tag value counts as none set',
-    parseCanvasBlock({ ...allTags, attrs: { ...allTags.attrs, 'data-block-config': JSON.stringify({ tag: '<x>' }) } }).stripTag === 'altar-library');
+    parseCanvasBlock({ ...allTags, attrs: { ...allTags.attrs, 'data-block-config': JSON.stringify({ tag: '<x>' }) } }).stripTag === null);
 
   const scene = { ...parsed.scene, elements: [image('i1', pic), image('i2', pic)], background: { fill: { kind: 'none' }, image: { src: bg, fit: 'cover' }, tint: null } };
   const full = withCanvasScene(fresh, scene, render);
@@ -1118,13 +1133,17 @@ console.log('\n7. Blocks as rows (blocks, block_refs)\n');
   check('a row\'s attrs keep only data-* strings, never the type or the ID', JSON.stringify(foreignRow.attrs) === '{"data-ok":"1"}', foreignRow.attrs);
   check('unreadable attrs JSON loses only itself', Object.keys(fromBlockRow({ id: 'f', type: 'core.text', html: '', attrs: '{nope' }).attrs).length === 0);
 
-  check('plain text: tags gone, words kept apart by block elements, chips their own word, entities decoded',
-    blockPlainText(titled) === 'Kopf einszwei & Ziel', blockPlainText(titled)); // lang-ok
-  check('plain text: a fields block reads as its fallback', blockPlainText(withLink).includes('Ziel'), blockPlainText(withLink)); // lang-ok
-  check('plain text: a canvas and a drawing have none', blockPlainText(canvas) === '' && blockPlainText(paint) === '');
+  check('search text: tags gone, words kept apart by block elements, chips their own word, entities decoded',
+    blockSearchText(titled) === 'Kopf einszwei & Ziel', blockSearchText(titled)); // lang-ok
+  check('search text: a fields block reads as its fallback', blockSearchText(withLink).includes('Ziel'), blockSearchText(withLink)); // lang-ok
+  check('search text: a canvas and a drawing have none', blockSearchText(canvas) === '' && blockSearchText(paint) === '');
+  check('search text: an unknown type is read as its markup', blockSearchText({ id: 'u', type: 'x.y', html: '<p>Fremd</p>', attrs: {} }) === 'Fremd'); // lang-ok
+  check('the row text is the block search text', toBlockRow(titled).text === blockSearchText(titled));
 
+  const withoutVersion = (b) => ({ ...b, attrs: Object.fromEntries(Object.entries(b.attrs).filter(([k]) => k !== 'data-block-v')) });
   const refs = (b) => blockRefs(b).map((r) => `${r.kind}:${r.target === linked ? 'L' : r.target.slice(0, 1)}:${r.role}`).sort().join(' ');
-  check('refs: a text block points at its chip and its picture', refs(titled) === 'entry:L:content image:1:content', refs(titled));
+  check('refs: a text block points at its chip and its picture', refs(withoutVersion(titled)) === 'entry:L:content image:1:content', refs(withoutVersion(titled)));
+  check('refs: the same text block in a newer format (v3) keeps its picture as its own', refs(titled) === 'entry:L:content image:1:default', refs(titled));
   check('refs: link and image fields', refs(withLink) === 'entry:L:content' && refs(withImage) === 'image:1:content', [refs(withLink), refs(withImage)]);
   check('refs: a drawing has its render and its layers', refs(paint) === 'image:2:layer image:3:render', refs(paint));
   check('refs: a canvas has its pictures, its background and its render', refs(canvas) === 'image:1:content image:3:render image:4:background', refs(canvas));
@@ -1223,6 +1242,114 @@ console.log('\n7. Blocks as rows (blocks, block_refs)\n');
       && htmlPlainText('<p>a</p><script>x').includes('x'), htmlPlainText('<p>a</p><script>x()</script><style>p{}</style><p>b</p>'));
   check('plain text: a chip inside a word still stands apart, formatting does not',
     htmlPlainText(`ab${chip}cd <b>fe</b>tt`) === 'ab Ziel cd fett', htmlPlainText(`ab${chip}cd <b>fe</b>tt`)); // lang-ok
+}
+
+console.log('\n7b. Block interfaces: registry, toolkit, copies, actions, settings, properties\n');
+
+{
+  let twice = false;
+  try {
+    registerBlockType(resolveBlockType(createTextBlock('')));
+  } catch {
+    twice = true;
+  }
+  check('a type ID registers once', twice);
+
+  // A type of the test's own, as an extension would register one.
+  registerBlockType({
+    id: 'test.tagger', origin: 'plugin', icon: resolveBlockType(createTextBlock('')).icon, labelKey: 'x', descriptionKey: 'x',
+    group: 'text', dataVersion: 2, defaultShowTitle: false,
+    upgrade: (b, from) => ({ ...b, attrs: { ...b.attrs, 'data-block-data': JSON.stringify({ from }) } }),
+    properties: {
+      mayContribute: (c) => c.includes('test.tagger'),
+      tags: () => ['moon-tag', '<bad>'],
+      icon: () => '🌕',
+      cover: () => null,
+      rows: (_b, ctx) => [{ key: 'day', labelKey: 'x', value: { kind: 'date', iso: ctx.entryDate ?? '' } }],
+      overridable: { icon: false, cover: true },
+    },
+    settings: [
+      { key: 'show', labelKey: 'x', kind: 'toggle', initial: true },
+      { key: 'mode', labelKey: 'x', kind: 'select', options: [{ value: 'a', labelKey: 'a' }, { value: 'b', labelKey: 'b' }], initial: 'a' },
+    ],
+  });
+  const tagger = { id: 'tg', type: 'test.tagger', html: '', attrs: {} };
+  check('a block\'s tags are references of kind tag; a malformed ID is left out',
+    JSON.stringify(blockRefs(tagger)) === JSON.stringify([{ kind: 'tag', target: 'moon-tag', role: 'tag' }]), blockRefs(tagger));
+  check('the tags of a stack come from its blocks', blockTagsOf([tagger, createTextBlock('<p>x</p>')]).join() === 'moon-tag');
+
+  const up = upgradeBlock(tagger);
+  check('an older block is brought up to its type\'s data version',
+    up.attrs['data-block-v'] === '2' && JSON.parse(up.attrs['data-block-data']).from === 1, up);
+  check('a current block stays as it is', upgradeBlock(up) === up);
+  const newer = { ...tagger, attrs: { 'data-block-v': '3' } };
+  check('a block from a newer version has no type here and is not touched', resolveBlockType(newer) === undefined && upgradeBlock(newer) === newer);
+
+  const defs = resolveBlockType(tagger).settings;
+  const start = readBlockSettings(tagger, defs);
+  check('settings start at their start values', start.show === true && start.mode === 'a', start);
+  const set = withBlockSetting(withBlockSetting(tagger, defs[0], false), defs[1], 'b');
+  const read = readBlockSettings(set, defs);
+  check('a setting is stored with the block and read back', read.show === false && read.mode === 'b', set.attrs);
+  check('values back at their start are not stored',
+    withBlockSetting(withBlockSetting(set, defs[0], true), defs[1], 'a').attrs['data-block-settings'] === undefined);
+  check('a stored value that does not fit its description reads as the start value',
+    readBlockSettings({ ...tagger, attrs: { 'data-block-settings': '{"show":"yes","mode":"z"}' } }, defs).mode === 'a');
+  check('settings travel through a row and the content',
+    fromBlockRow(toBlockRow(set)).attrs['data-block-settings'] === set.attrs['data-block-settings']
+      && parseBlocks(serializeBlocks([set]))[0].attrs['data-block-settings'] === set.attrs['data-block-settings']);
+
+  const ctx = { entryId: 'e', entryDate: '2026-11-25', today: '2026-11-25' };
+  const props = entryProperties({ icon: '🔥', cover_image: 'own.png' }, [tagger], { emoji: '📓' }, ctx);
+  check('a block\'s icon that may not be overridden stands before the user\'s',
+    props.icon?.value === '🌕' && props.icon.source === 'block' && props.icon.blockId === 'tg', props.icon);
+  check('without a block value the user\'s stands, without that the category\'s',
+    props.cover?.source === 'user' && entryProperties({}, [], { emoji: '📓' }, ctx).icon?.source === 'category', props.cover);
+  check('a hidden block suggests nothing', entryProperties({}, [{ ...tagger, attrs: { 'data-block-hidden': '1' } }], null, ctx).icon === null);
+  check('a block\'s rows come with its context',
+    props.rows.length === 1 && props.rows[0].value.iso === '2026-11-25' && props.rows[0].blockId === 'tg', props.rows);
+}
+
+{
+  const empty = createCanvasBlock();
+  check('an empty canvas offers nothing to save', blockActionsOf(empty, { reading: false }).length === 0);
+  const filled = withCanvasScene(empty, { ...parseCanvasBlock(empty).scene, background: { fill: { kind: 'solid', color: '#000000' }, image: null, tint: null } }, null);
+  check('a canvas with something on it offers "Save as picture", while reading too',
+    blockActionsOf(filled, { reading: true }).map((a) => a.id).join() === 'savePicture' && blockActionsOf(filled, { reading: false }).length === 1);
+  check('a text block has no actions', blockActionsOf(createTextBlock('<p>x</p>'), { reading: false }).length === 0);
+
+  const target = '44444444-4444-4444-4444-444444444444';
+  const chip = internalLinkChipHtml({ id: target, targetKind: 'entry', label: 'Ziel' }); // lang-ok
+  const content = serializeBlocks([createTextBlock(`<p>${chip}</p>`), createCanvasBlock()]);
+  check('linked entries come from the blocks\' references', [...linkedIdsOf(content)].join() === target);
+
+  const pic = 'a'.repeat(64) + '.png';
+  const text = createTextBlock(`<p>eins</p><img src="${pic}" alt=""><p>zwei</p>`);
+  const without = blockWithoutImage(text, pic);
+  check('a text block lets a picture go, nothing else',
+    !without.html.includes(pic) && without.html.includes('zwei') && blockWithoutImage(without, pic) === without, without.html);
+  const reporter = new RefReporter();
+  reporter.image('not-a-picture.txt');
+  reporter.icon('🙂');
+  reporter.entry('');
+  check('the reporter drops what is no reference', reporter.refs.length === 0, reporter.refs);
+}
+
+{
+  const empty = createCanvasBlock();
+  const none = withCanvasScene(empty, { ...parseCanvasBlock(empty).scene, background: { fill: { kind: 'none' }, image: null, tint: null } }, null);
+  check('a canvas whose background draws nothing offers nothing to save', blockActionsOf(none, { reading: true }).length === 0);
+
+  // A canvas from a newer app: its render and background stay what they are, and "Images" leaves it alone.
+  const pic = 'b'.repeat(64) + '.png';
+  const render = 'c'.repeat(64) + '.png';
+  const drawn = withCanvasScene(empty, { ...parseCanvasBlock(empty).scene, elements: [] , background: { fill: { kind: 'none' }, image: { src: pic, fit: 'cover' }, tint: null } }, render);
+  const tooNew = { ...drawn, attrs: { ...drawn.attrs, 'data-block-v': '9' } };
+  const roles = blockRefs(tooNew).map((r) => `${r.kind}:${r.role}`).sort().join(' ');
+  check('a known type in a newer format keeps its pictures as its own, not as shown ones', roles === 'image:default image:default', roles);
+  check('"Images" does not take a picture out of a block in a newer format', blockWithoutImage(tooNew, pic) === tooNew);
+  check('an unknown type still lets "Images" take a picture out of its markup',
+    !blockWithoutImage({ id: 'u', type: 'x.y', html: `<img src="${pic}" alt="">`, attrs: {} }, pic).html.includes(pic));
 }
 
 console.log('\n8. .emerald manifest (lib/emerald/manifest.ts)\n');

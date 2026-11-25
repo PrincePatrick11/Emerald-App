@@ -141,7 +141,7 @@ export function parseBlocks(html: string): BlockInstance[] {
  * from a row or from the stack, a block comes out as the same string.
  */
 const ATTR_ORDER: readonly string[] = [
-  BLOCK_ATTR.version, BLOCK_ATTR.hidden, BLOCK_ATTR.title, BLOCK_ATTR.showTitle, BLOCK_ATTR.config, BLOCK_ATTR.data,
+  BLOCK_ATTR.version, BLOCK_ATTR.hidden, BLOCK_ATTR.title, BLOCK_ATTR.showTitle, BLOCK_ATTR.config, BLOCK_ATTR.data, BLOCK_ATTR.settings,
 ];
 
 /** The attributes of a block in the order they are written (`ATTR_ORDER`, then the rest). */

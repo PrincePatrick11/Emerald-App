@@ -28,7 +28,7 @@ export type ListInfoValue = { kind: 'date'; iso: string } | { kind: 'text'; text
 /** A part the lists show: `pickListInfo` has left out those without a value. */
 export type ShownListInfoPart = ListInfoPart & { value: ListInfoValue };
 
-/** What a block type registers (`BlockTypeMeta.listInfo`). */
+/** What a block type registers (`BlockTypeDef.listInfo`). */
 export interface ListInfoProvider {
   /** The cheap pre-check on the raw content: can it hold anything for this type? Lists stay fast because most entries fail it. */
   mayContribute: (content: string) => boolean;

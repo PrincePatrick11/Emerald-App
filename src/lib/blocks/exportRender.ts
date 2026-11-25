@@ -1,7 +1,7 @@
 import { escapeHtml } from '../internalLinkHtml';
 import { isBlockHidden, showsTitleInRead } from './blockAttrs';
 import { parseBlocks } from './blockHtml';
-import { resolveBlockType, type BlockTypeMeta } from './blockTypes';
+import { resolveBlockType, type BlockTypeDef } from './blockTypes';
 import {
   FIELDS_BLOCK_TYPE, fieldValueHtml, imageFromSlot, isElementEmpty, isHiddenInRead, isSigilElement, isSlotKind, parseFields, soleSigilElement,
   type ElementDef, type FallbackText, type FieldsModel,
@@ -35,7 +35,7 @@ import { localIsoDay } from '../helpers';
 
 export interface ExportText {
   /** What the block is called (`blockLabel` with `t`). */
-  title: (block: BlockInstance, meta: BlockTypeMeta | undefined) => string;
+  title: (block: BlockInstance, meta: BlockTypeDef | undefined) => string;
   fields: FallbackText;
   /** A `YYYY-MM-DD` for humans. */
   date: (iso: string) => string;
@@ -122,7 +122,7 @@ function chargeHtml(block: BlockInstance, text: ExportText): string {
 
 function bodyHtml(
   block: BlockInstance,
-  meta: BlockTypeMeta | undefined,
+  meta: BlockTypeDef | undefined,
   text: ExportText,
   concealed: ReadonlyMap<string, string | null>,
 ): string {

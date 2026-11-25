@@ -30,7 +30,7 @@ export default function SigilPart({ element, block, model, write, persist, ...re
   write: (next: FieldsModel) => void;
   /** Save the changed model immediately; absent if read mode is not allowed to do anything here. */
   persist?: (next: FieldsModel) => void;
-} & Pick<BlockViewProps, 'blocks' | 'isEditing' | 'sigil'>) {
+} & Pick<BlockViewProps, 'blocks' | 'isEditing' | 'sigil' | 'context'>) {
   const View = PART_VIEWS[element.kind];
   return (
     <View

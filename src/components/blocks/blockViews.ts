@@ -2,6 +2,7 @@ import type { ComponentType } from 'react';
 import { TEXT_BLOCK_TYPE, type BlockInstance } from '../../lib/blocks/types';
 import { FIELDS_BLOCK_TYPE, type ElementDef } from '../../lib/blocks/fields';
 import type { SigilState } from '../../lib/blocks/sigil';
+import type { BlockContext } from '../../lib/blocks/blockType';
 import { ALTAR_BLOCK_TYPE, CANVAS_BLOCK_TYPE } from '../../lib/blocks/canvas';
 import { PAINT_BLOCK_TYPE } from '../../lib/blocks/paint';
 import TextBlock from './TextBlock';
@@ -43,6 +44,8 @@ export interface BlockViewProps {
   onPersist?: (next: BlockInstance) => void;
   /** What the charges give the entry: locked, concealed (see `sigilState`). */
   sigil: SigilState;
+  /** Where the block is: its entry and the entry's date (toolkit, `blockContext`). */
+  context: BlockContext;
   /**
    * Only for a sigil part of a custom block (`SigilPart`): its
    * element, with the settings from the builder (calculator mode, brush).

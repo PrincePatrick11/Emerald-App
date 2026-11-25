@@ -349,16 +349,6 @@ function withChargesRewritten(block: BlockInstance, rewrite: (charge: SigilCharg
 }
 
 /**
- * A duplicated field block: the charge parts of the copy target the parts
- * of the copy, no longer those of the original — otherwise loading the
- * copy would conceal the original and leave its own parts open.
- */
-export function withRenamedPartTargets(block: BlockInstance, oldId: string, newId: string): BlockInstance {
-  const from = `${oldId}:`;
-  return withMappedChargeTargets(block, (id) => (id.startsWith(from) ? `${newId}:${id.slice(from.length)}` : id));
-}
-
-/**
  * A block was duplicated: a charge in `block` that conceals the original (or
  * parts of it) also conceals the copy. A loaded sigil stays loaded
  * when duplicated — and the copy does not show what the original conceals.

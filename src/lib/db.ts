@@ -174,12 +174,38 @@ type Migration = {
 
 /**
  * The steps that bring a vault created under an earlier state of this schema
- * up to `schema.ts`. Empty since the fresh start: the old chain is gone, and
+ * up to `schema.ts`. They start at the fresh start: the old chain is gone, and
  * vaults from before it are refused (`VAULT_OUTDATED`). A schema change
  * changes `schema.ts`, appends a step here and raises `BASELINE_VERSION` to
  * its version (see "Rules for Future Schema Changes" in `database.md`).
  */
-const MIGRATIONS: Migration[] = [];
+const MIGRATIONS: Migration[] = [
+  {
+    // `block_refs` also holds the tags a block gives its entry: its two
+    // CHECKs widen, so the table is built anew under its name and the rows
+    // are copied over (nothing points at it). One batch, one transaction.
+    // The DDL is the step's own, as of v103: a released step never follows
+    // later changes of `schema.ts`.
+    version: 103,
+    name: 'block_refs_tags',
+    up: async (db) => {
+      await db.batch([
+        ['ALTER TABLE block_refs RENAME TO block_refs_v102'],
+        [`
+    CREATE TABLE block_refs (
+      block_row INTEGER NOT NULL REFERENCES blocks(row_id) ON DELETE CASCADE,
+      target_kind TEXT NOT NULL CHECK (target_kind IN ('entry', 'image', 'icon', 'tag')),
+      target TEXT NOT NULL,
+      role TEXT NOT NULL CHECK (role IN ('content', 'render', 'layer', 'background', 'default', 'icon', 'tag')),
+      PRIMARY KEY (block_row, target_kind, target, role)
+    )`],
+        ['INSERT INTO block_refs (block_row, target_kind, target, role) SELECT block_row, target_kind, target, role FROM block_refs_v102'],
+        ['DROP TABLE block_refs_v102'],
+        ['CREATE INDEX idx_block_refs_target ON block_refs(target_kind, target)'],
+      ]);
+    },
+  },
+];
 
 /**
  * Where the file stands: `'empty'` (a new vault), `'unfinished'` (a new vault

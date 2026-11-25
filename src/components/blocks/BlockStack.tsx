@@ -21,12 +21,13 @@ import { useFieldFallbackText } from './useFieldFallbackText';
 import { REORDER_SPRING } from '../../lib/motion';
 import { flashReveal, scrollIntoViewCentered } from '../../lib/reveal';
 import { createTextBlock, neutralizeSectionTags, parseBlocks, serializeBlocks } from '../../lib/blocks/blockHtml';
-import { resolveBlockType, type BlockTypeMeta } from '../../lib/blocks/blockTypes';
+import { resolveBlockType, upgradeBlock, withDuplicatedBlock, type BlockTypeDef } from '../../lib/blocks/blockTypes';
+import { blockContext } from '../../lib/blocks/toolkit';
+import { findEntry, useEntryStore } from '../../store/entryStore';
 import { blockIcon, createFromPreset } from '../../lib/blocks/presets';
 import { useBlockDefinitionStore } from '../../store/blockDefinitionStore';
 import {
-  SIGIL_CHARGE_KIND, withChargesCoveringOnly, sigilState, sigilUnits, withChargesCoveringCopy, withoutConcealedParts,
-  withRenamedPartTargets,
+  SIGIL_CHARGE_KIND, withChargesCoveringOnly, sigilState, sigilUnits, withoutConcealedParts,
 } from '../../lib/blocks/sigil';
 import { blockLabel, hiddenAttrValue, isBlockHidden, showsTitleInRead, withBlockAttr } from '../../lib/blocks/blockAttrs';
 import { BLOCK_ATTR, TEXT_BLOCK_TYPE, type BlockAttrName, type BlockInstance } from '../../lib/blocks/types';
@@ -38,8 +39,8 @@ import { applyTemplateFields, undoTemplateFields } from '../../store/templateApp
 import { areBlocksEmpty, instantiateTemplateBlocks, isTextBlockEmpty, type Template } from '../../lib/blocks/templates';
 import TemplateInsertion, { type TemplateTarget } from '../templates/TemplateInsertion';
 import { BLOCK_VIEWS } from './blockViews';
-import { BlockStackContext, type BlockStackContextValue } from './blockStackContext';
-import { addBlockActions, commonBlockActions } from './blockActions';
+import { BlockStackContext, type BlockActionHandler, type BlockStackContextValue } from './blockStackContext';
+import { addBlockActions, commonBlockActions, typeBlockActions } from './blockActions';
 import BlockFrame from './BlockFrame';
 import UnknownBlock from './UnknownBlock';
 import BlockErrorBoundary from './BlockErrorBoundary';
@@ -159,13 +160,31 @@ export default function BlockStack({
   });
   const { orderedEditors, targetEditor, focusOnMount } = textHost;
 
-  const context = useMemo<BlockStackContextValue>(() => ({
+  // Where the blocks are: the entry and its date (none on a template's page).
+  const createdAt = useEntryStore((s) => findEntry(s.entries, entryId)?.created_at);
+  const blockCtx = useMemo(
+    () => blockContext(createdAt ? { id: entryId, created_at: createdAt } : null),
+    [entryId, createdAt],
+  );
+
+  // How the mounted views carry out their types' actions (`useBlockAction`), by block and action.
+  const actionHandlers = useRef(new Map<string, BlockActionHandler>());
+  const runAction = (blockId: string, actionId: string) => actionHandlers.current.get(actionKey(blockId, actionId))?.();
+
+  const stackContext = useMemo<BlockStackContextValue>(() => ({
     // Only the first text block carries the page's placeholder ("Begin your
     // record…"); further text blocks get a neutral one.
     placeholderFor: (blockId) =>
       blocksRef.current.find((b) => b.type === TEXT_BLOCK_TYPE)?.id === blockId
         ? placeholder
         : t('blocks.types.text.placeholder'),
+    registerAction: (blockId, actionId, handler) => {
+      const key = actionKey(blockId, actionId);
+      actionHandlers.current.set(key, handler);
+      return () => {
+        if (actionHandlers.current.get(key) === handler) actionHandlers.current.delete(key);
+      };
+    },
   }), [placeholder, t]);
 
   /* ---------------- Link requests from the sidebar ---------------- */
@@ -293,16 +312,11 @@ export default function BlockStack({
   };
 
   const duplicate = (id: string) => {
-    const index = blocksRef.current.findIndex((b) => b.id === id);
-    if (index < 0) return;
-    const source = blocksRef.current[index];
+    if (!blocksRef.current.some((b) => b.id === id)) return;
     const id2 = generateId();
-    // A charged sigil stays charged: charge parts of the copy target
-    // the parts of the copy, and any charge elsewhere that conceals the original
-    // also conceals the copy. The sidebar passes through here as well.
-    const next = blocksRef.current.map((b) => (b.id === source.id ? b : withChargesCoveringCopy(b, source.id, id2)));
-    next.splice(index + 1, 0, withRenamedPartTargets({ ...source, id: id2, attrs: { ...source.attrs } }, source.id, id2));
-    commit(next);
+    // Each type says how it copies and takes a copy in (a charged sigil stays
+    // charged). The sidebar passes through here as well.
+    commit(withDuplicatedBlock(blocksRef.current, id, id2));
     selectNew(id2);
   };
 
@@ -423,7 +437,7 @@ export default function BlockStack({
   // arrive via `onChange` in the entry that is now open.
   const apiRef = useRef<BlockStackApi>(null!);
   apiRef.current = {
-    insert: insertAt, duplicate, remove, reorder, setAttr, update: updateBlock, reveal,
+    insert: insertAt, duplicate, remove, reorder, setAttr, update: updateBlock, reveal, runAction,
     liveBlocks: () => blocksRef.current,
     openTemplatePicker: () => setTemplatePickerOpen(true),
   };
@@ -438,6 +452,7 @@ export default function BlockStack({
       setAttr: (id, name, value) => live()?.setAttr(id, name, value),
       update: (id, next) => live()?.update(id, next),
       reveal: (id) => live()?.reveal(id),
+      runAction: (id, actionId) => live()?.runAction(id, actionId),
       liveBlocks: () => live()?.liveBlocks() ?? [],
       openTemplatePicker: () => live()?.openTemplatePicker(),
     };
@@ -464,7 +479,7 @@ export default function BlockStack({
     actions: addBlockActions(t, (presetId) => insertAt(index, presetId), definitions),
   });
 
-  const openBlockMenu = (e: MouseEvent, block: BlockInstance, meta: BlockTypeMeta | undefined) => {
+  const openBlockMenu = (e: MouseEvent, block: BlockInstance, meta: BlockTypeDef | undefined) => {
     const hidden = isBlockHidden(block);
     setMenu({
       x: e.clientX,
@@ -475,6 +490,11 @@ export default function BlockStack({
           icon: hidden ? <Eye size={12} /> : <EyeOff size={12} />,
           onClick: () => setAttr(block.id, BLOCK_ATTR.hidden, hiddenAttrValue(!hidden)),
         },
+        // The live block: a setting must not write back a text block's HTML from the last structural change.
+        ...typeBlockActions(t, blocksRef.current.find((b) => b.id === block.id) ?? block, {
+          run: (actionId) => runAction(block.id, actionId),
+          update: (next) => updateBlock(block.id, next),
+        }),
         ...commonBlockActions(t, meta, {
           duplicate: () => duplicate(block.id),
           remove: () => remove(block.id),
@@ -490,7 +510,7 @@ export default function BlockStack({
     return !!live && isTextBlockEmpty(live);
   };
 
-  const renderBody = (block: BlockInstance, meta: BlockTypeMeta | undefined) => {
+  const renderBody = (block: BlockInstance, meta: BlockTypeDef | undefined) => {
     const View = meta ? BLOCK_VIEWS.get(meta.id) : undefined;
     // The fallback shows stored HTML, without what a sigil conceals.
     if (!View) return <UnknownBlock block={withoutConcealedParts(block, sigil.concealed)} />;
@@ -510,6 +530,7 @@ export default function BlockStack({
             ? (next) => persistRead(block.id, next)
             : undefined}
           sigil={sigil}
+          context={blockCtx}
         />
       </BlockErrorBoundary>
     );
@@ -522,7 +543,7 @@ export default function BlockStack({
   ].filter(Boolean).join(' ');
 
   return (
-    <BlockStackContext.Provider value={context}>
+    <BlockStackContext.Provider value={stackContext}>
     <TextEditorHostContext.Provider value={textHost.context}>
       {textHost.toolbar}
 
@@ -597,6 +618,11 @@ function isFirstVisibleItem(el: Element): boolean {
   return true;
 }
 
+/** The key of a view's action handler. */
+function actionKey(blockId: string, actionId: string): string {
+  return `${blockId}\u0000${actionId}`;
+}
+
 /** Does the block hold a charge (a charge on its own or the part of a custom block)? */
 function holdsCharge(block: BlockInstance): boolean {
   return sigilUnits([block]).some((u) => u.block.type === SIGIL_CHARGE_KIND);
@@ -616,9 +642,9 @@ function textEditorKeys(blocks: BlockInstance[]): string[] {
   ]);
 }
 
-/** The blocks of a content; an empty entry gets an empty text block. */
+/** The blocks of a content, each at its type's data version (`upgradeBlock`); an empty entry gets an empty text block. */
 function blocksFromContent(content: string): BlockInstance[] {
-  const parsed = parseBlocks(content);
+  const parsed = parseBlocks(content).map(upgradeBlock);
   return parsed.length > 0 ? parsed : [createTextBlock()];
 }
 

@@ -1,6 +1,6 @@
 import { generateId, isRecord } from '../helpers';
 import { escapeHtml, decodeHtmlAttr } from '../internalLinkHtml';
-import { ALTAR_LIBRARY_TAG_ID, storedImageName } from '../schema';
+import { storedImageName } from '../schema';
 import { paintDocToJson, type PaintDoc } from '../paint/document';
 import { createTextBlock } from './blockHtml';
 import { readBlockJson } from './blockJson';
@@ -16,7 +16,7 @@ import { BLOCK_ATTR, type BlockInstance, type BlockTypeId } from './types';
  * `props.src` (the place turns it into a URL to show). What the block offers
  * — which parts — is its config JSON (`CanvasParts`), set in the block's
  * settings and in templates; next to them `tag`, the tag "Images" below
- * show ('' for all; an altar starts with "Altar Library").
+ * show ('' for all; not chosen yet: the type's storage tag, `BlockTypeDef.storage`).
  *
  * The inner HTML holds the rendered picture of the scene first
  * (`data-canvas="render"`, for the export and the card), then every stored
@@ -30,11 +30,6 @@ export const CANVAS_BLOCK_TYPE = 'core.canvas' satisfies BlockTypeId;
  * its own so that it is offered, named and iconed as one. Same data.
  */
 export const ALTAR_BLOCK_TYPE = 'core.altar' satisfies BlockTypeId;
-
-/** A canvas or an altar: both are scenes of the canvas editor. */
-export function isCanvasBlockType(type: string): boolean {
-  return type === CANVAS_BLOCK_TYPE || type === ALTAR_BLOCK_TYPE;
-}
 
 /** The artboard of a new canvas, in its own pixels. */
 const CANVAS_BLOCK_WIDTH = 1600;
@@ -100,8 +95,8 @@ interface CanvasBlock {
   broken: boolean;
   scene: CanvasScene;
   parts: CanvasParts;
-  /** The tag "Images" below show, '' for all. */
-  stripTag: string;
+  /** The tag "Images" below show, '' for all; `null` if none was chosen yet (then the type's storage tag). */
+  stripTag: string | null;
   /** The rendered picture, or `null`. */
   render: string | null;
 }
@@ -143,10 +138,9 @@ function readParts(value: Record<string, unknown>, type: string): CanvasParts {
   return parts;
 }
 
-/** The strip's tag: as stored, or what the type starts with. */
-function readStripTag(value: Record<string, unknown>, type: string): string {
-  if (typeof value.tag === 'string' && (value.tag === '' || ID_RE.test(value.tag))) return value.tag;
-  return type === ALTAR_BLOCK_TYPE ? ALTAR_LIBRARY_TAG_ID : '';
+/** The strip's tag as stored — `null` if none was chosen. */
+function readStripTag(value: Record<string, unknown>): string | null {
+  return typeof value.tag === 'string' && (value.tag === '' || ID_RE.test(value.tag)) ? value.tag : null;
 }
 
 const RENDER = 'render';
@@ -167,7 +161,7 @@ export function parseCanvasBlock(block: BlockInstance): CanvasBlock {
   return {
     broken: data.broken,
     parts: readParts(config.value, block.type),
-    stripTag: readStripTag(config.value, block.type),
+    stripTag: readStripTag(config.value),
     render,
     scene: {
       width: size(d.width, CANVAS_BLOCK_WIDTH),

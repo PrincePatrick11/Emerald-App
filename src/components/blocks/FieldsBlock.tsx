@@ -41,7 +41,7 @@ type Setter = (value: FieldValue | undefined) => void;
  * read mode, even with "completely read-only" or a locked
  * entry, otherwise a sigil could never be discharged again.
  */
-export default function FieldsBlock({ block, blocks, isEditing, onBlockChange, onPersist, sigil }: BlockViewProps) {
+export default function FieldsBlock({ block, blocks, isEditing, onBlockChange, onPersist, sigil, context }: BlockViewProps) {
   const { t } = useTranslation();
   const text = useFieldFallbackText();
   const model = parseFields(block);
@@ -81,6 +81,7 @@ export default function FieldsBlock({ block, blocks, isEditing, onBlockChange, o
       model={model}
       isEditing={isEditing}
       sigil={sigil}
+      context={context}
       write={write}
       // Only the charge may act despite the lock and "read-only", and
       // the drawing, whose saving has outlasted "Done".

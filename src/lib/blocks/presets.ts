@@ -12,7 +12,7 @@ import {
   type ElementKind, type FallbackText,
 } from './fields';
 import { instantiateDefinition, type BlockDefinition } from './definitions';
-import type { BlockGroup, BlockTypeMeta } from './blockTypes';
+import type { BlockGroup, BlockTypeDef } from './blockTypes';
 import type { BlockInstance } from './types';
 
 /**
@@ -102,7 +102,7 @@ export function createFromPreset(
  * The glyph of a block: a copy of a custom block carries its emoji,
  * a fields block with exactly one element the icon of its kind.
  */
-export function blockIcon(block: BlockInstance, meta: BlockTypeMeta | undefined): GlyphSource | undefined {
+export function blockIcon(block: BlockInstance, meta: BlockTypeDef | undefined): GlyphSource | undefined {
   if (meta?.id === FIELDS_BLOCK_TYPE) {
     const model = parseFields(block);
     if (model.icon) return model.icon;

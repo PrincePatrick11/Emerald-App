@@ -1,6 +1,6 @@
 import type { TFunction } from 'i18next';
 import { BLOCK_ATTR, type BlockAttrName, type BlockInstance } from './types';
-import type { BlockTypeMeta } from './blockTypes';
+import type { BlockTypeDef } from './blockTypes';
 import {
   activeElements, elementKindLabelKey, FIELDS_BLOCK_TYPE, parseFields, type ElementDef, type FallbackText,
 } from './fields';
@@ -27,7 +27,7 @@ export function customBlockTitle(block: BlockInstance): string | null {
  * unknown or data format too new — `meta` is then `undefined`) "Unknown
  * block (type)".
  */
-export function blockLabel(t: TFunction, block: BlockInstance, meta: BlockTypeMeta | undefined): string {
+export function blockLabel(t: TFunction, block: BlockInstance, meta: BlockTypeDef | undefined): string {
   return customBlockTitle(block) ?? blockTypeLabel(t, block, meta);
 }
 
@@ -36,7 +36,7 @@ export function blockLabel(t: TFunction, block: BlockInstance, meta: BlockTypeMe
  * renaming. The copy of a custom block is named like that block, a fields
  * block with exactly one element like that element.
  */
-export function blockTypeLabel(t: TFunction, block: BlockInstance, meta: BlockTypeMeta | undefined): string {
+export function blockTypeLabel(t: TFunction, block: BlockInstance, meta: BlockTypeDef | undefined): string {
   if (!meta) return t('blocks.unknown', { type: block.type });
   if (meta.id === FIELDS_BLOCK_TYPE) {
     const model = parseFields(block);
@@ -89,7 +89,7 @@ export function hiddenAttrValue(hidden: boolean): string | null {
 }
 
 /** Does the block show its title in read mode? The instance beats the type's default. */
-export function showsTitleInRead(block: BlockInstance, meta: BlockTypeMeta | undefined): boolean {
+export function showsTitleInRead(block: BlockInstance, meta: BlockTypeDef | undefined): boolean {
   const value = block.attrs[BLOCK_ATTR.showTitle];
   if (value === '1') return true;
   if (value === '0') return false;
@@ -109,6 +109,6 @@ export function withBlockAttr(block: BlockInstance, name: BlockAttrName, value: 
  * type's default, the attribute is dropped — a text block whose switch is
  * back at the default is then saved without a wrapper again.
  */
-export function showTitleAttrValue(show: boolean, meta: BlockTypeMeta | undefined): string | null {
+export function showTitleAttrValue(show: boolean, meta: BlockTypeDef | undefined): string | null {
   return show === (meta?.defaultShowTitle ?? false) ? null : show ? '1' : '0';
 }

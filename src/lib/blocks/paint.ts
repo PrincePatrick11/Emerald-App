@@ -38,11 +38,6 @@ export function createSigilDrawingBlock(): BlockInstance {
   return { ...createPaintBlock(), attrs: { ...SIGIL_DRAWING_ATTRS } };
 }
 
-/** A block that holds a drawing in that form — the paint block, marked or not. Kept as the one question the image cleanup asks. */
-export function isDrawingBlockType(type: string): boolean {
-  return type === PAINT_BLOCK_TYPE;
-}
-
 /** Is this a paint block marked as a sigil drawing? Unreadable config: no. */
 export function isSigilDrawing(block: BlockInstance): boolean {
   if (block.type !== PAINT_BLOCK_TYPE) return false;

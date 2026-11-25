@@ -135,13 +135,19 @@ export function filterCanMatch(filter: DashboardFilter, live: LiveIds): boolean 
   return ruleAlive(filter.categories, live.categories) && ruleAlive(filter.tags, live.tags);
 }
 
+/** The tags an entry carries: its own and those its blocks give it while they are there. */
+export function entryTagIds(entry: Pick<Entry, 'tags' | 'block_tags'>): string[] {
+  return entry.block_tags?.length ? [...new Set([...entry.tags, ...entry.block_tags])] : entry.tags;
+}
+
 /**
- * Does the entry pass the filter? A missing rule does not narrow; a rule that
- * names nothing that still exists (gone, or in the trash — `live` lacks them)
- * matches nothing. Also the export menu's collection (`bulkEntries`).
+ * Does the entry pass the filter? Tags count with those the blocks give
+ * (`entryTagIds`). A missing rule does not narrow; a rule that names nothing
+ * that still exists (gone, or in the trash — `live` lacks them) matches
+ * nothing. Also the export menu's collection (`bulkEntries`).
  */
 export function matchesFilter(
-  entry: Pick<Entry, 'category_id' | 'tags'>,
+  entry: Pick<Entry, 'category_id' | 'tags' | 'block_tags'>,
   filter: DashboardFilter,
   live: LiveIds,
 ): boolean {
@@ -149,7 +155,7 @@ export function matchesFilter(
     const id = entry.category_id;
     if (id === null || !filter.categories.includes(id) || !live.categories.has(id)) return false;
   }
-  if (filter.tags && !entry.tags.some((tag) => filter.tags!.includes(tag) && live.tags.has(tag))) return false;
+  if (filter.tags && !entryTagIds(entry).some((tag) => filter.tags!.includes(tag) && live.tags.has(tag))) return false;
   return true;
 }
 

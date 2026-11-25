@@ -369,11 +369,11 @@ console.log('\n2. Vaults from another version are refused and stay as they were\
     CREATE TABLE entries (id TEXT PRIMARY KEY, tags TEXT NOT NULL DEFAULT '[]');`);
   check('a vault of v101 (tags as JSON) is refused as outdated, unchanged', await refuses(jsonTags, VAULT_OUTDATED));
 
-  // The mechanism for the steps to come: a vault at the fresh start runs a
+  // The mechanism for the steps to come: a vault at the baseline runs a
   // step above it once, stamps it, and keeps the schema otherwise.
   const db = await freshVault('future-step.db');
   let ran = 0;
-  const step = { version: FRESH_START_VERSION + 1, name: 'harness_step', up: async (d) => { ran++; await d.execute('CREATE TABLE harness_step (id TEXT)'); } };
+  const step = { version: BASELINE_VERSION + 1, name: 'harness_step', up: async (d) => { ran++; await d.execute('CREATE TABLE harness_step (id TEXT)'); } };
   await runMigrations(db, [step], step.version);
   await runMigrations(db, [step], step.version);
   const stamped = (await db.select('SELECT version FROM schema_version ORDER BY version')).map((r) => r.version).join();
@@ -381,6 +381,39 @@ console.log('\n2. Vaults from another version are refused and stay as they were\
     ran === 1 && stamped === `${BASELINE_VERSION},${step.version}`, `${ran} / ${stamped}`);
   check('the runner refuses steps that do not end at the baseline',
     await throwsCode(() => runMigrations(db, [step]), 'BASELINE_VERSION'));
+  db.close();
+}
+
+console.log('\n2b. v102 to v103: block_refs takes the tags a block gives its entry\n');
+
+{
+  // A vault as v102 left it: block_refs with the narrower CHECKs, one row in it.
+  const db = await freshVault('v102.db');
+  db.raw.exec(`
+    DROP TABLE block_refs;
+    CREATE TABLE block_refs (
+      block_row INTEGER NOT NULL REFERENCES blocks(row_id) ON DELETE CASCADE,
+      target_kind TEXT NOT NULL CHECK (target_kind IN ('entry', 'image', 'icon')),
+      target TEXT NOT NULL,
+      role TEXT NOT NULL CHECK (role IN ('content', 'render', 'layer', 'background', 'default', 'icon')),
+      PRIMARY KEY (block_row, target_kind, target, role)
+    );
+    CREATE INDEX idx_block_refs_target ON block_refs(target_kind, target);
+    DELETE FROM schema_version;
+    INSERT INTO schema_version VALUES (102, 'baseline', '2026-11-20');
+    INSERT INTO entries (id, title, created_at, updated_at) VALUES ('e1', 'Eins', '${now}', '${now}');
+    INSERT INTO blocks (id, entry_id, position, type, updated_at) VALUES ('b1', 'e1', 'a0', 'core.text', '${now}');
+    INSERT INTO block_refs SELECT row_id, 'entry', 'e2', 'content' FROM blocks WHERE id = 'b1';`); // lang-ok
+  await runMigrations(db);
+  check('the migrated vault has the schema of a fresh one', JSON.stringify(await readSchema(db)) === JSON.stringify(schemaA));
+  const kept = await db.select('SELECT target_kind, target, role FROM block_refs');
+  check('its references stay', JSON.stringify(kept) === JSON.stringify([{ target_kind: 'entry', target: 'e2', role: 'content' }]), JSON.stringify(kept));
+  await db.execute("INSERT INTO block_refs SELECT row_id, 'tag', 't1', 'tag' FROM blocks WHERE id = 'b1'");
+  check('a tag can be referenced now', (await db.select("SELECT COUNT(*) AS n FROM block_refs WHERE target_kind = 'tag'"))[0].n === 1);
+  const stamps = (await db.select('SELECT version FROM schema_version ORDER BY version')).map((r) => r.version).join();
+  check('stamped with the step', stamps === `102,${BASELINE_VERSION}`, stamps);
+  const violations = await db.select('PRAGMA foreign_key_check');
+  check('foreign_key_check empty after the step', violations.length === 0, JSON.stringify(violations));
   db.close();
 }
 

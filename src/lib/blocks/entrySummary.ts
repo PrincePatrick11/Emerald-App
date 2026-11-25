@@ -1,6 +1,6 @@
 import { parseBlocks } from './blockHtml';
 import { isBlockHidden } from './blockAttrs';
-import { LIST_INFO_PROVIDERS, resolveBlockType } from './blockTypes';
+import { listInfoProviders, resolveBlockType } from './blockTypes';
 import { pickListInfo, type ShownListInfoPart } from './listInfo';
 import { mayHoldSigil, sigilState, sigilUnits, type SigilState } from './sigil';
 import type { BlockInstance } from './types';
@@ -23,7 +23,7 @@ const EMPTY: EntryBlockSummary = { sigil: null, listInfo: [] };
 const cache = new Map<string, { content: string; day: string; summary: EntryBlockSummary }>();
 
 function mayHoldListInfo(content: string): boolean {
-  return LIST_INFO_PROVIDERS.some((provider) => provider.mayContribute(content));
+  return listInfoProviders().some((provider) => provider.mayContribute(content));
 }
 
 function collectListInfo(blocks: readonly BlockInstance[], today: string): ShownListInfoPart[] {

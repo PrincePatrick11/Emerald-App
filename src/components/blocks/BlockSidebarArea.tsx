@@ -10,7 +10,7 @@ import { useBlockDefinitionStore } from '../../store/blockDefinitionStore';
 import BlockGlyph from './BlockGlyph';
 import { usePointerReorder } from '../../hooks/usePointerReorder';
 import { sidebarRowStateClasses } from '../../lib/styleClasses';
-import { resolveBlockType, type BlockTypeMeta } from '../../lib/blocks/blockTypes';
+import { blockActionsOf, resolveBlockType, type BlockTypeDef } from '../../lib/blocks/blockTypes';
 import {
   blockLabel, blockTypeLabel, customBlockTitle, hiddenAttrValue, isBlockHidden, showsTitleInRead, showTitleAttrValue,
 } from '../../lib/blocks/blockAttrs';
@@ -18,10 +18,12 @@ import { BLOCK_ATTR, type BlockInstance } from '../../lib/blocks/types';
 import { blockIcon } from '../../lib/blocks/presets';
 import { BLOCK_SIDEBAR_VIEWS } from './blockSidebarViews';
 import { FIELDS_BLOCK_TYPE, parseFields, soleSigilElement } from '../../lib/blocks/fields';
-import { addBlockActions, commonBlockActions } from './blockActions';
+import { addBlockActions, commonBlockActions, typeBlockActions } from './blockActions';
 
 /** Open/closed state of the blocks; outline (reading) and management (editing) share it. */
 const OPEN_KEY = 'blocks-sidebar-open';
+/** Open/closed state of the blocks' actions while reading. */
+const ACTIONS_OPEN_KEY = 'blocks-sidebar-actions-open';
 
 /** What the outline shows in read mode: only what can be read. */
 function readableBlocks(session: BlockSession): BlockInstance[] {
@@ -56,6 +58,45 @@ export default function BlockSidebarArea() {
     return <BlockOutline key={session.sessionId} session={session} />;
   }
   return <BlockManager key={session.sessionId} session={session} />;
+}
+
+/**
+ * The blocks' actions while reading (`BlockTypeDef.actions` with `inRead`),
+ * in a section of the properties panel of their own: one row per action and
+ * block. Where several blocks of a type offer it, each row names its block.
+ * Carried out by the block's view in the stack (`api.runAction`).
+ */
+export function BlockReadActions() {
+  const { t } = useTranslation();
+  const activeViewId = useUIStore((s) => s.activeView.id);
+  const session = useBlockSessionStore((s) => s.session);
+  if (!session || session.entryId !== activeViewId || session.isEditing) return null;
+  const rows = readableBlocks(session).flatMap((block) => blockActionsOf(block, { reading: true }).map((action) => ({
+    block, action, name: blockLabel(t, block, resolveBlockType(block)),
+  })));
+  if (rows.length === 0) return null;
+  return (
+    <SidebarSection storageKey={ACTIONS_OPEN_KEY} label={t('blocks.actionsTitle')} count={rows.length}>
+      {rows.map(({ block, action, name }) => {
+        const Icon = action.icon;
+        // Several rows of the same action name their block; blocks of the same name are numbered.
+        const same = rows.filter((r) => r.action.labelKey === action.labelKey);
+        const namesakes = same.filter((r) => r.name === name);
+        const meta = same.length < 2 ? undefined
+          : namesakes.length < 2 ? name
+            : `${name} ${namesakes.findIndex((r) => r.block.id === block.id) + 1}`;
+        return (
+          <SidebarItemRow
+            key={`${block.id}:${action.id}`}
+            icon={<Icon size={14} />}
+            label={t(action.labelKey)}
+            meta={meta}
+            onClick={() => session.api.runAction(block.id, action.id)}
+          />
+        );
+      })}
+    </SidebarSection>
+  );
 }
 
 /**
@@ -163,7 +204,7 @@ function BlockManager({ session }: { session: BlockSession }) {
     });
   }, [selection, session.sessionId, setSectionOpen, listRef]);
 
-  const openRowMenu = (e: MouseEvent, block: BlockInstance, meta: BlockTypeMeta | undefined) => {
+  const openRowMenu = (e: MouseEvent, block: BlockInstance, meta: BlockTypeDef | undefined) => {
     const showsTitle = showsTitleInRead(block, meta);
     setMenu({
       x: e.clientX,
@@ -175,6 +216,11 @@ function BlockManager({ session }: { session: BlockSession }) {
           icon: showsTitle ? <Check size={12} /> : <Type size={12} />,
           onClick: () => api.setAttr(block.id, BLOCK_ATTR.showTitle, showTitleAttrValue(!showsTitle, meta)),
         },
+        // The live block: the session's lags behind a text block's typing.
+        ...typeBlockActions(t, api.liveBlocks().find((b) => b.id === block.id) ?? block, {
+          run: (actionId) => api.runAction(block.id, actionId),
+          update: (next) => api.update(block.id, next),
+        }),
         ...commonBlockActions(t, meta, {
           duplicate: () => api.duplicate(block.id),
           remove: () => api.remove(block.id),
@@ -228,7 +274,7 @@ function BlockManager({ session }: { session: BlockSession }) {
 
 interface ManagerRowProps {
   block: BlockInstance;
-  meta: BlockTypeMeta | undefined;
+  meta: BlockTypeDef | undefined;
   label: string;
   typeLabel: string;
   renaming: boolean;
@@ -325,7 +371,7 @@ function ManagerRow({
  * The settings that a block type brings into the sidebar
  * (`blockSidebarViews.ts`); `null` if it has none for this mode.
  */
-function blockSettings(session: BlockSession, block: BlockInstance, meta: BlockTypeMeta | undefined): ReactNode {
+function blockSettings(session: BlockSession, block: BlockInstance, meta: BlockTypeDef | undefined): ReactNode {
   const { isEditing, api } = session;
   // A calculator or charge on its own has no settings, as the sigil never had.
   if (meta?.id === FIELDS_BLOCK_TYPE && soleSigilElement(parseFields(block))) return null;

@@ -1,7 +1,9 @@
 import type { TFunction } from 'i18next';
 import { Copy, Trash2 } from 'lucide-react';
 import type { ContextMenuAction } from '../ui/ContextMenu';
-import type { BlockTypeMeta } from '../../lib/blocks/blockTypes';
+import { blockActionsOf, blockSettingsOf, type BlockTypeDef } from '../../lib/blocks/blockTypes';
+import { readBlockSettings, withBlockSetting } from '../../lib/blocks/toolkit';
+import type { BlockInstance } from '../../lib/blocks/types';
 import type { BlockDefinition } from '../../lib/blocks/definitions';
 import { definitionLabel } from '../../lib/blocks/blockAttrs';
 import { BLOCK_PRESETS, definitionPresetId } from '../../lib/blocks/presets';
@@ -35,13 +37,46 @@ export function addBlockActions(
 }
 
 /**
+ * What the block's type brings to its menu while editing: its actions
+ * (`BlockTypeDef.actions`, carried out by the mounted view through `run`),
+ * then its settings (`BlockTypeDef.settings`) — a switch as one ticked
+ * entry, a choice as one entry per option. Every type's settings look alike
+ * here; a change goes through `update`, so Cancel rolls it back.
+ */
+export function typeBlockActions(
+  t: TFunction,
+  block: BlockInstance,
+  { run, update }: { run: (actionId: string) => void; update: (next: BlockInstance) => void },
+): ContextMenuAction[] {
+  const actions: ContextMenuAction[] = blockActionsOf(block, { reading: false }).map((action) => {
+    const Icon = action.icon;
+    return { label: t(action.labelKey), icon: <Icon size={12} />, onClick: () => run(action.id) };
+  });
+  const defs = blockSettingsOf(block);
+  const values = readBlockSettings(block, defs);
+  const settings = defs.flatMap((def): ContextMenuAction[] => {
+    if (def.kind === 'toggle') {
+      const on = values[def.key] === true;
+      return [{ label: t(def.labelKey), checked: on, onClick: () => update(withBlockSetting(block, def, !on)) }];
+    }
+    return def.options.map((option) => ({
+      label: t('common.labelValue', { label: t(def.labelKey), value: t(option.labelKey) }),
+      checked: values[def.key] === option.value,
+      onClick: () => update(withBlockSetting(block, def, option.value)),
+    }));
+  });
+  if (settings.length) settings[0] = { ...settings[0], separator: actions.length > 0 };
+  return [...actions, ...settings];
+}
+
+/**
  * Duplicate and remove. An unknown block (`meta` is missing: foreign type
  * or too new a data format) can only be removed; a copy of its
  * data would be worthless without the type that understands it.
  */
 export function commonBlockActions(
   t: TFunction,
-  meta: BlockTypeMeta | undefined,
+  meta: BlockTypeDef | undefined,
   { duplicate, remove }: { duplicate: () => void; remove: () => void },
 ): ContextMenuAction[] {
   return [

@@ -164,6 +164,7 @@
     "actions": "Block actions",
     "dragToMove": "Drag to move",
     "sidebarTitle": "Blocks",
+    "actionsTitle": "Actions",
     "hide": "Hide",
     "show": "Show",
     "hiddenHint": "Hidden — not shown in read mode",
@@ -297,6 +298,7 @@
     },
     "canvas": {
       "broken": "This canvas could not be read. It stays as it is.",
+      "savePicture": "Save as picture…",
       "empty": "Nothing on the canvas yet.",
       "parts": "Available",
       "part": {
@@ -758,7 +760,6 @@
     "zoomIn": "Zoom in",
     "zoomOut": "Zoom out",
     "fit": "Fit to view",
-    "export": "Save as picture…",
     "image": "Image",
     "element": "Element",
     "layers": {

@@ -8,7 +8,7 @@ import type { Entry } from '../types';
 import i18n from '../i18n';
 import { displayTitle } from '../lib/entryTitle';
 import { startOfNewEntry, useTemplateNoticeStore } from './templateStore';
-import { contentOf, loadBlocks, planContentWrite, type BlockOwner } from '../lib/blockStore';
+import { contentOf, loadBlocks, planContentWrite, readBlockTags, type BlockOwner } from '../lib/blockStore';
 import { readTagLinks, readTags, tagStatements } from '../lib/tagRefs';
 
 /**
@@ -60,7 +60,8 @@ const LIST_COLUMNS = 'id, title, category_id, entry_number, icon, cover_image, c
 
 /**
  * The live entries from the database — without content, the first stage of
- * `fetchEntries` — with their tags from `entry_tags`. The trashed entries'
+ * `fetchEntries` — with their tags from `entry_tags` and those their blocks
+ * give them (`block_refs`). The trashed entries'
  * links come along too: reading them costs less than filtering them out.
  */
 async function selectLiveEntries(): Promise<Entry[]> {
@@ -68,11 +69,15 @@ async function selectLiveEntries(): Promise<Entry[]> {
   // Two connections, so not the same state: a write exactly in between can
   // attach older tags to newer list columns — display only, and the next
   // load fixes it.
-  const [rows, tags] = await Promise.all([
+  const [rows, tags, blockTags] = await Promise.all([
     db.select<DbRow[]>(`SELECT ${LIST_COLUMNS} FROM entries WHERE deleted_at IS NULL`),
     readTagLinks(db, 'entry'),
+    readBlockTags(db),
   ]);
-  return rows.map((row) => fromRow.entry({ ...row, tags: tags.get(String(row.id)) ?? [] })).sort(byCreatedDesc);
+  return rows.map((row) => ({
+    ...fromRow.entry({ ...row, tags: tags.get(String(row.id)) ?? [] }),
+    block_tags: blockTags.get(String(row.id)) ?? [],
+  })).sort(byCreatedDesc);
 }
 
 /** The running second stage of `fetchEntries`; a new load makes an older one ineffective. */
@@ -227,6 +232,7 @@ export const useEntryStore = create<EntryState>((set, get) => ({
       created_at: createdAt ?? now,
       updated_at: now,
       tags: [...new Set([...start.tags, ...tagIds])],
+      block_tags: blocks.blockTags,
       deleted_at: null,
     };
     // The row first: its blocks point at it.
@@ -291,7 +297,10 @@ export const useEntryStore = create<EntryState>((set, get) => ({
     const blocks = patch.content !== undefined
       ? await planContentWrite(db, owner, patch.content, merged.updated_at)
       : null;
-    if (blocks) merged.content = blocks.content;
+    if (blocks) {
+      merged.content = blocks.content;
+      merged.block_tags = blocks.blockTags;
+    }
     await db.batch([
       [
         `UPDATE entries
@@ -326,7 +335,11 @@ export const useEntryStore = create<EntryState>((set, get) => ({
     // Only this row, sorted in as on load.
     const rows = await db.select<DbRow[]>(`SELECT ${LIST_COLUMNS} FROM entries WHERE id = $1`, [id]);
     if (!rows[0]) return;
-    const entry = { ...fromRow.entry({ ...rows[0], tags: await readTags(db, 'entry', id) }), content: await selectContent(id) };
+    const entry = {
+      ...fromRow.entry({ ...rows[0], tags: await readTags(db, 'entry', id) }),
+      block_tags: (await readBlockTags(db, [id])).get(id) ?? [],
+      content: await selectContent(id),
+    };
     set((s) => ({
       entries: [...s.entries.filter((e) => e.id !== id), entry].sort(byCreatedDesc),
       // The full row is here — even if the second stage is still running.
