@@ -288,7 +288,7 @@ const PRINT_CSS = `
     background: #e8e8e8; border-radius: 12px; padding: 2px 10px; color: #444;
   }
   /* Content */
-  .entry-content h1, .entry-content h2, .entry-content h3 { margin-top: 1.3em; margin-bottom: 0.4em; }
+  .entry-content h1, .entry-content h2, .entry-content h3, .entry-content h4 { margin-top: 1.3em; margin-bottom: 0.4em; }
   .entry-content p  { margin-bottom: 0.8em; }
   .entry-content dl { margin-bottom: 0.8em; }
   .entry-content dt { font-size: 0.85em; font-weight: 600; color: #666; margin-top: 0.4em; }

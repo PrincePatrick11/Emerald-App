@@ -6,7 +6,7 @@ import { readContents, replaceOwnerBlocks } from './blockStore';
 import { ALTAR_CATEGORY_ID, SIGIL_CATEGORY_ID } from './schema';
 import { serializeBlocks } from './blocks/blockHtml';
 import { translatedOr } from './blocks/blockAttrs';
-import { sigilBlockSet } from './blocks/sigil';
+import { createSigilBlock } from './blocks/sigil';
 import { altarBlockSet } from './blocks/canvas';
 import { ALTAR_TEMPLATE_ID, SIGIL_TEMPLATE_ID, templateToRow, type Template } from './blocks/templates';
 import { readTags, tagStatements } from './tagRefs';
@@ -58,8 +58,8 @@ async function templateById(db: Database, id: string): Promise<Template | undefi
 }
 
 /**
- * The built-in "Sigil" template: calculator, drawing and charge, the start
- * template of the "Sigils" category.
+ * The built-in "Sigil" template: one sigil block with all its parts, the
+ * start template of the "Sigils" category.
  * The name ends up permanently in the row; if i18n is not ready yet, English.
  */
 function sigilTemplate(t: TFunction, now: string, sortOrder: number): Template {
@@ -68,7 +68,7 @@ function sigilTemplate(t: TFunction, now: string, sortOrder: number): Template {
     name: translatedOr(t, 'templates.builtin.sigil', 'Sigil'),
     icon: '🔯',
     title: '',
-    content: serializeBlocks(sigilBlockSet()),
+    content: serializeBlocks([createSigilBlock()]),
     tags: [],
     sort_order: sortOrder,
     created_at: now,

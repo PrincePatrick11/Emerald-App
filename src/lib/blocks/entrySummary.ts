@@ -1,10 +1,9 @@
 import { parseBlocks } from './blockHtml';
 import { isBlockHidden } from './blockAttrs';
 import type { BlockContext, BlockFieldValue, BlockValue } from './blockType';
-import { mayShowOutside, resolveBlockType } from './blockTypes';
+import { entryEffects, mayAffectEntry, mayShowOutside, NO_EFFECTS, resolveBlockType, type EntryEffects } from './blockTypes';
 import { blockSuggestions, NO_SUGGESTIONS, type BlockSuggestions } from './entryProperties';
 import { pickListInfo, type InfoForm, type ListInfoPart, type ShownListInfoPart } from './listInfo';
-import { mayHoldSigil, sigilState, sigilUnits, type SigilState } from './sigil';
 import { blockContext } from './toolkit';
 import type { BlockInstance } from './types';
 import { localIsoDay } from '../helpers';
@@ -14,12 +13,12 @@ import { localIsoDay } from '../helpers';
  * blocks of an entry without opening it — everything the blocks show
  * outside themselves, read through their interfaces: the info line in both
  * forms (1), the suggested icon and cover and the panel rows (3), the
- * values to filter and sort by (4/9). Parsed from the `content` that the
+ * values to filter and sort by (4/9), what they do to the entry (6). Parsed from the `content` that the
  * stores keep in memory anyway, once per content state (and day).
  */
 interface EntryBlockSummary {
-  /** The entry's sigil — `null` without sigil blocks. For locking, not for display. */
-  sigil: SigilState | null;
+  /** What the blocks do to the entry — locked, concealed (interface 6). For locking, not for display. */
+  effects: EntryEffects;
   /** What the blocks add to the info line in lists, per form, in stack order. */
   info: Readonly<Record<InfoForm, readonly ShownListInfoPart[]>>;
   /** What the visible blocks suggest for the properties, and their rows. */
@@ -29,7 +28,7 @@ interface EntryBlockSummary {
 }
 
 const NO_INFO: EntryBlockSummary['info'] = { short: [], long: [] };
-const EMPTY: EntryBlockSummary = { sigil: null, info: NO_INFO, properties: NO_SUGGESTIONS, values: [] };
+const EMPTY: EntryBlockSummary = { effects: NO_EFFECTS, info: NO_INFO, properties: NO_SUGGESTIONS, values: [] };
 
 /** What the summary needs of an entry. */
 type SummaryEntry = { id: string; content: string; created_at: string };
@@ -48,14 +47,14 @@ function collectInfo(blocks: readonly BlockInstance[], ctx: BlockContext): Entry
 
 function summarize(entry: SummaryEntry, today: string): EntryBlockSummary {
   // The vast majority of entries have nothing to show outside — then do not parse at all.
-  const sigilPossible = mayHoldSigil(entry.content);
+  const effectPossible = mayAffectEntry(entry.content);
   const outsidePossible = mayShowOutside(entry.content);
-  if (!sigilPossible && !outsidePossible) return EMPTY;
+  if (!effectPossible && !outsidePossible) return EMPTY;
   const blocks = parseBlocks(entry.content);
   const ctx = blockContext(entry, today);
 
   return {
-    sigil: sigilPossible && sigilUnits(blocks).length > 0 ? sigilState(blocks, today) : null,
+    effects: effectPossible ? entryEffects(blocks, ctx) : NO_EFFECTS,
     info: outsidePossible ? collectInfo(blocks, ctx) : NO_INFO,
     properties: outsidePossible ? blockSuggestions(blocks, ctx) : NO_SUGGESTIONS,
     values: outsidePossible

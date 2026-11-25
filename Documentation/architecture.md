@@ -60,7 +60,7 @@ src/
 │   │   └── titlebar/                           custom title bar, menus, SearchModal
 │   ├── editors/
 │   │   └── text/     TextEditor, its host (toolbar, link picker, drops), TipTap extensions
-│   ├── blocks/       BlockStack, block views, fields/sigil/canvas/painting blocks, block editor
+│   ├── blocks/       BlockStack, block views, fields, sigil, canvas and painting blocks, block editor
 │   ├── images/       picture tile, picker, add and edit dialogs, the strip below a canvas
 │   ├── views/        one view per module and aux view (Dashboard … Trash)
 │   ├── sidebar/
@@ -203,7 +203,7 @@ The schema itself lives in `src/lib/schema.ts`, not in `db.ts`: fresh vaults exe
 
 `AppShell` calls `reloadAllStores()` (`src/store/moduleWiring.ts`) on mount and again on every vault switch — see [Module Registry](architecture/modules.md#module-registry) for the sequence. Views do **not** refetch on mount; a view that mounts before the startup fetch resolves renders its empty state until the store fills.
 
-One detail of what the stores load: **sigil drawings are files, not columns.** A drawing's rendered image is a file referenced from the sigil drawing's (a paint block's) or drawing part's `<img src>`, next to its vector strokes as block data (see [Editors](architecture/editors.md#canvas-editor)), so the entry rows stay small. `entryBlockSummary(...).sigil` gives the sigil's state for the lock; what the info line of lists shows comes from the blocks themselves (`listInfo`, see [Blocks](architecture/blocks.md#registry-and-interfaces)) — for a sigil, its target date.
+One detail of what the stores load: **sigil drawings are files, not columns.** A drawing's rendered image is a file referenced from the `<img src>` of a paint block or of the sigil's drawing part, next to its vector strokes as block data (see [Editors](architecture/editors.md#canvas-editor)), so the entry rows stay small. `entryBlockSummary(...).effects` gives what the blocks do to the entry (the lock of a loaded sigil); what the info line of lists shows comes from the blocks themselves (`listInfo`, see [Blocks](architecture/blocks.md#registry-and-interfaces)) — for a sigil, its target date.
 
 ### Store write serialization
 

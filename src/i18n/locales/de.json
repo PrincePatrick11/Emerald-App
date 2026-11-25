@@ -156,8 +156,7 @@
     "chargingTechnique": "Ladetechnik",
     "letterBank": "Buchstabensatz",
     "noLetters": "Noch keine Buchstaben vorbereitet.",
-    "targetDate": "Zieldatum",
-    "brushSize": "Pinsel"
+    "targetDate": "Zieldatum"
   },
   "blocks": {
     "add": "Block hinzufügen",
@@ -183,17 +182,15 @@
         "label": "Felder",
         "description": "Beschriftete Werte: Text, Zahl, Datum, Auswahl, Ja/Nein, Checkliste, Verknüpfung, Bild, Mondphase."
       },
-      "sigilCalc": {
-        "label": "Sigillen-Rechner",
-        "description": "Die Absicht auf ihre Buchstabenbank kürzen und abhaken, welche Buchstaben in der Zeichnung stecken."
-      },
-      "sigilCanvas": {
-        "label": "Sigillen-Zeichnung",
-        "description": "Die Sigille zeichnen — gespeichert als Bild, verborgen, solange sie geladen ist."
-      },
-      "sigilCharge": {
-        "label": "Ladung",
-        "description": "Zieldatum, Ladetechnik und das Laden der Sigille. Geladen verbirgt sie die gewählten Rechner und Zeichnungen und sperrt den Eintrag oder nur diese Blöcke."
+      "sigil": {
+        "label": "Sigille",
+        "description": "Rechner, Zeichnung und Ladung einer Sigille — jeden Teil im Menü des Blocks ein- oder ausschalten. Geladen verbirgt sie Rechner und Zeichnung und sperrt den Eintrag oder nur diese Sigille.",
+        "noParts": "Alle Teile sind ausgeschaltet — schalte sie im Menü des Blocks ein.",
+        "parts": {
+          "calc": "Rechner",
+          "drawing": "Zeichnung",
+          "charge": "Ladung"
+        }
       },
       "canvas": {
         "label": "Leinwand",
@@ -218,10 +215,7 @@
       "checklist": "Checkliste",
       "link": "Verknüpfung",
       "image": "Bild",
-      "moon": "Mondphase",
-      "sigilCalc": "Sigillen-Rechner",
-      "sigilCanvas": "Sigillen-Zeichnung",
-      "sigilCharge": "Ladung"
+      "moon": "Mondphase"
     },
     "fields": {
       "yes": "Ja",
@@ -256,17 +250,6 @@
       "prefillHint": "Jede neue Kopie startet mit diesem Wert — bestehende Einträge behalten ihren.",
       "linkCategories": "Kategorien",
       "linkCategoriesHint": "Nur Einträge und Aufgaben dieser Kategorien werden angeboten, in jeder neuen Kopie. Ein bereits gesetzter Link bleibt stehen. Ohne Auswahl werden alle angeboten.",
-      "calcMode": "Buchstabenbank",
-      "calcModes": {
-        "both": "Automatisch und manuell",
-        "auto": "Nur automatisch (aus der Absicht)",
-        "manual": "Nur manuell"
-      },
-      "brushPreset": "Pinsel voreinstellen",
-      "brushPresetHint": "Farbe und Pinselgröße, mit denen das Zeichnen beginnt — beim Zeichnen lässt sich weiter umstellen.",
-      "chargePrefillHint": "Jede neue Kopie startet mit dieser Sperre und diesen verdeckten Teilen — im Eintrag lässt sich beides ändern, solange nicht geladen ist.",
-      "chargeCoversAll": "Alle Sigillen im Eintrag",
-      "chargeNoTools": "Dieser Block hat noch keinen Rechner und keine Zeichnung.",
       "display": "Anzeige",
       "fieldCount": "{{count}} Feld",
       "fieldCount_other": "{{count}} Felder"
@@ -279,14 +262,12 @@
       "revealedSince": "enthüllt seit {{date}}",
       "hiddenUntilUnloaded": "verborgen bis zum Entladen",
       "noRevealDate": "Kein Zieldatum",
-      "loadConfirm": "Sigille laden? Die verdeckten Blöcke bleiben bis {{date}} verborgen.",
-      "loadConfirmNoDate": "Sigille laden? Die verdeckten Blöcke bleiben verborgen, bis du sie entlädst.",
+      "loadConfirm": "Sigille laden? Rechner und Zeichnung bleiben bis {{date}} verborgen.",
+      "loadConfirmNoDate": "Sigille laden? Rechner und Zeichnung bleiben verborgen, bis du sie entlädst.",
       "unloadConfirm": "Sigille entladen? Sie lässt sich danach sofort wieder bearbeiten.",
       "lockScope": "Geladen sperrt",
       "lockEntry": "den ganzen Eintrag",
-      "lockSigil": "nur die verdeckten Blöcke",
-      "covers": "Verdeckt",
-      "noTools": "Noch kein Rechner und keine Zeichnung im Eintrag",
+      "lockSigil": "nur diese Sigille",
       "locked": "Gesperrt, solange die Sigille geladen ist",
       "saveFailed": "Die Zeichnung ließ sich nicht speichern",
       "loadFailed": "Die Zeichnung ließ sich nicht laden — den Eintrag schließen und neu öffnen"

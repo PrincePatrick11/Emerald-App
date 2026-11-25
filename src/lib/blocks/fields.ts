@@ -8,8 +8,7 @@ import { BLOCK_ATTR, type BlockInstance, type BlockTypeId } from './types';
 
 /**
  * The field block (`core.fields`): a sequence of elements — text, short text, number,
- * date, select, yes/no, checklist, link, image, moon phase and the
- * three sigil parts calculator, drawing, charge (see `isSigilKind`). A
+ * date, select, yes/no, checklist, link, image, moon phase. A
  * single field is a field block with one element; custom, composite
  * blocks (blocks view) are field blocks with several.
  *
@@ -34,7 +33,6 @@ export const FIELDS_BLOCK_TYPE = 'core.fields' satisfies BlockTypeId;
 
 export const ELEMENT_KINDS = [
   'text', 'shorttext', 'number', 'date', 'select', 'toggle', 'checklist', 'link', 'image', 'moon',
-  'sigilCalc', 'sigilCanvas', 'sigilCharge',
 ] as const;
 export type ElementKind = (typeof ELEMENT_KINDS)[number];
 
@@ -44,28 +42,6 @@ const SLOT_KINDS: ReadonlySet<ElementKind> = new Set<ElementKind>(['text', 'link
 
 export function isSlotKind(kind: ElementKind): boolean {
   return SLOT_KINDS.has(kind);
-}
-
-export type SigilElementKind = 'sigilCalc' | 'sigilCanvas' | 'sigilCharge';
-
-/**
- * The sigil parts of a custom block: calculator, drawing, charge — what
- * otherwise exists as separate blocks (`lib/blocks/sigil.ts`). A part stores
- * exactly what the block stores: its data JSON as a value under the
- * element ID, its inner HTML (read version, drawing as `<img>`,
- * charging technique as a chip) in the slot. `sigil.ts` therefore treats it as a
- * "virtual block" with the ID `<block ID>:<element ID>` — loading, concealing
- * and locking apply to parts as to blocks.
- */
-export function isSigilKind(kind: ElementKind): kind is SigilElementKind {
-  return kind === 'sigilCalc' || kind === 'sigilCanvas' || kind === 'sigilCharge';
-}
-
-/** An element that is a sigil part. */
-export type SigilElement = ElementDef & { kind: SigilElementKind };
-
-export function isSigilElement(element: ElementDef): element is SigilElement {
-  return isSigilKind(element.kind);
 }
 
 /** The i18n key for the name of an element kind — picker, label, placeholder. */
@@ -108,11 +84,6 @@ export interface ElementDef {
    * A link already set stays, whatever its category.
    */
   linkCategories?: LinkCategoryFilter;
-  /** Sigil calculator only: which ways to the letter bank it offers — missing = both. */
-  calcMode?: CalcMode;
-  /** Sigil drawing only: colour and brush size with which drawing starts. */
-  brushColor?: string;
-  brushSize?: number;
 }
 
 export interface LinkCategoryFilter {
@@ -142,25 +113,6 @@ export function passesLinkCategoryFilter(filter: LinkCategoryFilter | undefined,
   return categoryId ? filter.categoryIds.includes(categoryId) : filter.includeUncategorized;
 }
 
-/** How the calculator arrives at the letter bank: from the intention, by hand, or both. */
-export type CalcMode = 'auto' | 'manual' | 'both';
-export const CALC_MODES: readonly CalcMode[] = ['both', 'auto', 'manual'];
-
-/** The brush limits — the same as the drawing's slider. */
-export const BRUSH_SIZE_MIN = 2;
-export const BRUSH_SIZE_MAX = 48;
-
-/**
- * The default of a charge: what "loaded" locks and what it conceals — `null`
- * means all sigils in the entry, otherwise element IDs of the calculators and
- * drawings of the same block. Only the copy turns these into targets
- * (`<block ID>:<element ID>`), since its block ID is not known beforehand.
- */
-export interface ChargeDefault {
-  lock: 'entry' | 'sigil';
-  targets: string[] | null;
-}
-
 /** The default of a link: the target together with its name at the time of selection. */
 interface LinkDefault {
   id: string;
@@ -168,7 +120,7 @@ interface LinkDefault {
   label: string;
 }
 
-export type ElementDefault = FieldValue | LinkDefault | ChargeDefault;
+export type ElementDefault = FieldValue | LinkDefault;
 
 export interface DisplayRules {
   /** Hide empty elements in read mode. */
@@ -185,10 +137,7 @@ export interface ChecklistItem {
   checked: boolean;
 }
 
-/** The data JSON of a sigil part — it is only validated by `sigil.ts`, when reading the virtual block. */
-export type SigilData = Record<string, unknown>;
-
-export type FieldValue = string | number | boolean | ChecklistItem[] | SigilData;
+export type FieldValue = string | number | boolean | ChecklistItem[];
 
 export interface FieldsModel {
   /**
@@ -272,13 +221,6 @@ function parseElement(raw: unknown): ElementDef | null {
     const filter = normalizeLinkCategoryFilter({ categoryIds: ids, includeUncategorized: raw.linkCategories.includeUncategorized === true });
     if (filter) element.linkCategories = filter;
   }
-  if (element.kind === 'sigilCalc' && CALC_MODES.includes(raw.calcMode as CalcMode)) element.calcMode = raw.calcMode as CalcMode;
-  if (element.kind === 'sigilCanvas') {
-    if (typeof raw.brushColor === 'string' && /^#[0-9a-f]{6}$/i.test(raw.brushColor)) element.brushColor = raw.brushColor;
-    if (Number.isInteger(raw.brushSize) && (raw.brushSize as number) >= BRUSH_SIZE_MIN && (raw.brushSize as number) <= BRUSH_SIZE_MAX) {
-      element.brushSize = raw.brushSize as number;
-    }
-  }
   if (raw.defaultValue !== undefined) {
     const value = parseDefault(element, raw.defaultValue);
     if (value !== undefined) element.defaultValue = value;
@@ -311,24 +253,6 @@ export function activeElements(model: FieldsModel): ElementDef[] {
   return model.elements.filter((e) => !e.archived);
 }
 
-/** The element IDs of a calculator and a charge standing on their own (`sigil.ts`). */
-export const SIGIL_CALC_ELEMENT_ID = 'calc';
-export const SIGIL_CHARGE_ELEMENT_ID = 'charge';
-
-/**
- * The sigil part the block is — a calculator or a charge on its own, not a
- * copy of a custom block (which carries its name) — or `null`. Such a block
- * shows the part itself, under the block's title, without a label row or
- * settings: in read and edit mode, in the sidebar, in the export, in a
- * charge's list of what it covers.
- */
-export function soleSigilElement(model: FieldsModel): SigilElement | null {
-  if (model.name.trim()) return null;
-  const [only, ...more] = activeElements(model);
-  return only && more.length === 0 && isSigilElement(only)
-    && (only.id === SIGIL_CALC_ELEMENT_ID || only.id === SIGIL_CHARGE_ELEMENT_ID) ? only : null;
-}
-
 function parseValue(kind: ElementKind, raw: unknown): FieldValue | undefined {
   switch (kind) {
     case 'shorttext':
@@ -346,10 +270,6 @@ function parseValue(kind: ElementKind, raw: unknown): FieldValue | undefined {
             .filter((i): i is Record<string, unknown> => isRecord(i) && typeof i.id === 'string')
             .map((i) => ({ id: i.id as string, text: typeof i.text === 'string' ? i.text : '', checked: i.checked === true }))
         : undefined;
-    case 'sigilCalc':
-    case 'sigilCanvas':
-    case 'sigilCharge':
-      return isRecord(raw) ? raw : undefined;
     default:
       return undefined;
   }
@@ -444,17 +364,8 @@ function parseDefault(element: ElementDef, raw: unknown): ElementDefault | undef
     }
     case 'image':
       return typeof raw === 'string' ? storedImageName(raw) ?? undefined : undefined;
-    case 'sigilCharge': {
-      if (!isRecord(raw)) return undefined;
-      const targets = Array.isArray(raw.targets)
-        ? [...new Set(raw.targets.filter((id): id is string => typeof id === 'string' && isSafeElementId(id)))].slice(0, 100)
-        : null;
-      return { lock: raw.lock === 'sigil' ? 'sigil' : 'entry', targets };
-    }
     case 'text':
-    case 'sigilCalc':
-    case 'sigilCanvas':
-      return undefined; // Text, calculator and drawing start empty.
+      return undefined; // Text starts empty.
     default: {
       const value = parseValue(element.kind, raw);
       // A select default only for an option that still exists — otherwise every copy would get a dead value.
@@ -519,19 +430,13 @@ export function isElementEmpty(element: ElementDef, model: FieldsModel): boolean
       return isBlankContent(model.slots[element.id] ?? '');
     case 'link':
     case 'image':
-    case 'sigilCalc':
       return !model.slots[element.id];
-    case 'sigilCanvas':
-    case 'sigilCharge':
-      // The charge: loading and unloading belong in read mode. The drawing:
-      // its saving outlasts "Done" and needs the mounted component.
-      return false;
   }
 }
 
-/** Can an element of this kind be empty? Yes/no, drawing and charge never — for them there is no "hide when empty". */
+/** Can an element of this kind be empty? Yes/no never — for it there is no "hide when empty". */
 export function canBeEmpty(kind: ElementKind): boolean {
-  return kind !== 'toggle' && kind !== 'sigilCanvas' && kind !== 'sigilCharge';
+  return kind !== 'toggle';
 }
 
 /** Does read mode hide this element? Archived, or empty AND (element or block rule). */
@@ -589,7 +494,7 @@ export function serializeFields(block: BlockInstance, model: FieldsModel, text: 
   const known = new Set(model.elements.map((e) => e.id));
   const rows = model.elements.map((element) => {
     const dt = `<dt>${escapeHtml(text.label(element))}</dt>`;
-    if (isSlotKind(element.kind) || isSigilKind(element.kind)) {
+    if (isSlotKind(element.kind)) {
       const slot = model.slots[element.id];
       // Archived: without a label, but the slot stays — and with it link and image.
       if (!slot) return '';
@@ -635,9 +540,9 @@ function readValuesJson(block: BlockInstance): Record<string, unknown> | null {
 }
 
 /**
- * The block without value and slot of these elements — for search and export
- * when a sigil conceals parts. Without `FallbackText`: only the data JSON and
- * the rows in the fallback are dropped, everything else stays byte for byte.
+ * The block without value and slot of these elements — a picture taken out
+ * of its image fields ("Images"). Without `FallbackText`: only the data JSON
+ * and the rows in the fallback are dropped, everything else stays byte for byte.
  */
 export function withoutElementContent(block: BlockInstance, ids: ReadonlySet<string>): BlockInstance {
   if (ids.size === 0) return block;
@@ -649,12 +554,6 @@ export function withoutElementContent(block: BlockInstance, ids: ReadonlySet<str
   }
   const html = block.html.replace(SLOT_ROW_RE, (row, id: string) => (ids.has(decodeHtmlAttr(id)) ? '' : row));
   return { ...block, attrs, html };
-}
-
-/** The block with a new value for this element — only in the data JSON, the fallback stays. */
-export function withElementValue(block: BlockInstance, id: string, value: FieldValue): BlockInstance {
-  const values = readValuesJson(block) ?? {};
-  return { ...block, attrs: { ...block.attrs, [BLOCK_ATTR.data]: JSON.stringify({ values: { ...values, [id]: value } }) } };
 }
 
 /** A new field block with exactly one element of this kind. */

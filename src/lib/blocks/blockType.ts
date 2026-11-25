@@ -49,11 +49,33 @@ export type BlockValue =
 
 /* ---------------- 2 Export ---------------- */
 
-/** One piece of what a block shows in PDF, HTML, Markdown — the app lays them out per format (#151). */
+/**
+ * One piece of what a block shows in PDF, HTML, Markdown — the app lays them
+ * out per format and words them (#151). A `row` is "label: value" (a missing
+ * value shows as a dash); `html` is markup the block already holds in its
+ * readable form (a link chip, an escaped text).
+ */
 export type BlockExportPart =
   | { kind: 'text'; text: string }
   | { kind: 'html'; html: string }
-  | { kind: 'image'; file: string; alt?: string };
+  | { kind: 'image'; file: string; altKey: string }
+  | { kind: 'heading'; labelKey: string }
+  | { kind: 'row'; labelKey: string; value: BlockExportValue | null }
+  | { kind: 'note'; textKey: string };
+
+/** The value of an export row: a value the app formats, or markup the block holds in readable form. */
+export type BlockExportValue = BlockValue | { kind: 'html'; html: string };
+
+/** What the search and the export need to know of where they read: today, for what is concealed until a day. */
+export interface ReadContext {
+  today: string;
+  /**
+   * Read as if nothing were concealed — for the stored row text (`blocks.text`),
+   * which outlives the day it was written; whoever searches it applies the
+   * concealing then.
+   */
+  revealAll?: boolean;
+}
 
 /* ---------------- 3 Properties ---------------- */
 
@@ -117,7 +139,7 @@ export interface BlockValues {
 
 /* ---------------- 6 Effect on the entry ---------------- */
 
-/** What a block does to the whole entry: lock it, lock or conceal blocks (#182). */
+/** What a block does to the whole entry: lock it, lock or conceal blocks and parts of blocks. */
 export interface BlockEntryEffect {
   lockEntry?: boolean;
   /** Block (or part) IDs that cannot be edited. */
@@ -126,6 +148,15 @@ export interface BlockEntryEffect {
   concealed?: ReadonlyMap<string, string | null>;
 }
 
+/**
+ * How a type acts on its entry. Read for every list row (an entry locked
+ * from the list's menu), hence the cheap pre-check as for the info line.
+ * The effects of all blocks are folded by `entryEffects` (`blockTypes.ts`).
+ */
+export interface BlockEntryEffects {
+  mayContribute: (content: string) => boolean;
+  read: (block: BlockInstance, blocks: readonly BlockInstance[], ctx: ReadContext) => BlockEntryEffect;
+}
 /* ---------------- 7 Storage ---------------- */
 
 /**
@@ -197,18 +228,18 @@ export interface BlockTypeDef {
 
   /** 1 — what the block adds to its entry's info line in lists. */
   listInfo?: ListInfoProvider;
-  /** 2 — how the block appears in an export (#151). */
-  export?: (block: BlockInstance, ctx: BlockContext) => BlockExportPart[];
+  /** 2 — how the block appears in PDF, HTML and Markdown (#151); without it, its readable markup. What its entry's effects conceal is left out already. */
+  export?: (block: BlockInstance, ctx: ReadContext) => BlockExportPart[];
   /** 3 — rows and suggested values for the entry's properties; the panel shows them, a suggested value marked as the block's. */
   properties?: BlockProperties;
   /** 4 / 9 — values to filter and sort dashboards by; the dashboard's controls for them come with #117. */
   values?: BlockValues;
-  /** 6 — what the block does to the whole entry (#182). */
-  entryEffect?: (block: BlockInstance, blocks: readonly BlockInstance[], ctx: BlockContext) => BlockEntryEffect;
+  /** 6 — what the block does to the whole entry: lock it, lock or conceal blocks or parts. */
+  entryEffect?: BlockEntryEffects;
   /** 7 — the tag the block's pictures go under. */
   storage?: BlockStorage;
-  /** 8 — the text the search finds; none if missing. */
-  searchText?: (block: BlockInstance) => string;
+  /** 8 — the text the search finds; none if missing. A part the block conceals today it leaves out itself. */
+  searchText?: (block: BlockInstance, ctx: ReadContext) => string;
   /** 10 — commands of the block. */
   actions?: readonly BlockActionDef[];
   /** 11 — what the block points at: entries, pictures, icons (`block_refs`). Tags come from `properties.tags`. */
@@ -217,8 +248,6 @@ export interface BlockTypeDef {
   withoutImage?: (block: BlockInstance, file: string) => BlockInstance;
   /** 12 — the block as a copy (it already carries its new ID): what it points at inside the copied blocks follows. */
   copy?: (block: BlockInstance, ctx: BlockCopyContext) => BlockInstance;
-  /** 12 — another block of the entry was duplicated; this one may have to take the copy in (a charge covering it). */
-  siblingCopied?: (block: BlockInstance, from: string, to: string) => BlockInstance;
   /** 14 — the settings the block offers. */
   settings?: readonly BlockSettingDef[];
 }

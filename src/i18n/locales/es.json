@@ -156,8 +156,7 @@
     "chargingTechnique": "Técnica de carga",
     "letterBank": "Banco de letras",
     "noLetters": "Aún no hay letras preparadas.",
-    "targetDate": "Fecha objetivo",
-    "brushSize": "Pincel"
+    "targetDate": "Fecha objetivo"
   },
   "blocks": {
     "add": "Añadir bloque",
@@ -183,17 +182,15 @@
         "label": "Campos",
         "description": "Valores con etiqueta: texto, número, fecha, selección, sí/no, lista de verificación, enlace, imagen, fase lunar."
       },
-      "sigilCalc": {
-        "label": "Calculadora de sigilo",
-        "description": "Reduce una intención a su banco de letras y marca las letras usadas en el dibujo."
-      },
-      "sigilCanvas": {
-        "label": "Dibujo del sigilo",
-        "description": "Dibuja el sigilo — se guarda como imagen y se oculta mientras está cargado."
-      },
-      "sigilCharge": {
-        "label": "Carga",
-        "description": "Fecha objetivo, técnica de carga y la carga del sigilo. Cargado oculta las calculadoras y dibujos elegidos y bloquea la entrada o solo esos bloques."
+      "sigil": {
+        "label": "Sigilo",
+        "description": "Calculadora, dibujo y carga de un sigilo — activa o desactiva cada parte en el menú del bloque. Cargado oculta la calculadora y el dibujo y bloquea la entrada o solo este sigilo.",
+        "noParts": "Todas las partes están desactivadas — actívalas en el menú del bloque.",
+        "parts": {
+          "calc": "Calculadora",
+          "drawing": "Dibujo",
+          "charge": "Carga"
+        }
       },
       "canvas": {
         "label": "Lienzo",
@@ -218,10 +215,7 @@
       "checklist": "Lista de verificación",
       "link": "Enlace",
       "image": "Imagen",
-      "moon": "Fase lunar",
-      "sigilCalc": "Calculadora de sigilo",
-      "sigilCanvas": "Dibujo del sigilo",
-      "sigilCharge": "Carga"
+      "moon": "Fase lunar"
     },
     "fields": {
       "yes": "Sí",
@@ -256,17 +250,6 @@
       "prefillHint": "Cada copia nueva empieza con este valor; las entradas existentes conservan el suyo.",
       "linkCategories": "Categorías",
       "linkCategoriesHint": "Solo se ofrecen entradas y tareas de estas categorías, en cada copia nueva. Un enlace ya puesto se mantiene. Sin ninguna marcada, se ofrece todo.",
-      "calcMode": "Banco de letras",
-      "calcModes": {
-        "both": "Automático y manual",
-        "auto": "Solo automático (desde la intención)",
-        "manual": "Solo manual"
-      },
-      "brushPreset": "Preajustar el pincel",
-      "brushPresetHint": "Color y tamaño de pincel con los que empieza el dibujo; al dibujar se pueden cambiar.",
-      "chargePrefillHint": "Cada copia nueva empieza con este bloqueo y estas partes cubiertas; en la entrada se pueden cambiar mientras no esté cargado.",
-      "chargeCoversAll": "Todos los sigilos de la entrada",
-      "chargeNoTools": "Este bloque todavía no tiene calculadora ni dibujo.",
       "display": "Visualización",
       "fieldCount": "{{count}} campo",
       "fieldCount_other": "{{count}} campos"
@@ -279,14 +262,12 @@
       "revealedSince": "revelado desde {{date}}",
       "hiddenUntilUnloaded": "oculto hasta descargarlo",
       "noRevealDate": "Sin fecha objetivo",
-      "loadConfirm": "¿Cargar el sigilo? Los bloques cubiertos quedan ocultos hasta el {{date}}.",
-      "loadConfirmNoDate": "¿Cargar el sigilo? Los bloques cubiertos quedan ocultos hasta que lo descargues.",
+      "loadConfirm": "¿Cargar el sigilo? La calculadora y el dibujo quedan ocultos hasta el {{date}}.",
+      "loadConfirmNoDate": "¿Cargar el sigilo? La calculadora y el dibujo quedan ocultos hasta que lo descargues.",
       "unloadConfirm": "¿Descargar el sigilo? Se podrá editar de nuevo enseguida.",
       "lockScope": "Cargado bloquea",
       "lockEntry": "toda la entrada",
-      "lockSigil": "solo los bloques cubiertos",
-      "covers": "Cubre",
-      "noTools": "Todavía no hay calculadora ni dibujo en la entrada",
+      "lockSigil": "solo este sigilo",
       "locked": "Bloqueado mientras el sigilo está cargado",
       "saveFailed": "No se pudo guardar el dibujo",
       "loadFailed": "No se pudo cargar el dibujo — cierra y vuelve a abrir la entrada"

@@ -1,15 +1,12 @@
 import { escapeHtml } from '../internalLinkHtml';
 import { isBlockHidden, showsTitleInRead } from './blockAttrs';
 import { parseBlocks } from './blockHtml';
-import { resolveBlockType, type BlockTypeDef } from './blockTypes';
+import type { BlockExportPart, BlockExportValue } from './blockType';
+import { entryEffects, resolveBlockType, type BlockTypeDef } from './blockTypes';
 import {
-  FIELDS_BLOCK_TYPE, fieldValueHtml, imageFromSlot, isElementEmpty, isHiddenInRead, isSigilElement, isSlotKind, parseFields, soleSigilElement,
+  FIELDS_BLOCK_TYPE, fieldValueHtml, imageFromSlot, isElementEmpty, isHiddenInRead, isSlotKind, parseFields,
   type ElementDef, type FallbackText, type FieldsModel,
 } from './fields';
-import {
-  parseSigilCharge, sigilPartBlock, sigilState, SIGIL_CANVAS_KIND, SIGIL_CHARGE_KIND,
-  withoutConcealedParts,
-} from './sigil';
 import { TEXT_BLOCK_TYPE, type BlockInstance } from './types';
 import { ALTAR_BLOCK_TYPE, CANVAS_BLOCK_TYPE, parseCanvasBlock } from './canvas';
 import { drawingImage, PAINT_BLOCK_TYPE } from './paint';
@@ -19,7 +16,11 @@ import { localIsoDay } from '../helpers';
  * The blocks of an entry as HTML for PDF and Markdown — one serializer per
  * type, following the same rules as read mode:
  * - hidden blocks (the eye) are missing,
- * - calculators and drawings that a loaded sigil still conceals are missing,
+ * - what a block's effect conceals today is missing (a loaded sigil's
+ *   calculator and drawing): a concealed block here, a concealed part by
+ *   its block's own export,
+ * - a type with an export of its own (`BlockTypeDef.export`) is laid out
+ *   from the parts it delivers,
  * - field blocks show only what read mode shows (archived and — per
  *   the display rule — empty fields do not appear), date and number formatted,
  * - the block title appears as a heading where read mode shows it,
@@ -40,12 +41,8 @@ export interface ExportText {
   /** A `YYYY-MM-DD` for humans. */
   date: (iso: string) => string;
   number: (value: number) => string;
-  targetDate: string;
-  technique: string;
-  loaded: string;
-  notLoaded: string;
-  /** Label of the drawing — in the Markdown the placeholder in its place. */
-  drawing: string;
+  /** A text by its i18n key — the labels a block's export parts name. */
+  t: (key: string) => string;
 }
 
 function row(label: string, valueHtml: string): string {
@@ -76,59 +73,57 @@ function fieldValue(element: ElementDef, model: FieldsModel, text: ExportText): 
   }
 }
 
-function fieldsHtml(block: BlockInstance, text: ExportText, concealed: ReadonlyMap<string, string | null>): string {
+function fieldsHtml(block: BlockInstance, text: ExportText): string {
   const model = parseFields(block);
   if (model.broken) return block.html;
-  // A sigil part on its own is shown as read mode shows it: the part, under the block's title.
-  const sole = soleSigilElement(model);
-  if (sole) {
-    const part = sigilPartBlock(block, sole, model);
-    return isHiddenInRead(sole, model) || concealed.has(part.id) ? '' : sigilHtml(part, text);
-  }
   const rows = model.elements
     .filter((element) => !isHiddenInRead(element, model))
-    .flatMap((element) => {
-      if (!isSigilElement(element)) return [row(text.fields.label(element), fieldValue(element, model, text) ?? '—')];
-      // A sigil part as read mode shows it — if concealed it is missing entirely.
-      const part = sigilPartBlock(block, element, model);
-      if (concealed.has(part.id)) return [];
-      const body = sigilHtml(part, text);
-      return body.trim() ? [row(text.fields.label(element), body)] : [];
-    });
+    .map((element) => row(text.fields.label(element), fieldValue(element, model, text) ?? '—'));
   return rows.length ? `<dl>${rows.join('')}</dl>` : '';
 }
 
-/** Calculator, drawing or charge — a part of a fields block, as its virtual block. */
-function sigilHtml(block: BlockInstance, text: ExportText): string {
-  switch (block.type) {
-    case SIGIL_CANVAS_KIND: {
-      const image = drawingImage(block);
-      return image ? imageHtml(image, text.drawing) : '';
-    }
-    case SIGIL_CHARGE_KIND:
-      return chargeHtml(block, text);
-    default: // Calculator: its stored fallback is already the read version (intention, letters).
-      return block.html;
+function valueHtml(value: BlockExportValue | null, text: ExportText): string {
+  if (!value) return '—';
+  switch (value.kind) {
+    case 'html': return value.html;
+    case 'date': return escapeHtml(text.date(value.iso));
+    case 'number': return escapeHtml(text.number(value.value));
+    case 'bool': return escapeHtml(value.value ? text.fields.yes : text.fields.no);
+    case 'text': return escapeHtml(value.text);
   }
 }
 
-function chargeHtml(block: BlockInstance, text: ExportText): string {
-  const charge = parseSigilCharge(block);
-  if (charge.broken) return block.html;
-  return `<dl>${row(text.targetDate, charge.revealDate ? escapeHtml(text.date(charge.revealDate)) : '—')}`
-    + `${row(text.technique, charge.technique ?? '—')}</dl>`
-    + `<p>${escapeHtml(charge.loaded ? text.loaded : text.notLoaded)}</p>`;
+/** A block's export parts as HTML: consecutive rows in one `<dl>`, a part's heading one level below the block's title. */
+function partsHtml(parts: readonly BlockExportPart[], text: ExportText): string {
+  let html = '';
+  let rows = '';
+  const flush = () => {
+    if (rows) html += `<dl>${rows}</dl>`;
+    rows = '';
+  };
+  for (const part of parts) {
+    if (part.kind === 'row') {
+      rows += row(text.t(part.labelKey), valueHtml(part.value, text));
+      continue;
+    }
+    flush();
+    switch (part.kind) {
+      case 'heading': html += `<h4>${escapeHtml(text.t(part.labelKey))}</h4>`; break;
+      case 'note': html += `<p>${escapeHtml(text.t(part.textKey))}</p>`; break;
+      case 'text': html += `<p>${escapeHtml(part.text)}</p>`; break;
+      case 'html': html += part.html; break;
+      case 'image': html += imageHtml(part.file, text.t(part.altKey)); break;
+    }
+  }
+  flush();
+  return html;
 }
 
-function bodyHtml(
-  block: BlockInstance,
-  meta: BlockTypeDef | undefined,
-  text: ExportText,
-  concealed: ReadonlyMap<string, string | null>,
-): string {
+function bodyHtml(block: BlockInstance, meta: BlockTypeDef | undefined, text: ExportText, today: string): string {
+  if (meta?.export) return partsHtml(meta.export(block, { today }), text);
   switch (meta?.id) {
     case FIELDS_BLOCK_TYPE:
-      return fieldsHtml(block, text, concealed);
+      return fieldsHtml(block, text);
     case PAINT_BLOCK_TYPE: {
       const image = drawingImage(block);
       return image ? imageHtml(image, text.title(block, meta)) : '';
@@ -147,14 +142,12 @@ function bodyHtml(
 
 export function renderBlocksForExport(content: string, text: ExportText, today = localIsoDay()): string {
   const blocks = parseBlocks(content);
-  const { concealed } = sigilState(blocks, today);
+  const { concealed } = entryEffects(blocks, { today });
   const parts: string[] = [];
-  for (const original of blocks) {
-    if (isBlockHidden(original) || concealed.has(original.id)) continue;
-    // Also the fallback of a field block (format too new) without concealed parts.
-    const block = withoutConcealedParts(original, concealed);
+  for (const block of blocks) {
+    if (isBlockHidden(block) || concealed.has(block.id)) continue;
     const meta = resolveBlockType(block);
-    const body = bodyHtml(block, meta, text, concealed);
+    const body = bodyHtml(block, meta, text, today);
     if (!body.trim()) continue;
     const title = showsTitleInRead(block, meta) ? `<h3>${escapeHtml(text.title(block, meta))}</h3>` : '';
     parts.push(title + body);

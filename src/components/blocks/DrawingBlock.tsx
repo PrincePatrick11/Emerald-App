@@ -22,8 +22,8 @@ interface DrawingTexts {
 }
 
 /**
- * A drawing, painted in the canvas editor: the paint block, and the sigil
- * drawing, which puts its concealment around it. The block keeps the
+ * A drawing, painted in the canvas editor: the paint block, and the sigil's
+ * drawing part, which puts its concealment around it. The block keeps the
  * vector document as its data and the rendered image as a stored file
  * (`saveImage`, see `parseDrawing`); base64 never enters the content.
  * The undo list lives only in the editor while editing; rendered images
@@ -146,8 +146,7 @@ const DRAWING_ID = 'sigil-drawing';
  * The adapter between block and canvas editor: a scene of one drawing over
  * the whole artboard, fixed in the paint mode, so the editor is a plain paint
  * editor here (`paintOnlyProfile`). The document the block holds (an old
- * image as its first layer), the palette, and the brush it starts with (a
- * custom block's sigil part may set it).
+ * image as its first layer), the palette, and the brush it starts with.
  *
  * Layer images are loaded as data URLs first (`canvasImageSrc`): the PNG the
  * block stores is rendered from them, and a canvas with an `emerald-img`

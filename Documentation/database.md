@@ -70,7 +70,7 @@ When a category is merged into a namesake instead (`reassignCategoryContent(db, 
 
 Only a **permanent** deletion reassigns: `categoryStore.permanentlyDeleteCategory`, `trashStore.emptyTrash`, and the periodic cleanup for an expired category (`purgeCategory`). That is why `categories` is **not in `CLEANUP_TABLES`** — it is purged separately, after its content is released. A *soft* delete never reassigns: content keeps pointing at the trashed category, the UI groups it under "Uncategorized", and restoring the category brings everything back. `reassignCategoriesInMemory` in `categoryStore.ts` applies the same move to the loaded content stores, so an in-memory row doesn't write back a `category_id` the foreign key would reject.
 
-The built-ins, `journal`, `sigils` and `altars`, cannot be deleted: the journal's entries are what the Journal shows, with their moon phase; an entry in `sigils` is a sigil, and a new one starts with the sigil blocks through its start template, the built-in `core-sigil`; an entry in `altars` is an altar and starts with an altar block and a text for notes through `core-altar`.
+The built-ins, `journal`, `sigils` and `altars`, cannot be deleted: the journal's entries are what the Journal shows, with their moon phase; an entry in `sigils` is a sigil, and a new one starts with a sigil block through its start template, the built-in `core-sigil`; an entry in `altars` is an altar and starts with an altar block and a text for notes through `core-altar`.
 
 ## Tables
 
@@ -152,7 +152,7 @@ The user-built blocks of the Blocks view. A row is only the template — an inse
 | id | TEXT PK | UUID |
 | name | TEXT | NOT NULL |
 | icon | TEXT | emoji or an icon file (see [Icons](#icons)), NOT NULL DEFAULT `'🧩'`; a copy carries it in its config |
-| elements | TEXT | JSON array of `ElementDef` (`id`, `kind`, `label`, `options`, `hideWhenEmpty`, `defaultValue`, plus `calcMode` for a `sigilCalc` element and `brushColor`/`brushSize` for a `sigilCanvas` one), NOT NULL DEFAULT `'[]'`; read through the same validation as a copy in content |
+| elements | TEXT | JSON array of `ElementDef` (`id`, `kind`, `label`, `options`, `hideWhenEmpty`, `defaultValue`), NOT NULL DEFAULT `'[]'`; read through the same validation as a copy in content |
 | display | TEXT | JSON `{ readHideEmpty, readOnly, showTitle }`, NOT NULL DEFAULT `'{}'` (missing keys fall back to their defaults) |
 | sort_order | INTEGER | NOT NULL DEFAULT 0 |
 | created_at / updated_at | TEXT | ISO 8601 |
@@ -160,7 +160,7 @@ The user-built blocks of the Blocks view. A row is only the template — an inse
 
 An element's kind never changes — the builder adds a new element instead.
 
-An element's `defaultValue` (the builder's "Prefill") is what a new copy starts with. A scalar (checklist, choice, …) is stored as the value itself; a `link` element stores `{id, targetKind, label}`; an `image` element stores the filename; a `sigilCharge` element stores `{lock, targets}`, with `targets` holding element ids (block-qualified only once a copy exists) or `null` for "all sigils in this block". Nothing here is markup — `instantiateDefinition` turns a default into a link chip or `<img>` only inside the copy it creates, so the definition row never needs the link or image machinery to understand it.
+An element's `defaultValue` (the builder's "Prefill") is what a new copy starts with. A scalar (checklist, choice, …) is stored as the value itself; a `link` element stores `{id, targetKind, label}`; an `image` element stores the filename. Nothing here is markup — `instantiateDefinition` turns a default into a link chip or `<img>` only inside the copy it creates, so the definition row never needs the link or image machinery to understand it.
 
 ### templates
 
@@ -176,7 +176,7 @@ The templates dashboard's rows, behind every entry's "insert a template" flow �
 | created_at / updated_at | TEXT | ISO 8601 |
 | deleted_at | TEXT | NULL = active; purged after the retention period (`CLEANUP_TABLES`) |
 
-`core-sigil` is seeded with the three sigil blocks (`sigilBlockSet()` in `lib/blocks/sigil.ts`) as the start template of `sigils`, and `core-altar` with an altar block on a dark night and a text block (`altarBlockSet()` in `lib/blocks/canvas.ts`) as that of `altars`; otherwise each is an ordinary row — editable, deletable. Which categories start with a template is said by the categories (`template_id`); deleting a template for good clears it there (`ON DELETE SET NULL`), and a template in the Trash counts as none. Older blocks may still carry `data-block-origin`, `data-block-rev` and `data-template-origin`, which nothing reads.
+`core-sigil` is seeded with one sigil block (`createSigilBlock()` in `lib/blocks/sigil.ts`) as the start template of `sigils`, and `core-altar` with an altar block on a dark night and a text block (`altarBlockSet()` in `lib/blocks/canvas.ts`) as that of `altars`; otherwise each is an ordinary row — editable, deletable. Which categories start with a template is said by the categories (`template_id`); deleting a template for good clears it there (`ON DELETE SET NULL`), and a template in the Trash counts as none. Older blocks may still carry `data-block-origin`, `data-block-rev` and `data-template-origin`, which nothing reads.
 
 ### languages
 
@@ -272,7 +272,7 @@ The blocks of entries and templates, one row each. An entry or a template is the
 | config / data | TEXT | the block's JSON as written (`data-block-config`/`-data`), NULL when absent; field values sit in `data` by element ID, for filters through SQLite's JSON functions |
 | attrs | TEXT | NOT NULL DEFAULT `'{}'`; JSON object of every other `data-*` attribute, in order — older copies' `data-block-origin`, a newer type's own, and an instance attribute whose value the app does not write that way (`hidden="0"`) |
 | html | TEXT | NOT NULL DEFAULT `''`; the inner HTML. For now every type keeps it, the pictures a canvas or drawing lists included, so the block HTML of `.emerald` files can be written from the rows; a backup carries it as it is |
-| text | TEXT | NOT NULL DEFAULT `''`; plain text, written for a later search over the rows — the search reads the stores' in-memory content today (see below) — without a DOM — the block's search text (`blockSearchText`, its type's `searchText`): tags gone, block elements and chips as word boundaries; empty for a canvas and a drawing. A concealed sigil's text is in it — concealing depends on the date |
+| text | TEXT | NOT NULL DEFAULT `''`; plain text, written for a later search over the rows — the search reads the stores' in-memory content today (see below) — without a DOM — the block's search text (`blockSearchText`, its type's `searchText`): tags gone, block elements and chips as word boundaries; empty for a canvas and a drawing. A concealed sigil's text is in it (read with `revealAll`) — concealing depends on the date, so whoever searches applies it then |
 | updated_at | TEXT | NOT NULL; ISO 8601, when the block was last written by a save that changed it (a move does not count). A rebuild from a whole block stack (a seed) writes all of its owner's blocks anew, with new positions and this stamp; a backup restores each block with its own position and stamp |
 
 `UNIQUE (entry_id, id)` and `UNIQUE (template_id, id)` (NULL is distinct, so each covers only its owner kind); indexes `idx_blocks_entry` and `idx_blocks_template` on `(owner, position)`.
@@ -370,13 +370,13 @@ The `icon` columns of `ICON_FIELDS` in `schema.ts` — `entries`, `templates`, `
 
 ## Sigil Workflow
 
-A sigil is not a kind of row but three blocks of an entry (`src/lib/blocks/sigil.ts`), in any category; a new entry in `sigils` starts with them via the built-in `core-sigil` template (see [templates](#templates)). Calculator and charge are fields blocks with that one element (element IDs `calc` and `charge`), the drawing a paint block marked as a sigil drawing — the same three exist as parts of a user-built block:
+A sigil is one block of an entry, `core.sigil` (`src/lib/blocks/sigil.ts`), in any category; a new entry in `sigils` starts with it via the built-in `core-sigil` template (see [templates](#templates)). Its calculator, drawing and charge are parts that the block's settings switch on and off (`data-block-settings`, one toggle each, all on to start with). A part switched off keeps its data. Each part keeps its data JSON under its name in the block's `data-block-data`, and its markup in a slot of the inner HTML, `<div data-sigil-part="calc|drawing|charge">`:
 
-1. **Calculator** (element kind `sigilCalc`) — the intention, the letter bank (each letter once) and the letters already implemented, as the element's value in `data-block-data`, the readable version in its slot.
-2. **Drawing** (`core.paint` with `data-block-config='{"sigil":true}'`, or element kind `sigilCanvas`) — the vector strokes as data JSON (`data-block-data`, layers of strokes, see [Editors](architecture/editors.md#canvas-editor)), and as inner HTML the rendered image first (`<img src="{sha}.png" data-paint="render">`), then the image of every layer that has one (`data-paint="<layer ID>"`), so backups, exports and the image cleanup see them. A block whose first image is not marked as the render (one from before the vector format) opens with that image as its only layer. No base64 in content; rendered images saved while drawing become unused files that "Delete unused images" removes.
-3. **Charge** (element kind `sigilCharge`) — `loaded`, `revealDate`, `lock` and `targets` (`entry` — the whole entry — or `sigil` — only calculator and drawing) as JSON; the charging technique as a real link chip in the markup, so the "Linked entries" field and import remapping see it.
+1. **Calculator** (`calc`) — the intention, the letter bank (each letter once) and the letters already implemented; the slot holds the readable version.
+2. **Drawing** (`drawing`) — the vector strokes as data JSON (layers of strokes, see [Editors](architecture/editors.md#canvas-editor)), and as slot markup the rendered image first (`<img src="{sha}.png" data-paint="render">`), then the image of every layer that has one (`data-paint="<layer ID>"`), so backups, exports and the image cleanup see them. A block whose first image is not marked as the render (one from before the vector format) opens with that image as its only layer. No base64 in content; rendered images saved while drawing become unused files that "Delete unused images" removes.
+3. **Charge** (`charge`) — `loaded`, `revealDate` and `lock` (`entry` — the whole entry — or `sigil` — only this sigil's calculator and drawing) as JSON; the charging technique as a real link chip in the markup, so the "Linked entries" field and import remapping see it.
 
-The entry's state comes from the charges (`sigilState`). A charge's `targets` are unit IDs — `<block ID>:<element ID>` for a calculator or drawing part, the block ID for a sigil drawing — or absent for every calculator and drawing of the entry. An unmarked paint block is never a target. Charged and before the reveal date, the sigil is *concealed*: calculator and drawing hidden in both modes, left out of search and every export. Charged, it is *locked* in any entry: `lock: 'entry'` hides Edit and blocks read-mode writes except unloading, `'sigil'` makes the two blocks read-only; date and lock scope are fixed while charged.
+The entry's state comes from the loaded charges (`entryEffects`, see [Blocks](architecture/blocks.md#sigils)). A charge acts on its own block's calculator and drawing only, by the IDs `<block ID>:calc` and `<block ID>:drawing`. Loaded and before the reveal date, the sigil is *concealed*: calculator and drawing hidden in both modes, left out of search and every PDF, HTML and Markdown export; a loaded charge stays shown even if its part is switched off. Loaded, it is *locked* in any entry: `lock: 'entry'` hides Edit and blocks read-mode writes except unloading, `'sigil'` makes the two parts read-only; date and lock scope are fixed while loaded. The `.emerald` and `.vault.emerald` files carry the block whole, so it arrives concealed.
 
 ## Image Storage
 

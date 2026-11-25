@@ -27,11 +27,7 @@ function exportText(): ExportText {
     fields: fieldFallbackText(t),
     date: formatIsoDateLong,
     number: (value) => value.toLocaleString(i18n.language),
-    targetDate: t('creation.targetDate'),
-    technique: t('creation.chargingTechnique'),
-    loaded: t('blocks.sigil.loaded'),
-    notLoaded: t('blocks.sigil.notLoaded'),
-    drawing: t('blocks.types.sigilCanvas.label'),
+    t: (key) => t(key),
   };
 }
 

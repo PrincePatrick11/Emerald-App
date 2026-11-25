@@ -53,11 +53,11 @@ function requestNewForm(type: 'categories' | 'tags' | 'images'): () => Promise<A
 }
 
 /**
- * Where a new entry opens: for editing — unless its template brought a loaded
- * sigil that locks the entry, which can only be read until it is unloaded.
+ * Where a new entry opens: for editing — unless its template brought a block
+ * that locks the entry (a loaded sigil), which can only be read until it is lifted.
  */
 function newEntryView(dashboard: string, entry: { id: string; content: string; created_at: string }): ActiveView {
-  return entryBlockSummary(entry).sigil?.lockEntry
+  return entryBlockSummary(entry).effects.lockEntry
     ? entryView(entry.id, dashboard)
     : { ...entryView(entry.id, dashboard, 'edit'), isNew: true };
 }

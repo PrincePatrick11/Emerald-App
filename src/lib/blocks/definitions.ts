@@ -1,9 +1,8 @@
 import { generateId } from '../helpers';
 import {
   DEFAULT_DISPLAY, FIELDS_BLOCK_TYPE, isSlotKind, parseDisplay, parseElements, parseFields, serializeFields, slotFromDefault,
-  type ChargeDefault, type DisplayRules, type ElementDef, type FallbackText, type FieldsModel, type FieldValue,
+  type DisplayRules, type ElementDef, type FallbackText, type FieldsModel, type FieldValue,
 } from './fields';
-import { sigilPartId } from './sigil';
 import { BLOCK_ATTR, type BlockInstance } from './types';
 
 /**
@@ -146,20 +145,11 @@ function blockDisplay(display: DefinitionDisplay): DisplayRules {
  * The elements' defaults — what a new copy (or a new element in it)
  * receives: scalars as values, link and image as a slot.
  */
-function defaultsOf(elements: readonly ElementDef[], blockId: string): Pick<FieldsModel, 'values' | 'slots'> {
+function defaultsOf(elements: readonly ElementDef[]): Pick<FieldsModel, 'values' | 'slots'> {
   const values: Record<string, FieldValue> = {};
   const slots: Record<string, string> = {};
   for (const element of elements) {
     if (element.defaultValue === undefined) continue;
-    if (element.kind === 'sigilCharge') {
-      // The charge unloaded, with lock and targets — the targets now pointing to this block.
-      const { lock, targets } = element.defaultValue as ChargeDefault;
-      values[element.id] = {
-        loaded: false, revealDate: null, lock,
-        ...(targets ? { targets: targets.map((id) => sigilPartId(blockId, id)) } : {}),
-      };
-      continue;
-    }
     if (isSlotKind(element.kind)) {
       const slot = slotFromDefault(element);
       if (slot) slots[element.id] = slot;
@@ -191,7 +181,7 @@ export function instantiateDefinition(def: BlockDefinition, text: FallbackText):
   // The field block's default is "without title"; only the deviation becomes an attribute.
   if (def.display.showTitle) attrs[BLOCK_ATTR.showTitle] = '1';
   const block: BlockInstance = { id: generateId(), type: FIELDS_BLOCK_TYPE, html: '', attrs };
-  const defaults = defaultsOf(elements, block.id);
+  const defaults = defaultsOf(elements);
   if (Object.keys(defaults.values).length === 0 && Object.keys(defaults.slots).length === 0) return block;
   const model = parseFields(block);
   return serializeFields(block, {

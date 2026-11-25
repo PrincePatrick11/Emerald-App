@@ -305,7 +305,7 @@ h1.entry-title {
   font-family: var(--doc-font, Georgia, "Times New Roman", serif); font-size: var(--doc-size, 17px);
   line-height: 1.75; overflow-wrap: break-word;
 }
-.entry-content h1, .entry-content h2, .entry-content h3 { line-height: 1.3; margin: 1.5em 0 .5em; scroll-margin-top: 72px; }
+.entry-content h1, .entry-content h2, .entry-content h3, .entry-content h4 { line-height: 1.3; margin: 1.5em 0 .5em; scroll-margin-top: 72px; }
 .entry-content p { margin: 0 0 .9em; }
 .entry-content dl { margin: 0 0 .9em; }
 .entry-content dt { font-size: .85em; font-weight: 600; color: var(--muted); margin-top: .4em; }

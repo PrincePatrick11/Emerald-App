@@ -55,7 +55,7 @@ Skipping step 3 is the most common mistake: the fallback to English makes the om
 
 ## Built-in Category Names
 
-Entries and Tasks share one `categories` table (see [`database.md`](database.md#categories)). Two rows are true built-ins (`is_builtin = 1`): `sigils` and `altars` (a new entry in one starts with the sigil blocks, in the other with an altar). Their `name` column holds a fixed English seed value that must never be displayed directly — the display name always goes through the shared helper:
+Entries and Tasks share one `categories` table (see [`database.md`](database.md#categories)). Two rows are true built-ins (`is_builtin = 1`): `sigils` and `altars` (a new entry in one starts with a sigil block, in the other with an altar). Their `name` column holds a fixed English seed value that must never be displayed directly — the display name always goes through the shared helper:
 
 ```tsx
 // correct — the one rule for every module
@@ -83,7 +83,7 @@ Top-level keys of `en.json`, with the conventions worth knowing:
 | `dashboards` | Dashboards: the settings dialog (`settingsTitle`, `name`, `filterCategories`/`filterTags` with their hints, `newCategory`/`addCategory`, `allHasNoFilter`, `infoLine` with its hint and `infoShort`/`infoLong`), the rail menu (`settings`, `moveUp`, `moveDown`), `newEntry`, the plus's `dashboard` tile, `defaultName` for a new one and `unnamed` for one without a name |
 | `entries`, `tasks` | Entry and task UI strings. Their `untitled` key is what `displayTitle` (`src/lib/entryTitle.ts`) shows for an empty title — display text only, never stored |
 | `creation` | The sigil creation tools (intention, letters, canvas, charge) |
-| `blocks` | Content-block UI and the Blocks view: `types.*` (block types), `kinds.*` (one per `ElementKind`, shared by the "Add block" menu and the builder's element picker), `fields.*` (field block), `sigil.*` (calculator, drawing and charge, on their own or as parts of a block), `canvas.*` (the Canvas and Altar blocks), `paint.*` (the Painting block), `library.*` (the Blocks builder and its update/remove-copies notices) |
+| `blocks` | Content-block UI and the Blocks view: `types.*` (block types; `types.sigil.*` holds the sigil's name, description and the headings of its parts), `kinds.*` (one per `ElementKind`, shared by the "Add block" menu and the builder's element picker), `fields.*` (field block), `sigil.*` (the texts of the charge and the drawing: states, confirmations, lock), `canvas.*` (the Canvas and Altar blocks), `paint.*` (the Painting block), `library.*` (the Blocks builder and its update/remove-copies notices) |
 | `editor` | Shared editor buttons, link-popup actions, `lockedBySigil`, and `toolbar.*` (every formatting-toolbar tooltip) |
 | `symbols` | The canvas editor's symbol library: its own labels, `packs.*` the pack names, and `<pack>.<name>` every symbol's name, which the library's search looks in; also `editTitle`, the title of the Symbols view's edit dialog |
 | `moonPhase` | Display names of the eight moon phases |

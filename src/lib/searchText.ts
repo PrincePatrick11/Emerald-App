@@ -1,5 +1,6 @@
 import { parseBlocks } from './blocks/blockHtml';
-import { blockSearchText } from './blocks/blockTypes';
+import { blockSearchText, entryEffects } from './blocks/blockTypes';
+import { localIsoDay } from './helpers';
 
 /**
  * Plain text out of an entry's content, for the global search.
@@ -9,28 +10,39 @@ import { blockSearchText } from './blocks/blockTypes';
  * attributes of internal links and the hashed filenames behind `<img src>`.
  * So each block says what of it can be found (`searchText` of its type,
  * `blockSearchText`): a text its words, a fields block its readable fallback,
- * a canvas or a drawing nothing — the same text `blocks.text` holds.
+ * a canvas or a drawing nothing. What a block's effect conceals today (a
+ * loaded sigil) is not found: a concealed block is left out, a concealed part
+ * its block leaves out itself.
  */
 
 /** Read once per entry and revision; see `plainTextFor`. */
 const cache = new Map<string, { stamp: string; text: string }>();
 
-/** What the search finds in a content: the blocks' search texts, in order. */
-export function contentSearchText(content: string): string {
-  return parseBlocks(content).map(blockSearchText).filter(Boolean).join(' ');
+/** What the search finds in a content today: the blocks' search texts, in order. */
+export function contentSearchText(content: string, today = localIsoDay()): string {
+  const blocks = parseBlocks(content);
+  const { concealed } = entryEffects(blocks, { today });
+  return blocks
+    .filter((block) => !concealed.has(block.id))
+    .map((block) => blockSearchText(block, { today }))
+    .filter(Boolean)
+    .join(' ');
 }
 
 /**
  * The plain text of one entry, parsed at most once per revision.
  *
- * `stamp` is the entry's `updated_at`: the same id with a newer stamp re-parses,
- * the same stamp is served from the cache. That is what keeps a keystroke in the
+ * Re-parsed when the entry's `updated_at` changes, when its content arrives
+ * after startup (`pendingContent`: empty until then, so its length changes),
+ * and on a new day (what is concealed until a day is found from that day on);
+ * otherwise served from the cache. That is what keeps a keystroke in the
  * search field from re-parsing the whole vault.
  */
-export function plainTextFor(id: string, stamp: string, content: string): string {
+export function plainTextFor(id: string, updatedAt: string, content: string, today = localIsoDay()): string {
+  const stamp = `${updatedAt}|${content.length}|${today}`;
   const cached = cache.get(id);
   if (cached?.stamp === stamp) return cached.text;
-  const text = contentSearchText(content);
+  const text = contentSearchText(content, today);
   cache.set(id, { stamp, text });
   return text;
 }

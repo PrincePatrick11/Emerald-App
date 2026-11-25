@@ -156,8 +156,7 @@
     "chargingTechnique": "Technique de chargement",
     "letterBank": "Jeu de lettres",
     "noLetters": "Aucune lettre préparée pour le moment.",
-    "targetDate": "Date cible",
-    "brushSize": "Pinceau"
+    "targetDate": "Date cible"
   },
   "blocks": {
     "add": "Ajouter un bloc",
@@ -183,17 +182,15 @@
         "label": "Champs",
         "description": "Valeurs avec libellé : texte, nombre, date, choix, oui/non, liste de contrôle, lien, image, phase lunaire."
       },
-      "sigilCalc": {
-        "label": "Calculateur de sigil",
-        "description": "Réduire une intention à sa banque de lettres et cocher les lettres utilisées dans le dessin."
-      },
-      "sigilCanvas": {
-        "label": "Dessin du sigil",
-        "description": "Dessiner le sigil — enregistré comme image, masqué tant qu'il est chargé."
-      },
-      "sigilCharge": {
-        "label": "Charge",
-        "description": "Date cible, technique de charge et chargement du sigil. Chargé, il masque les calculateurs et dessins choisis et verrouille l'entrée ou seulement ces blocs."
+      "sigil": {
+        "label": "Sigil",
+        "description": "Calculateur, dessin et charge d'un sigil — activez ou désactivez chaque partie dans le menu du bloc. Chargé, il masque le calculateur et le dessin et verrouille l'entrée ou seulement ce sigil.",
+        "noParts": "Toutes les parties sont désactivées — activez-les dans le menu du bloc.",
+        "parts": {
+          "calc": "Calculateur",
+          "drawing": "Dessin",
+          "charge": "Charge"
+        }
       },
       "canvas": {
         "label": "Toile",
@@ -218,10 +215,7 @@
       "checklist": "Liste de contrôle",
       "link": "Lien",
       "image": "Image",
-      "moon": "Phase lunaire",
-      "sigilCalc": "Calculateur de sigil",
-      "sigilCanvas": "Dessin du sigil",
-      "sigilCharge": "Charge"
+      "moon": "Phase lunaire"
     },
     "fields": {
       "yes": "Oui",
@@ -256,17 +250,6 @@
       "prefillHint": "Chaque nouvelle copie commence avec cette valeur — les entrées existantes gardent la leur.",
       "linkCategories": "Catégories",
       "linkCategoriesHint": "Seules les entrées et tâches de ces catégories sont proposées, dans chaque nouvelle copie. Un lien déjà posé reste. Sans aucune case cochée, tout est proposé.",
-      "calcMode": "Banque de lettres",
-      "calcModes": {
-        "both": "Automatique et manuel",
-        "auto": "Automatique seulement (depuis l'intention)",
-        "manual": "Manuel seulement"
-      },
-      "brushPreset": "Prérégler le pinceau",
-      "brushPresetHint": "Couleur et taille de pinceau avec lesquelles le dessin commence — modifiables pendant le dessin.",
-      "chargePrefillHint": "Chaque nouvelle copie commence avec ce verrouillage et ces parties couvertes — modifiables dans l'entrée tant qu'elle n'est pas chargée.",
-      "chargeCoversAll": "Tous les sigils de l'entrée",
-      "chargeNoTools": "Ce bloc n'a encore ni calculateur ni dessin.",
       "display": "Affichage",
       "fieldCount": "{{count}} champ",
       "fieldCount_other": "{{count}} champs"
@@ -279,14 +262,12 @@
       "revealedSince": "révélé depuis le {{date}}",
       "hiddenUntilUnloaded": "masqué jusqu'au déchargement",
       "noRevealDate": "Pas de date cible",
-      "loadConfirm": "Charger le sigil ? Les blocs couverts restent masqués jusqu'au {{date}}.",
-      "loadConfirmNoDate": "Charger le sigil ? Les blocs couverts restent masqués jusqu'à ce que vous le déchargiez.",
+      "loadConfirm": "Charger le sigil ? Le calculateur et le dessin restent masqués jusqu'au {{date}}.",
+      "loadConfirmNoDate": "Charger le sigil ? Le calculateur et le dessin restent masqués jusqu'à ce que vous le déchargiez.",
       "unloadConfirm": "Décharger le sigil ? Il redevient modifiable aussitôt.",
       "lockScope": "Chargé, verrouille",
       "lockEntry": "toute l'entrée",
-      "lockSigil": "seulement les blocs couverts",
-      "covers": "Couvre",
-      "noTools": "Pas encore de calculateur ni de dessin dans l'entrée",
+      "lockSigil": "seulement ce sigil",
       "locked": "Verrouillé tant que le sigil est chargé",
       "saveFailed": "Le dessin n'a pas pu être enregistré",
       "loadFailed": "Le dessin n'a pas pu être chargé — fermez puis rouvrez l'entrée"

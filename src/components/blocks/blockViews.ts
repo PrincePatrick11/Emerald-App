@@ -1,14 +1,16 @@
 import type { ComponentType } from 'react';
 import { TEXT_BLOCK_TYPE, type BlockInstance } from '../../lib/blocks/types';
-import { FIELDS_BLOCK_TYPE, type ElementDef } from '../../lib/blocks/fields';
-import type { SigilState } from '../../lib/blocks/sigil';
+import { FIELDS_BLOCK_TYPE } from '../../lib/blocks/fields';
+import { SIGIL_BLOCK_TYPE } from '../../lib/blocks/sigil';
 import type { BlockContext } from '../../lib/blocks/blockType';
+import type { EntryEffects } from '../../lib/blocks/blockTypes';
 import { ALTAR_BLOCK_TYPE, CANVAS_BLOCK_TYPE } from '../../lib/blocks/canvas';
 import { PAINT_BLOCK_TYPE } from '../../lib/blocks/paint';
 import TextBlock from './TextBlock';
 import CanvasBlock from './CanvasBlock';
 import PaintBlock from './PaintBlock';
 import FieldsBlock from './FieldsBlock';
+import SigilBlock from './SigilBlock';
 
 /**
  * Which component renders a block type: the component part of the
@@ -26,12 +28,6 @@ export interface BlockViewProps {
    * controlled and read the block on every render.
    */
   block: BlockInstance;
-  /**
-   * All blocks of the entry, as of the last structural change, for types
-   * that point at other blocks (the charge picks its calculators and
-   * drawings). The HTML of text blocks in it may be stale.
-   */
-  blocks: readonly BlockInstance[];
   isEditing: boolean;
   /** Text block: new inner HTML, into the ref only, no re-render per keystroke. */
   onHtmlChange: (html: string) => void;
@@ -42,15 +38,10 @@ export interface BlockViewProps {
    * sigil) into the entry immediately. Absent if the entry does not allow it.
    */
   onPersist?: (next: BlockInstance) => void;
-  /** What the charges give the entry: locked, concealed (see `sigilState`). */
-  sigil: SigilState;
+  /** What the blocks do to the entry (interface 6): locked, and which blocks and parts are locked or concealed. */
+  effects: EntryEffects;
   /** Where the block is: its entry and the entry's date (toolkit, `blockContext`). */
   context: BlockContext;
-  /**
-   * Only for a sigil part of a custom block (`SigilPart`): its
-   * element, with the settings from the builder (calculator mode, brush).
-   */
-  part?: ElementDef;
 }
 
 export const BLOCK_VIEWS: ReadonlyMap<string, ComponentType<BlockViewProps>> = new Map<string, ComponentType<BlockViewProps>>([
@@ -59,4 +50,5 @@ export const BLOCK_VIEWS: ReadonlyMap<string, ComponentType<BlockViewProps>> = n
   [CANVAS_BLOCK_TYPE, CanvasBlock],
   [ALTAR_BLOCK_TYPE, CanvasBlock],
   [PAINT_BLOCK_TYPE, PaintBlock],
+  [SIGIL_BLOCK_TYPE, SigilBlock],
 ]);

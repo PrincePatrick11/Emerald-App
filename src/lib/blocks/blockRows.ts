@@ -1,4 +1,4 @@
-import { isRecord } from '../helpers';
+import { isRecord, localIsoDay } from '../helpers';
 import { blockSearchText } from './blockTypes';
 import { BLOCK_ATTR, type BlockInstance } from './types';
 
@@ -51,7 +51,8 @@ export function toBlockRow(block: BlockInstance): BlockRowValues {
     data: null,
     attrs: '{}',
     html: block.html,
-    text: blockSearchText(block),
+    // Everything, concealed or not: the row outlives the day it is written on.
+    text: blockSearchText(block, { today: localIsoDay(), revealAll: true }),
   };
   for (const [name, value] of Object.entries(block.attrs)) {
     if (name === BLOCK_ATTR.version && VERSION_RE.test(value)) row.version = Number(value);

@@ -58,10 +58,9 @@ function RightSidebarActionBar() {
     );
   }
 
-  // A loaded sigil with the "whole entry" lock cannot be edited — the
-  // charge decides, in every entry. The button stays
-  // and says why it does nothing.
-  const locked = !!entry && !!entryBlockSummary(entry).sigil?.lockEntry;
+  // An entry a block locks (a loaded sigil, interface 6) cannot be edited.
+  // The button stays and says why it does nothing.
+  const locked = !!entry && !!entryBlockSummary(entry).effects.lockEntry;
 
   return (
     <EditModeBar

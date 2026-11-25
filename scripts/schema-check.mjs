@@ -670,9 +670,8 @@ console.log('\n7. Seeds: built-in categories, starter set, built-in templates an
     JSON.stringify(starts)
   );
   check(
-    'with calculator, drawing and charge as fields and paint blocks (harness: English name)',
-    t?.name === 'Sigil' && !content.includes('core.sigil.') && content.includes('data-block="core.paint"')
-      && ['sigilCalc', 'sigilCharge'].every((kind) => content.includes(kind)),
+    'with one sigil block (harness: English name)',
+    t?.name === 'Sigil' && (content.match(/data-block="/g) ?? []).length === 1 && content.includes('data-block="core.sigil"'),
     content
   );
   check('the altar template, the start template of "altars"; no other category has one',
@@ -789,7 +788,7 @@ console.log('\n9. Block rows\n');
 {
   const db = await freshVault('blocks.db');
   const [seeded] = await db.select("SELECT COUNT(*) AS n FROM blocks WHERE template_id IN ('core-sigil', 'core-altar')");
-  check('the seeded templates have their block rows', seeded.n >= 4, seeded);
+  check('the seeded templates have their block rows', seeded.n >= 3, JSON.stringify(seeded));
 
   const linked = '44444444-4444-4444-4444-444444444444';
   const chip = `<span data-type="internalLink" class="internal-link" data-id="${linked}" data-target-kind="entry" data-label="Ziel">Ziel</span>`;
@@ -840,10 +839,9 @@ console.log('\n10. Readers of the block rows: "Images", image cleanup, field val
   const name = (c) => `${c.repeat(64)}.png`;
   const [shown, render, layer, tplPic, trashed] = ['1', '2', '3', '4', '5'].map(name);
   const enc = (value) => JSON.stringify(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
-  // A custom block with a drawing part (#107): its render and layer are the drawing.
-  const part = `<section data-block="core.fields" data-block-id="sp" data-block-config="${enc({ elements: [{ id: 'd', kind: 'sigilCanvas', label: '' }] })}"`
-    + ` data-block-data="${enc({ values: { d: { v: 1, layers: [{ id: 'L1', image: true }] } } })}">`
-    + `<dl><dt>Zeichnung</dt><dd data-block-slot="el:d"><img src="${render}" alt="" data-paint="render"><img src="${layer}" alt="" data-paint="L1"></dd></dl></section>`; // lang-ok
+  // A sigil with a drawing part (#107): its render and layer are the drawing.
+  const part = `<section data-block="core.sigil" data-block-id="sp" data-block-data="${enc({ drawing: { v: 1, layers: [{ id: 'L1', image: true }] } })}">`
+    + `<div data-sigil-part="drawing"><img src="${render}" alt="" data-paint="render"><img src="${layer}" alt="" data-paint="L1"></div></section>`;
   const text = `<section data-block="core.text" data-block-id="tx"><p><img src="${shown}"></p></section>`;
   await insertWithStack(db, 'entries', { id: 'u1', title: 'Uses', created_at: now, updated_at: now }, part + text);
   await insertWithStack(db, 'entries', { id: 'u2', title: 'Gone', created_at: now, updated_at: now, deleted_at: now }, `<p><img src="${trashed}"></p>`);
@@ -964,7 +962,7 @@ console.log('\n11. .vault.emerald: the round trip of a vault content, other vers
   };
   const journalStack =
     `<section data-block="core.text" data-block-id="t1"><p>Link ${chipTo(W)}</p><img src="${pic('1')}"></section>`
-    + `<section data-block="core.paint" data-block-id="p1" data-block-config="${attr({ sigil: true })}" data-block-data="${attr({ v: 1, layers: [{ id: 'L1', image: true, strokes: [] }] })}">`
+    + `<section data-block="core.paint" data-block-id="p1" data-block-data="${attr({ v: 1, layers: [{ id: 'L1', image: true, strokes: [] }] })}">`
     + `<img src="${pic('2')}" alt="" data-paint="render"><img src="${pic('3')}" alt="" data-paint="L1"></section>`
     + `<section data-block="core.canvas" data-block-id="c1" data-block-data="${attr(scene)}"><img src="${pic('4')}" alt="" data-canvas="background"></section>`
     + `<section data-block="core.fields" data-block-id="f1" data-block-config="${attr(fieldsConfig)}"></section>`;

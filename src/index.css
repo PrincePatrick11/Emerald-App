@@ -3813,8 +3813,21 @@ html[data-theme] .prop-segment--active {
   color: var(--text-subtle);
 }
 
-/* Sigil blocks: the drawing in read mode, the quiet "hidden until …" row
-   and the charge status. The toolbar uses the existing .sigil-* classes. */
+/* The sigil block: its parts one below the other, each under its small
+   heading; the drawing in read mode, the quiet "hidden until …" row and the
+   charge status. */
+.block-sigil {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.block-sigil-part {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
 .block-sigil-image {
   display: block;
   width: 100%;
@@ -4478,17 +4491,6 @@ html[data-theme] .tasks-category-trigger:hover {
   border-color: var(--field-border-hover);
 }
 
-.sigil-brush-controls {
-  background-color: var(--well-tint);
-  border: 1px solid var(--edge);
-  border-radius: 0.5rem;
-  padding: 0.35rem 0.55rem;
-}
-
-.sigil-brush-slider {
-  width: 8.5rem;
-}
-
 /* The attribute selector outranks the `bg-well-*` and `border-edge` utilities in the callers. */
 html[data-theme] .op-prop-select {
   background: var(--field-bg);
@@ -4935,12 +4937,6 @@ html[data-theme='emerald-noctis'] .tasks-linked-entry:hover {
   background: rgba(0, 122, 77, 0.34);
 }
 
-html[data-theme='emerald-noctis'] .sigil-brush-controls {
-  background: rgba(45, 36, 31, 0.84);
-  border-color: rgba(113, 94, 77, 0.48);
-  color: #d8c8b8;
-}
-
 /* Light mode redesign: stronger structure and readability */
 html[data-theme='emerald-parchment'] .window-control:focus-visible,
 html[data-theme='emerald-parchment'] .rail-button:focus-visible,
@@ -5177,16 +5173,6 @@ html[data-theme='emerald-parchment'] .tasks-linked-entry {
 html[data-theme='emerald-parchment'] .tasks-linked-entry:hover {
   color: #07593b;
   background: #c6e7d7;
-}
-
-html[data-theme='emerald-parchment'] .sigil-brush-controls {
-  background: #eadcc6;
-  border-color: rgba(145, 108, 70, 0.36);
-  color: #5b432d;
-}
-
-html[data-theme='emerald-parchment'] .sigil-brush-slider {
-  accent-color: #159165;
 }
 
 html[data-theme='emerald-parchment'] .input-field[type="date"] {

@@ -4,80 +4,38 @@ import type { TFunction } from 'i18next';
 import { Zap } from 'lucide-react';
 import Button from '../ui/Button';
 import Dropdown from '../ui/Dropdown';
-import { linkFromSlot, parseFields, soleSigilElement, type ElementDef } from '../../lib/blocks/fields';
+import { linkFromSlot } from '../../lib/blocks/fields';
 import {
-  chargeConceals, chargeCovers, isSigilToolType, parseSigilCharge, serializeSigilCharge, sigilUnits,
-  type SigilCharge, type SigilLockScope,
+  chargeConceals, parseSigilCharge, serializeSigilCharge, type SigilChargeData, type SigilLockScope,
 } from '../../lib/blocks/sigil';
-import { blockLabel, elementLabel } from '../../lib/blocks/blockAttrs';
-import { resolveBlockType } from '../../lib/blocks/blockTypes';
 import type { BlockInstance } from '../../lib/blocks/types';
 import { formatIsoDateLong } from '../../lib/formatDate';
 import { localIsoDay } from '../../lib/helpers';
 import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
 import UnknownBlock from './UnknownBlock';
-import BlockCheckbox from './BlockCheckbox';
 import { LinkEditor, LinkTarget } from './BlockLink';
-import type { BlockViewProps } from './blockViews';
-
-type ChargeData = Omit<SigilCharge, 'broken'>;
-
-/** A calculator or a drawing in the entry, as the charge offers it for selection. */
-interface ToolBlock {
-  id: string;
-  label: string;
-}
-
-/** "Block · Part" — or only the block's name where the block is the part (a calculator on its own). */
-function partLabel(t: TFunction, parent: BlockInstance, element: ElementDef): string {
-  const block = blockLabel(t, parent, resolveBlockType(parent));
-  return soleSigilElement(parseFields(parent)) ? block : `${block} · ${elementLabel(t, element)}`;
-}
 
 /**
- * The calculators and drawings of the entry: sigil drawings and parts of
- * fields blocks; those with identical names get their number added.
+ * The sigil's charge: target date, charging technique (a link chip) and what
+ * "loaded" locks. Charging and discharging work in read mode, with
+ * confirmation; loaded, the sigil's calculator and drawing are locked and
+ * concealed until the date (without a date until unloaded), and with the lock
+ * "whole entry" the entry too (`sigilEffect`).
  */
-function toolBlocks(t: TFunction, blocks: readonly BlockInstance[]): ToolBlock[] {
-  const tools = sigilUnits(blocks)
-    .filter(({ block, part }) => isSigilToolType(block.type) && !part?.element.archived)
-    .map(({ block, part }) => ({
-      id: block.id,
-      label: part ? partLabel(t, part.parent, part.element) : blockLabel(t, block, resolveBlockType(block)),
-    }));
-  const total = new Map<string, number>();
-  for (const tool of tools) total.set(tool.label, (total.get(tool.label) ?? 0) + 1);
-  const seen = new Map<string, number>();
-  return tools.map((tool) => {
-    if (total.get(tool.label)! < 2) return tool;
-    const n = (seen.get(tool.label) ?? 0) + 1;
-    seen.set(tool.label, n);
-    return { ...tool, label: `${tool.label} ${n}` };
-  });
-}
-
-/**
- * The sigil's charge: target date, charging technique (a link chip), which
- * calculators and drawings it conceals and what "charged" locks. Charging and
- * discharging work in read mode, with confirmation; charged locks the entry
- * (or only the concealed blocks) and hides them until the date, or without a date
- * until discharged.
- */
-export default function SigilChargeBlock({ block, blocks, isEditing, onBlockChange, onPersist }: BlockViewProps) {
-  const { t } = useTranslation();
-  const charge = parseSigilCharge(block);
-  if (charge.broken) return <UnknownBlock block={block} />;
+export default function SigilCharge({ value, isEditing, onChange, onPersist }: {
+  /** The charge's block-shaped value (`sigilPartBlock(block, 'charge')`). */
+  value: BlockInstance;
+  isEditing: boolean;
+  onChange: (next: BlockInstance) => void;
+  /** Read mode: write at once; absent if the entry allows no change. */
+  onPersist?: (next: BlockInstance) => void;
+}) {
+  const charge = parseSigilCharge(value);
+  if (charge.broken) return <UnknownBlock block={value} />;
   const { broken: _broken, ...data } = charge;
-  const write = (next: ChargeData) => serializeSigilCharge(block, next);
-  const tools = toolBlocks(t, blocks);
-  if (isEditing) return <ChargeEditor charge={data} tools={tools} onChange={(next) => onBlockChange(write(next))} />;
-  return (
-    <ChargeReader
-      charge={data}
-      tools={tools}
-      onPersist={onPersist ? (next) => onPersist(write(next)) : undefined}
-    />
-  );
+  const write = (next: SigilChargeData) => serializeSigilCharge(value, next);
+  if (isEditing) return <ChargeEditor charge={data} onChange={(next) => onChange(write(next))} />;
+  return <ChargeReader charge={data} onPersist={onPersist ? (next) => onPersist(write(next)) : undefined} />;
 }
 
 function Technique({ html, onChange }: { html: string | null; onChange?: (html: string | null) => void }) {
@@ -95,43 +53,8 @@ function Technique({ html, onChange }: { html: string | null; onChange?: (html: 
   );
 }
 
-/**
- * When editing: which calculators and drawings the charge conceals. All
- * checked means "all", including one that is added later.
- */
-function Targets({ charge, tools, onChange }: {
-  charge: ChargeData;
-  tools: ToolBlock[];
-  /** Absent while the sigil is charged: then the selection is fixed. */
-  onChange?: (targets: string[] | null) => void;
-}) {
-  const { t } = useTranslation();
-  const toggle = (id: string, on: boolean) => {
-    const next = tools.filter((tool) => (tool.id === id ? on : chargeCovers(charge, tool.id))).map((tool) => tool.id);
-    onChange?.(next.length === tools.length ? null : next);
-  };
-  return (
-    <div className="block-field">
-      <div className="block-field-label">{t('blocks.sigil.covers')}</div>
-      <div className="block-field-value space-y-1">
-        {tools.length === 0
-          ? <span className="block-field-hint">{t('blocks.sigil.noTools')}</span>
-          : tools.map((tool) => (
-              <BlockCheckbox
-                key={tool.id}
-                checked={chargeCovers(charge, tool.id)}
-                disabled={!onChange}
-                onChange={(on) => toggle(tool.id, on)}
-                label={tool.label}
-              />
-            ))}
-      </div>
-    </div>
-  );
-}
-
 /** The status line: charged or not, and how long the sigil stays concealed. */
-function chargeStatus(t: TFunction, charge: ChargeData, date: string | null): string {
+function chargeStatus(t: TFunction, charge: SigilChargeData, date: string | null): string {
   if (!charge.loaded) return t('blocks.sigil.notLoaded');
   const detail = !date
     ? t('blocks.sigil.hiddenUntilUnloaded')
@@ -141,17 +64,12 @@ function chargeStatus(t: TFunction, charge: ChargeData, date: string | null): st
   return `${t('blocks.sigil.loaded')} · ${detail}`;
 }
 
-function ChargeReader({ charge, tools, onPersist }: {
-  charge: ChargeData;
-  tools: ToolBlock[];
-  onPersist?: (next: ChargeData) => void;
+function ChargeReader({ charge, onPersist }: {
+  charge: SigilChargeData;
+  onPersist?: (next: SigilChargeData) => void;
 }) {
   const { t } = useTranslation();
   const date = charge.revealDate ? formatIsoDateLong(charge.revealDate) : null;
-  // The concealed blocks by name, only if not simply all of them are meant.
-  const covered = charge.targets === null
-    ? null
-    : tools.filter((tool) => chargeCovers(charge, tool.id)).map((tool) => tool.label).join(', ');
 
   return (
     <div className="block-fields">
@@ -160,12 +78,6 @@ function ChargeReader({ charge, tools, onPersist }: {
         <div className="block-field-value">{date ?? <span className="block-field-hint">{t('blocks.sigil.noRevealDate')}</span>}</div>
       </div>
       <Technique html={charge.technique} />
-      {covered !== null && (
-        <div className="block-field">
-          <div className="block-field-label">{t('blocks.sigil.covers')}</div>
-          <div className="block-field-value">{covered || <span className="block-field-hint">—</span>}</div>
-        </div>
-      )}
       <p className={`block-sigil-status ${charge.loaded ? 'block-sigil-status--loaded' : ''}`}>
         <Zap size={12} className="flex-shrink-0" />
         <span>{chargeStatus(t, charge, date)}</span>
@@ -176,7 +88,7 @@ function ChargeReader({ charge, tools, onPersist }: {
 }
 
 /** Charging (optionally after a timer) and discharging, each with confirmation. */
-function ChargeActions({ charge, date, onPersist }: { charge: ChargeData; date: string | null; onPersist: (next: ChargeData) => void }) {
+function ChargeActions({ charge, date, onPersist }: { charge: SigilChargeData; date: string | null; onPersist: (next: SigilChargeData) => void }) {
   const { t } = useTranslation();
   const [confirming, setConfirming] = useState(false);
   const [delayInput, setDelayInput] = useState('0');
@@ -191,7 +103,7 @@ function ChargeActions({ charge, date, onPersist }: { charge: ChargeData; date: 
     if (countdown == null) return;
     if (countdown <= 0) {
       setCountdown(null);
-      latest.current.onPersist({ ...latest.current.charge, loaded: true });
+      setLoaded(true);
       return;
     }
     const timer = window.setTimeout(() => setCountdown((n) => (n == null ? null : n - 1)), 1000);
@@ -225,7 +137,7 @@ function ChargeActions({ charge, date, onPersist }: { charge: ChargeData; date: 
     );
   }
   if (charge.loaded) {
-    // In one row like Charge; alone in the column of `.block-fields` the button would otherwise stretch across the full width.
+    // In a row of its own: alone in the column of `.block-fields` the button would stretch across the full width.
     return (
       <div className="flex items-center gap-2">
         <Button tone="neutral" small onClick={() => setConfirming(true)}>{t('creation.unloadSigil')}</Button>
@@ -252,14 +164,12 @@ function ChargeActions({ charge, date, onPersist }: { charge: ChargeData; date: 
   );
 }
 
-function ChargeEditor({ charge, tools, onChange }: {
-  charge: ChargeData;
-  tools: ToolBlock[];
-  onChange: (next: ChargeData) => void;
+function ChargeEditor({ charge, onChange }: {
+  charge: SigilChargeData;
+  onChange: (next: SigilChargeData) => void;
 }) {
   const { t } = useTranslation();
-  // Charged: date, selection and lock are fixed; a date in the
-  // past or a deselected block would end the concealing.
+  // Charged: date and lock are fixed; a date in the past would end the concealing.
   const fixed = charge.loaded;
   return (
     <div className="block-fields block-fields--edit">
@@ -276,7 +186,6 @@ function ChargeEditor({ charge, tools, onChange }: {
         </div>
       </div>
       <Technique html={charge.technique} onChange={(technique) => onChange({ ...charge, technique })} />
-      <Targets charge={charge} tools={tools} onChange={fixed ? undefined : (targets) => onChange({ ...charge, targets })} />
       <div className="block-field">
         <div className="block-field-label">{t('blocks.sigil.lockScope')}</div>
         <div className="block-field-value">

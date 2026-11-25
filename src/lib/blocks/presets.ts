@@ -1,14 +1,14 @@
 import {
-  Brush, Calendar, ChevronsUpDown, Frame, Hash, Image, Link2, ListChecks, Moon, PenTool, Sparkles, TextCursorInput, ToggleLeft, Type, Zap,
+  Brush, Calendar, ChevronsUpDown, Frame, Hash, Image, Link2, ListChecks, Moon, Sparkles, TextCursorInput, ToggleLeft, Type,
   type LucideIcon,
 } from 'lucide-react';
 import { AltarIcon } from '../altarIcon';
-import { createSigilCalcBlock, createSigilCanvasBlock, createSigilChargeBlock } from './sigil';
+import { createSigilBlock } from './sigil';
 import { createTextBlock } from './blockHtml';
 import { ALTAR_BLOCK_TYPE, createCanvasBlock } from './canvas';
-import { createPaintBlock, isSigilDrawing } from './paint';
+import { createPaintBlock } from './paint';
 import {
-  activeElements, createFieldsBlock, ELEMENT_KINDS, elementKindLabelKey, FIELDS_BLOCK_TYPE, isSigilKind, parseFields,
+  activeElements, createFieldsBlock, ELEMENT_KINDS, elementKindLabelKey, FIELDS_BLOCK_TYPE, parseFields,
   type ElementKind, type FallbackText,
 } from './fields';
 import { instantiateDefinition, type BlockDefinition } from './definitions';
@@ -46,17 +46,12 @@ export const ELEMENT_KIND_ICONS: Record<ElementKind, LucideIcon> = {
   link: Link2,
   image: Image,
   moon: Moon,
-  sigilCalc: Sparkles,
-  sigilCanvas: PenTool,
-  sigilCharge: Zap,
 };
 
 const KIND_GROUPS: Partial<Record<ElementKind, BlockGroup>> = { link: 'reference', image: 'media', moon: 'moon' };
 
-// Text and the sigil parts are not offered as fields of their own: one inserts
-// the text block, and the three sigil presets below (calculator and charge as
-// a fields block with that one part, the drawing as a sigil paint block).
-const FIELD_PRESET_KINDS = ELEMENT_KINDS.filter((kind) => kind !== 'text' && !isSigilKind(kind));
+// Text is not offered as a field of its own: one inserts the text block.
+const FIELD_PRESET_KINDS = ELEMENT_KINDS.filter((kind) => kind !== 'text');
 
 export const BLOCK_PRESETS: readonly BlockPreset[] = [
   { id: 'text', labelKey: 'blocks.types.text.label', descriptionKey: 'blocks.types.text.description', icon: Type, group: 'text', create: () => createTextBlock() },
@@ -70,9 +65,7 @@ export const BLOCK_PRESETS: readonly BlockPreset[] = [
   { id: 'canvas', labelKey: 'blocks.types.canvas.label', descriptionKey: 'blocks.types.canvas.description', icon: Frame, group: 'media', create: () => createCanvasBlock() },
   { id: 'paint', labelKey: 'blocks.types.paint.label', descriptionKey: 'blocks.types.paint.description', icon: Brush, group: 'media', create: createPaintBlock },
   { id: 'altar', labelKey: 'blocks.types.altar.label', descriptionKey: 'blocks.types.altar.description', icon: AltarIcon, group: 'media', create: () => createCanvasBlock(ALTAR_BLOCK_TYPE) },
-  { id: 'sigil.calc', labelKey: 'blocks.types.sigilCalc.label', descriptionKey: 'blocks.types.sigilCalc.description', icon: Sparkles, group: 'sigil', create: createSigilCalcBlock },
-  { id: 'sigil.canvas', labelKey: 'blocks.types.sigilCanvas.label', descriptionKey: 'blocks.types.sigilCanvas.description', icon: PenTool, group: 'sigil', create: createSigilCanvasBlock },
-  { id: 'sigil.charge', labelKey: 'blocks.types.sigilCharge.label', descriptionKey: 'blocks.types.sigilCharge.description', icon: Zap, group: 'sigil', create: createSigilChargeBlock },
+  { id: 'sigil', labelKey: 'blocks.types.sigil.label', descriptionKey: 'blocks.types.sigil.description', icon: Sparkles, group: 'sigil', create: createSigilBlock },
 ];
 
 const DEFINITION_PRESET_PREFIX = 'def:';
@@ -109,6 +102,5 @@ export function blockIcon(block: BlockInstance, meta: BlockTypeDef | undefined):
     const elements = activeElements(model);
     if (elements.length === 1) return ELEMENT_KIND_ICONS[elements[0].kind];
   }
-  if (meta && isSigilDrawing(block)) return ELEMENT_KIND_ICONS.sigilCanvas;
   return meta?.icon;
 }

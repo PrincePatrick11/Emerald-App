@@ -21,14 +21,11 @@ import { useFieldFallbackText } from './useFieldFallbackText';
 import { REORDER_SPRING } from '../../lib/motion';
 import { flashReveal, scrollIntoViewCentered } from '../../lib/reveal';
 import { createTextBlock, neutralizeSectionTags, parseBlocks, serializeBlocks } from '../../lib/blocks/blockHtml';
-import { resolveBlockType, upgradeBlock, withDuplicatedBlock, type BlockTypeDef } from '../../lib/blocks/blockTypes';
+import { entryEffects, resolveBlockType, upgradeBlock, withDuplicatedBlock, type BlockTypeDef } from '../../lib/blocks/blockTypes';
 import { blockContext } from '../../lib/blocks/toolkit';
 import { findEntry, useEntryStore } from '../../store/entryStore';
 import { blockIcon, createFromPreset } from '../../lib/blocks/presets';
 import { useBlockDefinitionStore } from '../../store/blockDefinitionStore';
-import {
-  SIGIL_CHARGE_KIND, withChargesCoveringOnly, sigilState, sigilUnits, withoutConcealedParts,
-} from '../../lib/blocks/sigil';
 import { blockLabel, hiddenAttrValue, isBlockHidden, showsTitleInRead, withBlockAttr } from '../../lib/blocks/blockAttrs';
 import { BLOCK_ATTR, TEXT_BLOCK_TYPE, type BlockAttrName, type BlockInstance } from '../../lib/blocks/types';
 import { useBlockSessionStore, type BlockStackApi } from '../../store/blockSessionStore';
@@ -148,8 +145,8 @@ export default function BlockStack({
 
   const resetEpoch = useExternalContentReset(initialContent, isEditing, blocksRef, setBlocks, onChangeRef);
 
-  // Locked and concealed come from the sigil's charges; all blocks see the same state.
-  const sigil = useMemo(() => sigilState(blocks, localIsoDay()), [blocks]);
+  // What the blocks do to the entry (a loaded sigil: locked, concealed); all blocks see the same state.
+  const effects = useMemo(() => entryEffects(blocks, { today: localIsoDay() }), [blocks]);
 
   const definitions = useBlockDefinitionStore((s) => s.definitions);
 
@@ -314,8 +311,7 @@ export default function BlockStack({
   const duplicate = (id: string) => {
     if (!blocksRef.current.some((b) => b.id === id)) return;
     const id2 = generateId();
-    // Each type says how it copies and takes a copy in (a charged sigil stays
-    // charged). The sidebar passes through here as well.
+    // Each type says how it copies (a charged sigil stays charged). The sidebar passes through here as well.
     commit(withDuplicatedBlock(blocksRef.current, id, id2));
     selectNew(id2);
   };
@@ -388,16 +384,15 @@ export default function BlockStack({
   const applyTemplate = (template: Template) => {
     if (!templateTarget || !isEditing) return;
     const added = instantiateTemplateBlocks(template);
-    // Appended, its sigil conceals only its own calculators and drawings.
-    const next = areBlocksEmpty(blocksRef.current) ? added : [...blocksRef.current, ...withChargesCoveringOnly(added)];
+    const next = areBlocksEmpty(blocksRef.current) ? added : [...blocksRef.current, ...added];
     commit(next.length > 0 ? next : [createTextBlock()]);
     const { flush } = templateTarget;
     // Save the deferred input first: title and tags are checked against the store.
     void flush()
       .then(() => applyTemplateFields(entryId, template))
       .then(() => {
-        // A loaded sigil that locks the entry ends the edit: the entry can only be read until it is unloaded.
-        if (!sigilState(blocksRef.current, localIsoDay()).lockEntry) return;
+        // A block that locks the entry (a loaded sigil) ends the edit: the entry can only be read until it is lifted.
+        if (!entryEffects(blocksRef.current, { today: localIsoDay() }).lockEntry) return;
         const { activeView, setActiveView } = useUIStore.getState();
         if (activeView.id === entryId) setActiveView({ ...activeView, mode: 'view', isNew: undefined });
       })
@@ -512,24 +507,22 @@ export default function BlockStack({
 
   const renderBody = (block: BlockInstance, meta: BlockTypeDef | undefined) => {
     const View = meta ? BLOCK_VIEWS.get(meta.id) : undefined;
-    // The fallback shows stored HTML, without what a sigil conceals.
-    if (!View) return <UnknownBlock block={withoutConcealedParts(block, sigil.concealed)} />;
+    // A block another one conceals as a whole is not shown (a block conceals its own parts in its view).
+    if (effects.concealed.has(block.id)) return null;
+    if (!View) return <UnknownBlock block={block} />;
     return (
       <BlockErrorBoundary block={block}>
         <View
           block={block}
-          blocks={blocks}
           isEditing={isEditing}
           onHtmlChange={(html) => updateHtml(block.id, html)}
           onBlockChange={(next) => updateBlock(block.id, next)}
-          // Locked "whole entry": no change even from read mode;
-          // discharging only works via the charge itself (which never locks itself out).
-          // A custom block with a charge part may write; it then itself
-          // allows only the charge (FieldsBlock).
-          onPersist={!isEditing && onReadModeChange && (!sigil.lockEntry || holdsCharge(block))
+          // A locked entry: no change even from read mode — except by the block
+          // that locks it, so the lock can be lifted where it was set (unloading).
+          onPersist={!isEditing && onReadModeChange && (!effects.lockEntry || effects.lockedBy.has(block.id))
             ? (next) => persistRead(block.id, next)
             : undefined}
-          sigil={sigil}
+          effects={effects}
           context={blockCtx}
         />
       </BlockErrorBoundary>
@@ -621,11 +614,6 @@ function isFirstVisibleItem(el: Element): boolean {
 /** The key of a view's action handler. */
 function actionKey(blockId: string, actionId: string): string {
   return `${blockId}\u0000${actionId}`;
-}
-
-/** Does the block hold a charge (a charge on its own or the part of a custom block)? */
-function holdsCharge(block: BlockInstance): boolean {
-  return sigilUnits([block]).some((u) => u.block.type === SIGIL_CHARGE_KIND);
 }
 
 /**

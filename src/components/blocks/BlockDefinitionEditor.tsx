@@ -13,7 +13,7 @@ import { useBlockDraftStore, type DefinitionDraft } from '../../store/draftStore
 import { useDraftPage } from '../../hooks/useDraftPage';
 import { useShrunkIcon } from '../../hooks/useShrunkIcon';
 import {
-  canBeEmpty, defaultFromSlot, ELEMENT_KINDS, elementKindLabelKey, isSigilKind, isSlotKind, slotFromDefault,
+  canBeEmpty, defaultFromSlot, ELEMENT_KINDS, elementKindLabelKey, isSlotKind, slotFromDefault,
   type ElementDef, type ElementKind, type FieldValue, type LinkCategoryFilter, normalizeLinkCategoryFilter,
 } from '../../lib/blocks/fields';
 import { categoryLabel } from '../../lib/categories';
@@ -29,7 +29,6 @@ import OptionsEditor from './OptionsEditor';
 import BlockCheckbox from './BlockCheckbox';
 import FieldValueEditor from './FieldValueEditor';
 import FieldSlotEditor from './FieldSlotEditor';
-import SigilPartSettings from './SigilPartSettings';
 
 const draftOf = (d: DefinitionDraft): DefinitionDraft => ({
   name: d.name, icon: d.icon, elements: d.elements, display: d.display,
@@ -158,7 +157,6 @@ export default function BlockDefinitionEditor({ definition, onClose, onDelete, i
               <ElementRow
                 key={element.id}
                 element={element}
-                siblings={draft.elements}
                 blockHidesEmpty={draft.display.readHideEmpty}
                 onPatch={(p) => patchElement(element.id, p)}
                 onRemove={() => removeElement(element.id)}
@@ -177,10 +175,8 @@ export default function BlockDefinitionEditor({ definition, onClose, onDelete, i
   );
 }
 
-function ElementRow({ element, siblings, blockHidesEmpty, onPatch, onRemove }: {
+function ElementRow({ element, blockHidesEmpty, onPatch, onRemove }: {
   element: ElementDef;
-  /** The visible elements of the block; the charge picks from them what it conceals. */
-  siblings: readonly ElementDef[];
   blockHidesEmpty: boolean;
   onPatch: (p: Partial<ElementDef>) => void;
   onRemove: () => void;
@@ -241,9 +237,7 @@ function ElementRow({ element, siblings, blockHidesEmpty, onPatch, onRemove }: {
         )}
         {element.kind === 'link' && <LinkCategoriesEditor element={element} onPatch={onPatch} />}
         {/* Text has no default: it would be markup in the definition. */}
-        {isSigilKind(element.kind)
-          ? <SigilPartSettings element={element} siblings={siblings} onPatch={onPatch} />
-          : element.kind !== 'text' && <PrefillEditor element={element} onPatch={onPatch} />}
+        {element.kind !== 'text' && <PrefillEditor element={element} onPatch={onPatch} />}
       </div>
     </Reorder.Item>
   );

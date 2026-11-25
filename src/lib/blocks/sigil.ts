@@ -1,72 +1,160 @@
-import { escapeHtml } from '../internalLinkHtml';
+import { decodeHtmlAttr, escapeHtml } from '../internalLinkHtml';
 import { generateId } from '../helpers';
-import { neutralizeSectionTags, parseBlocks, serializeBlocks } from './blockHtml';
-import {
-  DEFAULT_DISPLAY, FIELDS_BLOCK_TYPE, isSigilElement, SIGIL_CALC_ELEMENT_ID, SIGIL_CHARGE_ELEMENT_ID, parseFields, withElementValue, withoutElementContent,
-  type ElementDef, type FieldsModel, type SigilElement, type SigilElementKind,
-} from './fields';
-import { createSigilDrawingBlock, isSigilDrawing, PAINT_BLOCK_TYPE } from './paint';
+import { neutralizeSectionTags } from './blockHtml';
 import { readBlockData, withBlockData } from './blockJson';
-import { BLOCK_ATTR, type BlockInstance } from './types';
+import type { BlockEntryEffect, BlockSettingDef } from './blockType';
+import { readBlockSettings } from './toolkit';
+import { BLOCK_ATTR, type BlockInstance, type BlockTypeId } from './types';
 
 /**
- * A sigil: calculator, drawing, charge.
- * - Calculator (field kind `sigilCalc`): intention, letter bank, implemented letters.
- * - Drawing: a paint block marked as a sigil drawing (`isSigilDrawing`), or
- *   the drawing part of a custom block (field kind `sigilCanvas`) — the
- *   paint document of `lib/blocks/paint.ts` either way.
- * - Charge (field kind `sigilCharge`): loaded, target date, charging technique
- *   (as a link chip in the markup), what "loaded" locks and which calculators
- *   and drawings it conceals.
+ * The sigil block (`core.sigil`): calculator, drawing and charge as the
+ * parts of one block, each switched on or off in the block's settings
+ * (`SIGIL_SETTINGS`, interface 14).
  *
- * Calculator and charge are always elements of a fields block — on their own a
- * fields block with that one element, as every single field is. A part is
- * read as a virtual block with the ID `<block ID>:<element ID>` and the field
- * kind as its type (`sigilUnits`); a sigil drawing block is a unit of its own.
- * Loading, concealing and locking do not distinguish where a unit sits.
+ * - Calculator: intention, letter bank, implemented letters (`sigilCalc.ts`).
+ * - Drawing: the paint document of `lib/blocks/paint.ts`.
+ * - Charge: loaded, target date, charging technique (a link chip), and what
+ *   "loaded" locks — the whole entry or only this sigil.
  *
- * The state of the entry — locked, which blocks are concealed — results
- * from the charges (`sigilState`), not from the "Sigils" category.
+ * A loaded charge acts on the entry through the block's effect (interface
+ * 6, `sigilEffect`): it locks calculator and drawing of its own block, and
+ * conceals them until the target date (or, without one, until unloaded); with
+ * the lock "whole entry" the entry cannot be edited. What concealed means for
+ * search and export the block's other interfaces say (`kinds/sigil.ts`).
  *
- * Pure and DOM-free like the rest of `lib/blocks`: the migration uses it.
+ * Where things are — as for every block: each part keeps its data JSON under
+ * its name in the block's data JSON, and its markup (the readable version of
+ * the calculator, the drawing's pictures, the technique's chip) in a slot of
+ * the inner HTML, `<div data-sigil-part="…">`. Each part is read and written
+ * as a block of its own (`sigilPartBlock`, `withSigilPart`), under the ID
+ * `<block ID>:<part>` — the ID the effect locks and conceals. A part switched
+ * off keeps what it holds.
+ *
+ * Pure and DOM-free like the rest of `lib/blocks`.
  */
 
-/** The virtual block types of the parts: the field kinds themselves. */
-const SIGIL_CALC_KIND = 'sigilCalc' satisfies SigilElementKind;
-export const SIGIL_CANVAS_KIND = 'sigilCanvas' satisfies SigilElementKind;
-export const SIGIL_CHARGE_KIND = 'sigilCharge' satisfies SigilElementKind;
+export const SIGIL_BLOCK_TYPE = 'core.sigil' satisfies BlockTypeId;
 
-// A sigil part appears in the config JSON of a field block. Deliberately only
-// the kind name, without quotes: those are entity-encoded in the attribute, and
-// imported content may encode them differently (`&#34;`, single
-// quotes) — a pre-filter that is too narrow would let concealed parts through.
-const SIGIL_ELEMENT_MARKERS = [SIGIL_CALC_KIND, SIGIL_CANVAS_KIND, SIGIL_CHARGE_KIND];
+export const SIGIL_PARTS = ['calc', 'drawing', 'charge'] as const;
+export type SigilPartName = (typeof SIGIL_PARTS)[number];
 
-/** Can the content carry a sigil (part or sigil drawing)? The pre-filter before parsing. */
-export function mayHoldSigil(content: string): boolean {
-  return SIGIL_ELEMENT_MARKERS.some((m) => content.includes(m))
-    || (content.includes(PAINT_BLOCK_TYPE) && content.includes('sigil'));
+/** The parts as the block's settings: one switch each, all on to start with. */
+export const SIGIL_SETTINGS: readonly BlockSettingDef[] = SIGIL_PARTS.map((part) => ({
+  key: part,
+  labelKey: `blocks.types.sigil.parts.${part}`,
+  kind: 'toggle',
+  initial: true,
+}));
+
+/** The ID under which a part is locked and concealed. */
+export function sigilPartId(blockId: string, part: SigilPartName): string {
+  return `${blockId}:${part}`;
 }
 
-/** Can the content carry a charge? Without a charge nothing is concealed or locked. */
-function mayHoldCharge(content: string): boolean {
-  return content.includes(SIGIL_CHARGE_KIND);
+/* ---------------- The block's model ---------------- */
+
+interface SigilModel {
+  /** The data JSON is unreadable: such a block is shown as an unknown one and never written. */
+  broken: boolean;
+  data: Record<string, unknown>;
+  slots: Partial<Record<SigilPartName, string>>;
+}
+
+// Only the opening tag is a regex, with bounded attribute sections; its end is
+// found with one `indexOf`. Matching up to `</div>` in the regex itself would
+// take quadratic time on foreign markup with opening tags and no closing one.
+// A slot never holds a `</div>` — escaped text, `<img>` tags and a link chip.
+const SLOT_OPEN_RE = /<div\b[^<>]{0,256}?\bdata-sigil-part="([^"]{1,32})"[^<>]{0,256}>/gi;
+
+/**
+ * The inner markup of each element `open` matches, up to the first `close`
+ * after it — in linear time: without a closing tag after this point there is
+ * none after any later one either.
+ */
+function* taggedSlots(html: string, open: RegExp, close: string): Generator<[string, string]> {
+  const lower = html.toLowerCase();
+  const re = new RegExp(open.source, 'gi');
+  for (let m = re.exec(html); m; m = re.exec(html)) {
+    const end = lower.indexOf(close, re.lastIndex);
+    if (end < 0) return;
+    yield [m[1] ?? '', html.slice(re.lastIndex, end)];
+    re.lastIndex = end + close.length;
+  }
+}
+
+const modelCache = new WeakMap<BlockInstance, SigilModel>();
+
+function isPartName(name: string): name is SigilPartName {
+  return (SIGIL_PARTS as readonly string[]).includes(name);
+}
+
+function parseSigil(block: BlockInstance): SigilModel {
+  const cached = modelCache.get(block);
+  if (cached) return cached;
+  const { broken, data } = readBlockData(block);
+  const slots: SigilModel['slots'] = {};
+  for (const [name, inner] of taggedSlots(block.html, SLOT_OPEN_RE, '</div>')) {
+    const part = decodeHtmlAttr(name);
+    if (isPartName(part) && inner.trim()) slots[part] = inner;
+  }
+  const model = { broken, data, slots };
+  modelCache.set(block, model);
+  return model;
+}
+
+/** Is the block's stored data unreadable? Then it is shown as a fallback and left as it is. */
+export function isSigilBroken(block: BlockInstance): boolean {
+  return parseSigil(block).broken;
+}
+
+/** One part as a block of its own: its data JSON and its slot's markup. */
+export function sigilPartBlock(block: BlockInstance, part: SigilPartName): BlockInstance {
+  const { data, slots } = parseSigil(block);
+  const value = data[part];
+  return {
+    id: sigilPartId(block.id, part),
+    type: `sigil.${part}`,
+    html: slots[part] ?? '',
+    attrs: value !== undefined ? { [BLOCK_ATTR.data]: JSON.stringify(value) } : {},
+  };
+}
+
+/** The block with one part written back; without data JSON the part's value goes (an emptied drawing). */
+export function withSigilPart(block: BlockInstance, part: SigilPartName, next: BlockInstance): BlockInstance {
+  const { data, slots } = parseSigil(block);
+  const raw = next.attrs[BLOCK_ATTR.data];
+  const nextData = { ...data };
+  if (raw !== undefined) nextData[part] = JSON.parse(raw) as unknown;
+  else delete nextData[part];
+  const nextSlots = { ...slots, [part]: next.html };
+  const html = SIGIL_PARTS
+    .filter((p) => nextSlots[p])
+    // Defused like editor HTML: a `<section` in a slot must not nest the block format.
+    .map((p) => `<div data-sigil-part="${p}">${neutralizeSectionTags(nextSlots[p]!)}</div>`)
+    .join('');
+  return withBlockData(block, nextData, html);
 }
 
 /**
- * Is a unit of `sigilUnits` a drawing (a sigil drawing block or a drawing part)?
- * Only for the type of a unit: a plain paint block is never one, `sigilUnits` leaves it out.
+ * Which parts the block shows: those switched on — and the charge while it
+ * is loaded, whatever its switch says, so a loaded sigil can always be
+ * unloaded and its effect never hangs on a part one cannot see.
  */
-function isDrawingUnitType(type: string): boolean {
-  return type === SIGIL_CANVAS_KIND || type === PAINT_BLOCK_TYPE;
+export function shownSigilParts(block: BlockInstance): Record<SigilPartName, boolean> {
+  const settings = readBlockSettings(block, SIGIL_SETTINGS);
+  const charge = parseSigilCharge(sigilPartBlock(block, 'charge'));
+  return {
+    calc: settings.calc === true,
+    drawing: settings.drawing === true,
+    charge: settings.charge === true || (!charge.broken && charge.loaded),
+  };
 }
 
-/** Calculator and drawing — what a loaded sigil conceals and locks. For the type of a unit (`sigilUnits`). */
-export function isSigilToolType(type: string): boolean {
-  return type === SIGIL_CALC_KIND || isDrawingUnitType(type);
+export function createSigilBlock(): BlockInstance {
+  return { id: generateId(), type: SIGIL_BLOCK_TYPE, html: '', attrs: {} };
 }
 
-/* ---------------- Date and text ---------------- */
+/* ---------------- Charge ---------------- */
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -74,75 +162,7 @@ function isIsoDate(value: unknown): value is string {
   return typeof value === 'string' && ISO_DATE.test(value);
 }
 
-/** Plain text as paragraphs, one line per `<p>`, escaped. */
-function textParagraphs(text: string): string {
-  return text.split('\n').map((line) => `<p>${escapeHtml(line)}</p>`).join('');
-}
-
-/* ---------------- Calculator ---------------- */
-
-export interface SigilCalc {
-  broken: boolean;
-  intention: string;
-  /** The letter bank: each letter once, in order of first appearance. */
-  letters: string[];
-  /** Those of them already implemented in the drawing. */
-  implemented: string[];
-}
-
-/**
- * A letter list from a foreign source: only short strings, at most
- * 500. The limit protects against doctored imports — a bank of
- * hundreds of thousands of entries would otherwise cripple migration and rendering.
- */
-export function letterList(value: unknown): string[] {
-  return Array.isArray(value)
-    ? value.filter((l): l is string => typeof l === 'string' && l.length > 0 && l.length <= 8).slice(0, 500)
-    : [];
-}
-
-/** Each letter once, uppercased, without accents — as the sigil view always did. */
-export function extractUniqueLetters(input: string): string[] {
-  const seen = new Set<string>();
-  const result: string[] = [];
-  for (const char of input.normalize('NFKD').toUpperCase()) {
-    if (!/\p{L}/u.test(char) || seen.has(char)) continue;
-    seen.add(char);
-    result.push(char);
-  }
-  return result;
-}
-
-/** Only what is also in the bank. */
-export function implementedIn(letters: readonly string[], implemented: readonly string[]): string[] {
-  const bank = new Set(letters);
-  return implemented.filter((l) => bank.has(l));
-}
-
-export function parseSigilCalc(block: BlockInstance): SigilCalc {
-  const { broken, data } = readBlockData(block);
-  const letters = letterList(data.letters);
-  return {
-    broken,
-    intention: typeof data.intention === 'string' ? data.intention : '',
-    letters,
-    implemented: implementedIn(letters, letterList(data.implemented)),
-  };
-}
-
-/** The calculator with new data; the inner HTML is the readable fallback (intention, letters). */
-export function serializeSigilCalc(block: BlockInstance, calc: Omit<SigilCalc, 'broken'>): BlockInstance {
-  const done = new Set(calc.implemented);
-  const intention = calc.intention.trim() ? textParagraphs(calc.intention) : '';
-  const letters = calc.letters.length
-    ? `<p>${calc.letters.map((l) => (done.has(l) ? `<s>${escapeHtml(l)}</s>` : escapeHtml(l))).join(' ')}</p>`
-    : '';
-  return withBlockData(block, { intention: calc.intention, letters: calc.letters, implemented: calc.implemented }, intention + letters);
-}
-
-/* ---------------- Charge ---------------- */
-
-/** What a loaded sigil locks: the whole entry (as before) or only the concealed calculators and drawings. */
+/** What a loaded sigil locks: the whole entry, or only its own calculator and drawing. */
 export type SigilLockScope = 'entry' | 'sigil';
 
 export interface SigilCharge {
@@ -153,61 +173,31 @@ export interface SigilCharge {
   lock: SigilLockScope;
   /** Inner HTML of the charging technique slot (a link chip) — or `null`. */
   technique: string | null;
-  /**
-   * The block IDs of the calculators and drawings that this charge conceals —
-   * `null` means all in the entry, including ones added later (that is how
-   * every charge behaved before one could choose).
-   */
-  targets: string[] | null;
 }
 
-// A block ID, or `<block ID>:<element ID>` for the part of a custom block.
-const TARGET_ID_RE = /^[\w-]{1,64}(?::[\w-]{1,64})?$/;
+export type SigilChargeData = Omit<SigilCharge, 'broken'>;
 
-/** Block IDs from a foreign source: only short, harmless strings, at most 100. */
-function targetList(value: unknown): string[] | null {
-  if (!Array.isArray(value)) return null;
-  const ids = value.filter((id): id is string => typeof id === 'string' && TARGET_ID_RE.test(id));
-  return [...new Set(ids)].slice(0, 100);
-}
+// As the slots: the opening tag with bounded attribute sections, its end by `indexOf`
+// (it runs for every card, on markup that may come from an import).
+const TECHNIQUE_OPEN_RE = /<p\b[^<>]{0,256}?\bdata-block-slot="technique"[^<>]{0,256}>/i;
 
-// The attribute sections are bounded: unbounded, the regex would run quadratically on
-// doctored markup ("<p " hundreds of thousands of times) — and it runs for every card.
-const TECHNIQUE_RE = /<p\b[^<>]{0,256}?\bdata-block-slot="technique"[^<>]{0,256}>([\s\S]*?)<\/p>/i;
-
-export function parseSigilCharge(block: BlockInstance): SigilCharge {
-  const { broken, data } = readBlockData(block);
-  const technique = TECHNIQUE_RE.exec(block.html)?.[1];
+/** The charge, read from its part block (`sigilPartBlock(block, 'charge')`). */
+export function parseSigilCharge(part: BlockInstance): SigilCharge {
+  const { broken, data } = readBlockData(part);
+  const technique = taggedSlots(part.html, TECHNIQUE_OPEN_RE, '</p>').next().value?.[1];
   return {
     broken,
     loaded: data.loaded === true,
     revealDate: isIsoDate(data.revealDate) ? data.revealDate : null,
     lock: data.lock === 'sigil' ? 'sigil' : 'entry',
     technique: technique?.trim() ? technique : null,
-    targets: targetList(data.targets),
   };
 }
 
-export function serializeSigilCharge(block: BlockInstance, charge: Omit<SigilCharge, 'broken'>): BlockInstance {
+export function serializeSigilCharge(part: BlockInstance, charge: SigilChargeData): BlockInstance {
   const date = charge.revealDate ? `<p>${escapeHtml(charge.revealDate)}</p>` : '';
-  // Defused like editor HTML: a `<section` in the chip must not nest the block format.
   const technique = charge.technique ? `<p data-block-slot="technique">${neutralizeSectionTags(charge.technique)}</p>` : '';
-  const data: Record<string, unknown> = { loaded: charge.loaded, revealDate: charge.revealDate, lock: charge.lock };
-  if (charge.targets) data.targets = charge.targets;
-  return withBlockData(block, data, date + technique);
-}
-
-/**
- * The charge's target date, for the info line, the properties panel and
- * sorting (the fields block hands it on, `kinds/fields.ts`) — `null` for an
- * element that is no charge or a broken one; `iso: null` for a charge
- * without a date.
- */
-export function chargeTargetDate(block: BlockInstance, element: ElementDef, model: FieldsModel): { iso: string | null; loaded: boolean } | null {
-  if (!isSigilElement(element)) return null;
-  const charge = parseSigilCharge(sigilPartBlock(block, element, model));
-  if (charge.broken) return null;
-  return { iso: charge.revealDate || null, loaded: charge.loaded };
+  return withBlockData(part, { loaded: charge.loaded, revealDate: charge.revealDate, lock: charge.lock }, date + technique);
 }
 
 /** Does the charge currently conceal: loaded, and the target date has not been reached (or there is none). */
@@ -215,244 +205,38 @@ export function chargeConceals(charge: Pick<SigilCharge, 'loaded' | 'revealDate'
   return charge.loaded && (!charge.revealDate || charge.revealDate > today);
 }
 
-/** Does this charge conceal the calculator or drawing with this ID? */
-export function chargeCovers(charge: Pick<SigilCharge, 'targets'>, blockId: string): boolean {
-  return charge.targets === null || charge.targets.includes(blockId);
+/** The block's charge if it shows one and can read it — else `null`. */
+function shownCharge(block: BlockInstance): SigilCharge | null {
+  if (parseSigil(block).broken || !shownSigilParts(block).charge) return null;
+  const charge = parseSigilCharge(sigilPartBlock(block, 'charge'));
+  return charge.broken ? null : charge;
 }
 
-/* ---------------- Parts ---------------- */
-
-/** The ID under which a part is tracked as a sigil — also the target that a charge stores. */
-export function sigilPartId(blockId: string, elementId: string): string {
-  return `${blockId}:${elementId}`;
+/**
+ * The target date for the info line, the panel and sorting — `null` without a
+ * charge; `iso: null` for a charge without a date.
+ */
+export function sigilTargetDate(block: BlockInstance): { iso: string | null; loaded: boolean } | null {
+  const charge = shownCharge(block);
+  return charge ? { iso: charge.revealDate, loaded: charge.loaded } : null;
 }
 
-/** The part as a virtual block: the field kind as its type, its value as data JSON, its slot as inner HTML. */
-export function sigilPartBlock(
-  block: BlockInstance,
-  element: SigilElement,
-  model: FieldsModel,
-): BlockInstance {
-  const value = model.values[element.id];
+/* ---------------- Effect on the entry (6) ---------------- */
+
+/**
+ * What the block's charge does to the entry: while loaded it locks the
+ * block's calculator and drawing (and, with the lock "whole entry", the
+ * entry), and until the target date it conceals them. An unreadable block
+ * does nothing — as an unreadable charge never did.
+ */
+export function sigilEffect(block: BlockInstance, today: string): BlockEntryEffect {
+  if (parseSigil(block).broken) return {};
+  const charge = parseSigilCharge(sigilPartBlock(block, 'charge'));
+  if (charge.broken || !charge.loaded) return {};
+  const tools = [sigilPartId(block.id, 'calc'), sigilPartId(block.id, 'drawing')];
   return {
-    id: sigilPartId(block.id, element.id),
-    type: element.kind,
-    html: model.slots[element.id] ?? '',
-    attrs: value !== undefined ? { [BLOCK_ATTR.data]: JSON.stringify(value) } : {},
+    lockEntry: charge.lock === 'entry',
+    locked: tools,
+    concealed: chargeConceals(charge, today) ? new Map(tools.map((id) => [id, charge.revealDate])) : undefined,
   };
-}
-
-/** Back into the model: data JSON as value, inner HTML as slot (empty = no slot). */
-export function withSigilPart(model: FieldsModel, element: ElementDef, part: BlockInstance): FieldsModel {
-  const values = { ...model.values };
-  const slots = { ...model.slots };
-  const raw = part.attrs[BLOCK_ATTR.data];
-  // Without data JSON the value goes too: an emptied drawing drops its document.
-  if (raw !== undefined) values[element.id] = JSON.parse(raw) as Record<string, unknown>;
-  else delete values[element.id];
-  if (part.html) slots[element.id] = part.html;
-  else delete slots[element.id];
-  return { ...model, values, slots };
-}
-
-/** A sigil of the entry: a sigil drawing block, or the part of a fields block (then with element and field block). */
-interface SigilUnit {
-  block: BlockInstance;
-  part?: { parent: BlockInstance; element: ElementDef };
-}
-
-/**
- * All sigils of the entry in stack order: sigil drawing blocks, and parts as virtual blocks.
- * Archived calculators and drawings count — their content is still in the
- * block and must stay concealed; an archived charge does not, it could
- * no longer be unloaded anywhere.
- */
-export function sigilUnits(blocks: readonly BlockInstance[]): SigilUnit[] {
-  const units: SigilUnit[] = [];
-  for (const block of blocks) {
-    if (isSigilDrawing(block)) {
-      units.push({ block });
-      continue;
-    }
-    if (block.type !== FIELDS_BLOCK_TYPE) continue;
-    const model = parseFields(block);
-    if (model.broken) continue;
-    for (const element of model.elements) {
-      if (!isSigilElement(element) || (element.archived && element.kind === 'sigilCharge')) continue;
-      units.push({ block: sigilPartBlock(block, element, model), part: { parent: block, element } });
-    }
-  }
-  return units;
-}
-
-/* ---------------- State of the entry ---------------- */
-
-export interface SigilState {
-  /** A loaded charge with the "whole entry" lock: no editing, no change from read mode. */
-  lockEntry: boolean;
-  /**
-   * The concealed calculators and drawings — block ID → the date until which
-   * they stay concealed (`null`: until unloaded). Concealed while editing too,
-   * otherwise "Edit" (lock "sigil only") would show them prematurely.
-   */
-  concealed: ReadonlyMap<string, string | null>;
-  /** Calculators and drawings that a loaded charge makes read-only even while editing. */
-  locked: ReadonlySet<string>;
-}
-
-/**
- * Rewrite the targets of every charge in the block (the charge parts of a
- * fields block). `map` receives each target (block ID or
- * `<block ID>:<element ID>`) and returns the new one, or several; if none
- * changes, the charge is left untouched.
- */
-export function withMappedChargeTargets(block: BlockInstance, map: (target: string) => string | readonly string[]): BlockInstance {
-  return withChargesRewritten(block, (charge) => {
-    if (!charge.targets) return null;
-    const before = charge.targets;
-    const targets = before.flatMap(map);
-    return targets.length !== before.length || targets.some((id, i) => id !== before[i]) ? targets : null;
-  });
-}
-
-/**
- * Blocks that join an entry which already has content (a template appended):
- * a charge covering "every sigil in the entry" (`targets: null`) covers only
- * the calculators and drawings among these blocks — it would otherwise
- * conceal what the entry already held.
- */
-export function withChargesCoveringOnly(blocks: readonly BlockInstance[]): BlockInstance[] {
-  const tools = sigilUnits(blocks).filter(({ block }) => isSigilToolType(block.type)).map(({ block }) => block.id);
-  return blocks.map((block) => withChargesRewritten(block, (charge) => (charge.targets ? null : tools)));
-}
-
-/** Every charge part of the block with the targets `rewrite` returns; `null` leaves a charge as it is. */
-function withChargesRewritten(block: BlockInstance, rewrite: (charge: SigilCharge) => string[] | null): BlockInstance {
-  let result = block;
-  for (const unit of sigilUnits([block])) {
-    if (!unit.part || unit.block.type !== SIGIL_CHARGE_KIND) continue;
-    const charge = parseSigilCharge(unit.block);
-    if (charge.broken) continue;
-    const targets = rewrite(charge);
-    if (!targets) continue;
-    const next = serializeSigilCharge(unit.block, { ...charge, targets });
-    result = withElementValue(result, unit.part.element.id, JSON.parse(next.attrs[BLOCK_ATTR.data]));
-  }
-  return result;
-}
-
-/**
- * A block was duplicated: a charge in `block` that conceals the original (or
- * parts of it) also conceals the copy. A loaded sigil stays loaded
- * when duplicated — and the copy does not show what the original conceals.
- */
-export function withChargesCoveringCopy(block: BlockInstance, oldId: string, newId: string): BlockInstance {
-  const from = `${oldId}:`;
-  return withMappedChargeTargets(block, (id) => {
-    if (id === oldId) return [id, newId];
-    return id.startsWith(from) ? [id, `${newId}:${id.slice(from.length)}`] : id;
-  });
-}
-
-const NO_SIGIL: SigilState = { lockEntry: false, concealed: new Map(), locked: new Set() };
-
-/** Of two charges that conceal the same block, the longer one applies — "until unloaded" is the longest. */
-function laterReveal(a: string | null, b: string | null): string | null {
-  return a === null || b === null ? null : a > b ? a : b;
-}
-
-/**
- * The state that the charges give the entry — blocks and parts alike.
- * Each loaded charge acts on the calculators and drawings that it
- * conceals; unreadable ones do not count.
- */
-export function sigilState(blocks: readonly BlockInstance[], today: string): SigilState {
-  const units = sigilUnits(blocks).map((u) => u.block);
-  const charges = units
-    .filter((b) => b.type === SIGIL_CHARGE_KIND)
-    .map(parseSigilCharge)
-    .filter((c) => !c.broken);
-  if (charges.length === 0) return NO_SIGIL;
-
-  const concealed = new Map<string, string | null>();
-  const locked = new Set<string>();
-  let lockEntry = false;
-  for (const charge of charges) {
-    if (!charge.loaded) continue;
-    if (charge.lock === 'entry') lockEntry = true;
-    const hides = chargeConceals(charge, today);
-    for (const block of units) {
-      if (!isSigilToolType(block.type) || !chargeCovers(charge, block.id)) continue;
-      locked.add(block.id);
-      if (!hides) continue;
-      concealed.set(block.id, concealed.has(block.id)
-        ? laterReveal(concealed.get(block.id)!, charge.revealDate)
-        : charge.revealDate);
-    }
-  }
-  return { lockEntry, concealed, locked };
-}
-
-/** The element IDs of the concealed parts of this field block. */
-function concealedParts(block: BlockInstance, concealed: ReadonlyMap<string, string | null>): Set<string> {
-  const prefix = `${block.id}:`;
-  const ids = new Set<string>();
-  for (const id of concealed.keys()) if (id.startsWith(prefix)) ids.add(id.slice(prefix.length));
-  return ids;
-}
-
-/**
- * A field block without value and slot of its concealed parts — for every place
- * that shows its stored HTML instead of reading it (unknown type, format
- * too new, export of the fallback).
- */
-export function withoutConcealedParts(block: BlockInstance, concealed: ReadonlyMap<string, string | null>): BlockInstance {
-  return block.type === FIELDS_BLOCK_TYPE ? withoutElementContent(block, concealedParts(block, concealed)) : block;
-}
-
-/** The content without the concealed calculators and drawings (blocks and parts) — for search and export. */
-export function withoutConcealed(content: string, today: string): string {
-  if (!mayHoldCharge(content)) return content;
-  const blocks = parseBlocks(content);
-  const { concealed } = sigilState(blocks, today);
-  if (concealed.size === 0) return content;
-  return serializeBlocks(blocks.filter((b) => !concealed.has(b.id)).map((b) => withoutConcealedParts(b, concealed)));
-}
-
-/* ---------------- New ---------------- */
-
-/**
- * The attributes of a fields block holding this one sigil part, as every
- * single field is. As the sigil always did, read mode shows it even empty and
- * under its title (`FieldsBlock` then shows the part without a label row).
- * The converter of the old sigil blocks writes the same.
- */
-function sigilFieldAttrs(kind: SigilElementKind, elementId: string): Record<string, string> {
-  const element: ElementDef = { id: elementId, kind, label: '' };
-  return {
-    [BLOCK_ATTR.config]: JSON.stringify({ elements: [element], display: { ...DEFAULT_DISPLAY, readHideEmpty: false } }),
-    [BLOCK_ATTR.showTitle]: '1',
-  };
-}
-
-function sigilFieldBlock(kind: SigilElementKind, elementId: string): BlockInstance {
-  return { id: generateId(), type: FIELDS_BLOCK_TYPE, html: '', attrs: sigilFieldAttrs(kind, elementId) };
-}
-
-export function createSigilCalcBlock(): BlockInstance {
-  return sigilFieldBlock(SIGIL_CALC_KIND, SIGIL_CALC_ELEMENT_ID);
-}
-
-/** The drawing of a sigil set — a sigil drawing block; named alongside the calculator and the charge. */
-export function createSigilCanvasBlock(): BlockInstance {
-  return createSigilDrawingBlock();
-}
-
-export function createSigilChargeBlock(): BlockInstance {
-  return sigilFieldBlock(SIGIL_CHARGE_KIND, SIGIL_CHARGE_ELEMENT_ID);
-}
-
-/** The sigil set: calculator, drawing, charge — the default layout of the "Sigils" category. */
-export function sigilBlockSet(): BlockInstance[] {
-  return [createSigilCalcBlock(), createSigilCanvasBlock(), createSigilChargeBlock()];
 }

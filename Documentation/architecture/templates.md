@@ -8,7 +8,7 @@ Which template a new entry starts with is said by its category, not by the templ
 
 ### Insertion is a copy
 
-`instantiateTemplateBlocks` gives every block a fresh id (two insertions in one entry don't collide) and remaps charge targets to the new ids. Everything else comes as it is, a drawn or loaded sigil too. Nothing in the entry remembers the template, and changing a template never touches entries it already filled. The same holds one level down: a block copy in a template stays as it was when the block changes.
+`instantiateTemplateBlocks` gives every block a fresh id (two insertions in one entry don't collide). Everything else comes as it is, a drawn or loaded sigil too (its charge names its parts by its own block's id, so the copy acts on its own parts). Nothing in the entry remembers the template, and changing a template never touches entries it already filled. The same holds one level down: a block copy in a template stays as it was when the block changes.
 
 ### Starting an entry
 

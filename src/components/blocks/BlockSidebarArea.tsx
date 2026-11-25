@@ -18,7 +18,6 @@ import {
 import { BLOCK_ATTR, type BlockInstance } from '../../lib/blocks/types';
 import { blockIcon } from '../../lib/blocks/presets';
 import { BLOCK_SIDEBAR_VIEWS } from './blockSidebarViews';
-import { FIELDS_BLOCK_TYPE, parseFields, soleSigilElement } from '../../lib/blocks/fields';
 import { addBlockActions, commonBlockActions, typeBlockActions } from './blockActions';
 
 /** Open/closed state of the blocks; outline (reading) and management (editing) share it. */
@@ -376,8 +375,6 @@ function ManagerRow({
  */
 function blockSettings(session: BlockSession, block: BlockInstance, meta: BlockTypeDef | undefined): ReactNode {
   const { isEditing, api } = session;
-  // A calculator or charge on its own has no settings, as the sigil never had.
-  if (meta?.id === FIELDS_BLOCK_TYPE && soleSigilElement(parseFields(block))) return null;
   const views = meta ? BLOCK_SIDEBAR_VIEWS.get(meta.id) : undefined;
   if (isEditing && views?.Edit) {
     const Edit = views.Edit;

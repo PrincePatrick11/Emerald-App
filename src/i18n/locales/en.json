@@ -156,8 +156,7 @@
     "chargingTechnique": "Charging technique",
     "letterBank": "Letter Bank",
     "noLetters": "No letters prepared yet.",
-    "targetDate": "Target date",
-    "brushSize": "Brush"
+    "targetDate": "Target date"
   },
   "blocks": {
     "add": "Add block",
@@ -183,17 +182,15 @@
         "label": "Fields",
         "description": "Labelled values: text, number, date, choice, yes/no, checklist, link, image, moon phase."
       },
-      "sigilCalc": {
-        "label": "Sigil calculator",
-        "description": "Reduce an intention to its letter bank and tick off the letters used in the drawing."
-      },
-      "sigilCanvas": {
-        "label": "Sigil drawing",
-        "description": "Draw the sigil — saved as an image, hidden while it is loaded."
-      },
-      "sigilCharge": {
-        "label": "Charge",
-        "description": "Target date, charging technique and loading the sigil. Once loaded it hides the chosen calculators and drawings and locks the entry or only those blocks."
+      "sigil": {
+        "label": "Sigil",
+        "description": "Calculator, drawing and charge of one sigil — switch each part on or off in the block's menu. Once loaded it hides calculator and drawing and locks the entry or only this sigil.",
+        "noParts": "All parts are switched off — switch them on in the block's menu.",
+        "parts": {
+          "calc": "Calculator",
+          "drawing": "Drawing",
+          "charge": "Charge"
+        }
       },
       "canvas": {
         "label": "Canvas",
@@ -218,10 +215,7 @@
       "checklist": "Checklist",
       "link": "Link",
       "image": "Image",
-      "moon": "Moon phase",
-      "sigilCalc": "Sigil calculator",
-      "sigilCanvas": "Sigil drawing",
-      "sigilCharge": "Charge"
+      "moon": "Moon phase"
     },
     "fields": {
       "yes": "Yes",
@@ -256,17 +250,6 @@
       "prefillHint": "Every new copy starts with this value — existing entries keep theirs.",
       "linkCategories": "Categories",
       "linkCategoriesHint": "Only entries and tasks of these categories are offered, in every new copy. A link already set stays. With none checked, everything is offered.",
-      "calcMode": "Letter bank",
-      "calcModes": {
-        "both": "Automatic and manual",
-        "auto": "Automatic only (from the intention)",
-        "manual": "Manual only"
-      },
-      "brushPreset": "Preset the brush",
-      "brushPresetHint": "The color and brush size drawing starts with — you can still switch while drawing.",
-      "chargePrefillHint": "Every new copy starts with this lock and these covered parts — both can be changed in the entry while it isn't loaded.",
-      "chargeCoversAll": "All sigils in the entry",
-      "chargeNoTools": "This block has no calculator or drawing yet.",
       "display": "Display",
       "fieldCount": "{{count}} field",
       "fieldCount_other": "{{count}} fields"
@@ -279,14 +262,12 @@
       "revealedSince": "revealed since {{date}}",
       "hiddenUntilUnloaded": "hidden until unloaded",
       "noRevealDate": "No target date",
-      "loadConfirm": "Load the sigil? The covered blocks stay hidden until {{date}}.",
-      "loadConfirmNoDate": "Load the sigil? The covered blocks stay hidden until you unload it.",
+      "loadConfirm": "Load the sigil? Calculator and drawing stay hidden until {{date}}.",
+      "loadConfirmNoDate": "Load the sigil? Calculator and drawing stay hidden until you unload it.",
       "unloadConfirm": "Unload the sigil? It can be edited again right away.",
       "lockScope": "While loaded, lock",
       "lockEntry": "the whole entry",
-      "lockSigil": "only the covered blocks",
-      "covers": "Covers",
-      "noTools": "No calculator or drawing in this entry yet",
+      "lockSigil": "only this sigil",
       "locked": "Locked while the sigil is loaded",
       "saveFailed": "Couldn't save the drawing",
       "loadFailed": "Couldn't load the drawing — close and reopen the entry to try again"

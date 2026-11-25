@@ -10,45 +10,13 @@ import { paintDocFromImage, paintDocFromJson, paintDocToJson, type PaintDoc } fr
  * its data JSON, the rendered picture and every layer's picture are stored
  * files in its inner HTML (`parseDrawing`, `withDrawing`).
  *
- * A sigil drawing is a paint block too, marked in its config
- * (`{"sigil":true}`, `isSigilDrawing`): it is named and iconed as one, paints
- * in the sigil's colours, and a charge in the entry can conceal and lock it
- * (`lib/blocks/sigil.ts`). An unmarked paint block is never concealed.
+ * The drawing is a building block other types carry too: the sigil's
+ * drawing part is the same document, read through the same functions.
  */
 export const PAINT_BLOCK_TYPE = 'core.paint' satisfies BlockTypeId;
 
 export function createPaintBlock(): BlockInstance {
   return { id: generateId(), type: PAINT_BLOCK_TYPE, html: '', attrs: {} };
-}
-
-/** The config that marks a paint block as a sigil drawing. */
-const SIGIL_DRAWING_CONFIG = JSON.stringify({ sigil: true });
-
-/**
- * The attributes of a sigil drawing: marked, and its title shown in read mode,
- * as the sigil drawing's always was. The converter of the old sigil blocks writes the same.
- */
-const SIGIL_DRAWING_ATTRS: Readonly<Record<string, string>> = {
-  [BLOCK_ATTR.config]: SIGIL_DRAWING_CONFIG,
-  [BLOCK_ATTR.showTitle]: '1',
-};
-
-/** A new sigil drawing: an empty paint block, marked. */
-export function createSigilDrawingBlock(): BlockInstance {
-  return { ...createPaintBlock(), attrs: { ...SIGIL_DRAWING_ATTRS } };
-}
-
-/** Is this a paint block marked as a sigil drawing? Unreadable config: no. */
-export function isSigilDrawing(block: BlockInstance): boolean {
-  if (block.type !== PAINT_BLOCK_TYPE) return false;
-  const raw = block.attrs[BLOCK_ATTR.config];
-  if (raw === undefined || !raw.includes('sigil')) return false;
-  try {
-    const config: unknown = JSON.parse(raw);
-    return typeof config === 'object' && config !== null && (config as Record<string, unknown>).sigil === true;
-  } catch {
-    return false;
-  }
 }
 
 /* ---------------- Drawing ---------------- */

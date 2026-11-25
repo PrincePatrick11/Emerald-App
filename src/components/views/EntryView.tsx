@@ -49,9 +49,9 @@ export default function EntryView() {
   // Startup loads content after the lists: until it arrives, the frame with
   // the title is shown, and the block stack only mounts with the real content.
   const contentReady = useEntryContentReady(entry?.id);
-  // A loaded sigil with the "whole entry" lock never opens in edit mode.
+  // An entry a block locks (a loaded sigil) never opens in edit mode.
   const summary = entry ? entryBlockSummary(entry) : null;
-  const locked = !!summary?.sigil?.lockEntry;
+  const locked = !!summary?.effects.lockEntry;
   // The user's cover — or the one a block suggests (`resolveProperty`).
   const cover = entry && summary ? resolveProperty(entry.cover_image, summary.properties.cover, null)?.value : undefined;
   const isEditing = activeView.mode === 'edit' && !locked;

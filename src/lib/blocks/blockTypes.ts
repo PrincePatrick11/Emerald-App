@@ -1,11 +1,13 @@
-import type { BlockActionDef, BlockCopyContext, BlockSettingDef, BlockTypeDef } from './blockType';
+import type { BlockActionDef, BlockCopyContext, BlockSettingDef, BlockTypeDef, ReadContext } from './blockType';
 import { htmlPlainText } from './plainText';
 import { blockDataVersion, withDataVersion, withoutImageInMarkup, type RefReporter } from './toolkit';
 import { BLOCK_ATTR, type BlockInstance } from './types';
+import { localIsoDay } from '../helpers';
 import { textBlockType } from './kinds/text';
 import { fieldsBlockType } from './kinds/fields';
 import { altarBlockType, canvasBlockType } from './kinds/canvas';
 import { paintBlockType } from './kinds/paint';
+import { sigilBlockType } from './kinds/sigil';
 
 export type { BlockGroup, BlockTypeDef } from './blockType';
 
@@ -29,15 +31,18 @@ export type { BlockGroup, BlockTypeDef } from './blockType';
 const BLOCK_TYPES = new Map<string, BlockTypeDef>();
 /** The pre-checks of `mayShowOutside`, made once per state of the registry: lists ask it for every entry. */
 let preChecks: ((content: string) => boolean)[] | null = null;
+/** The same for `mayAffectEntry`. */
+let effectChecks: ((content: string) => boolean)[] | null = null;
 
 /** Adds a type. Built-in ones register below; the ID must be new. */
 export function registerBlockType(def: BlockTypeDef): void {
   if (BLOCK_TYPES.has(def.id)) throw new Error(`block type ${def.id} is already registered`);
   BLOCK_TYPES.set(def.id, def);
   preChecks = null;
+  effectChecks = null;
 }
 
-for (const def of [textBlockType, fieldsBlockType, canvasBlockType, paintBlockType, altarBlockType]) registerBlockType(def);
+for (const def of [textBlockType, fieldsBlockType, canvasBlockType, paintBlockType, altarBlockType, sigilBlockType]) registerBlockType(def);
 
 /**
  * The type with which the app can render this block — or `undefined` for
@@ -99,6 +104,58 @@ export function mayShowOutside(content: string): boolean {
   return preChecks.some((check) => check(content));
 }
 
+/* ---------------- 6 Effect on the entry ---------------- */
+
+/** What the blocks of an entry do to it together (`entryEffects`). */
+export interface EntryEffects {
+  /** The entry cannot be edited, nor changed from read mode — except by the blocks in `lockedBy`. */
+  lockEntry: boolean;
+  /** The blocks that lock the entry: they may still write in read mode, so the lock can be lifted where it was set. */
+  lockedBy: ReadonlySet<string>;
+  /** Block (or part) IDs that cannot be edited. */
+  locked: ReadonlySet<string>;
+  /** Block (or part) IDs concealed — in both modes, in the search and the export — until a day, or (`null`) until lifted. */
+  concealed: ReadonlyMap<string, string | null>;
+}
+
+export const NO_EFFECTS: EntryEffects = { lockEntry: false, lockedBy: new Set(), locked: new Set(), concealed: new Map() };
+
+/** Of two blocks concealing the same thing, the longer one holds — "until lifted" is the longest. */
+function laterReveal(a: string | null, b: string | null): string | null {
+  return a === null || b === null ? null : a > b ? a : b;
+}
+
+/** Can any block of this content act on its entry? The cheap pre-check before parsing. */
+export function mayAffectEntry(content: string): boolean {
+  effectChecks ??= [...BLOCK_TYPES.values()].flatMap((def) => def.entryEffect?.mayContribute ?? []);
+  return effectChecks.some((check) => check(content));
+}
+
+/**
+ * The effects of all blocks folded into one (interface 6): locked if any
+ * locks, each locked or concealed ID once — concealed until the latest day
+ * any block names. A hidden block (the eye) acts all the same: hiding it
+ * does not unload a sigil.
+ */
+export function entryEffects(blocks: readonly BlockInstance[], ctx: ReadContext): EntryEffects {
+  const lockedBy = new Set<string>();
+  const locked = new Set<string>();
+  const concealed = new Map<string, string | null>();
+  for (const block of blocks) {
+    const read = resolveBlockType(block)?.entryEffect?.read;
+    if (!read) continue;
+    const effect = read(block, blocks, ctx);
+    if (effect.lockEntry) lockedBy.add(block.id);
+    for (const id of effect.locked ?? []) locked.add(id);
+    for (const [id, until] of effect.concealed ?? []) {
+      concealed.set(id, concealed.has(id) ? laterReveal(concealed.get(id)!, until) : until);
+    }
+  }
+  return lockedBy.size > 0 || locked.size > 0 || concealed.size > 0
+    ? { lockEntry: lockedBy.size > 0, lockedBy, locked, concealed }
+    : NO_EFFECTS;
+}
+
 /** The settings the block's type describes (none for an unknown type). */
 export function blockSettingsOf(block: BlockInstance): readonly BlockSettingDef[] {
   return resolveBlockType(block)?.settings ?? [];
@@ -120,8 +177,8 @@ export function upgradeBlock(block: BlockInstance): BlockInstance {
  * The text the search finds in a block — its type's `searchText`, none if
  * the type has no text; an unknown type is read as its markup.
  */
-export function blockSearchText(block: BlockInstance): string {
-  return blockInterfaces(block).searchText?.(block) ?? '';
+export function blockSearchText(block: BlockInstance, ctx: ReadContext = { today: localIsoDay() }): string {
+  return blockInterfaces(block).searchText?.(block, ctx) ?? '';
 }
 
 /* ---------------- 7 Storage ---------------- */
@@ -145,16 +202,12 @@ export function copiedBlock(block: BlockInstance, ctx: BlockCopyContext): BlockI
   return resolveBlockType(block)?.copy?.(block, ctx) ?? block;
 }
 
-/**
- * The stack with a copy of one block right after it: the copy under `newId`,
- * and every other block told (`siblingCopied`), so a charge covering the
- * original covers the copy too.
- */
+/** The stack with a copy of one block right after it, under `newId`. */
 export function withDuplicatedBlock(blocks: readonly BlockInstance[], sourceId: string, newId: string): BlockInstance[] {
   const index = blocks.findIndex((b) => b.id === sourceId);
   if (index < 0) return [...blocks];
   const source = blocks[index];
-  const next = blocks.map((b) => (b.id === sourceId ? b : resolveBlockType(b)?.siblingCopied?.(b, sourceId, newId) ?? b));
+  const next = [...blocks];
   next.splice(index + 1, 0, copiedBlock({ ...source, id: newId, attrs: { ...source.attrs } }, { ids: new Map([[sourceId, newId]]) }));
   return next;
 }
