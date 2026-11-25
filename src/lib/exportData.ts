@@ -1,7 +1,8 @@
 import { useEntryStore } from '../store/entryStore';
 import { liveTagNames } from '../store/tagStore';
 import { renderBlocksForExport, type ExportText } from './blocks/exportRender';
-import { blockLabel, fieldFallbackText } from './blocks/blockAttrs';
+import type { BlockExportFormat } from './blocks/blockType';
+import { blockLabel, translatedOr } from './blocks/blockAttrs';
 import { formatIsoDateLong } from './formatDate';
 import { useCategoryStore } from '../store/categoryStore';
 import { entryMoonPhase, MOON_PHASE_SYMBOLS } from './moonPhase';
@@ -24,10 +25,16 @@ function exportText(): ExportText {
   const t = i18n.t;
   return {
     title: (block, meta) => blockLabel(t, block, meta),
-    fields: fieldFallbackText(t),
+    yes: translatedOr(t, 'blocks.fields.yes', 'Yes'),
+    no: translatedOr(t, 'blocks.fields.no', 'No'),
     date: formatIsoDateLong,
     number: (value) => value.toLocaleString(i18n.language),
     t: (key) => t(key),
+    concealed: (until) => until
+      ? t('exportMenu.html.concealedUntil', { date: formatIsoDateLong(until) })
+      : t('exportMenu.html.concealed'),
+    reveal: t('exportMenu.html.reveal'),
+    conceal: t('exportMenu.html.conceal'),
   };
 }
 
@@ -52,8 +59,8 @@ function moonLabel(phase: string): string {
   return phase.split('_').map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
 }
 
-/** An entry as the PDF, HTML and Markdown exports read it — `null` if it is gone. */
-export async function collectExportDataFor(id: string): Promise<ExportData | null> {
+/** An entry as the PDF, HTML or Markdown export (`format`) reads it — `null` if it is gone. */
+export async function collectExportDataFor(id: string, format: BlockExportFormat): Promise<ExportData | null> {
   // Right after startup an entry's content may still be pending.
   await useEntryStore.getState().ensureEntryContent(id);
   const entry = useEntryStore.getState().getEntry(id);
@@ -67,7 +74,7 @@ export async function collectExportDataFor(id: string): Promise<ExportData | nul
     id: entry.id,
     title: displayTitle(i18n.t, 'entry', entry.title),
     entryNumber: entry.entry_number,
-    content: renderBlocksForExport(entry.content, exportText()),
+    content: renderBlocksForExport(entry.content, format, exportText()),
     createdAt: entry.created_at,
     moonPhase: phase ? `${MOON_PHASE_SYMBOLS[phase]} ${moonLabel(phase)}` : undefined,
     category: cat ? { id: cat.id, label: categoryLabel(i18n.t, cat), icon: cat.emoji } : undefined,

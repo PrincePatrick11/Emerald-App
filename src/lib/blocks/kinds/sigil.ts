@@ -1,5 +1,5 @@
 import { CalendarClock, Sparkles } from 'lucide-react';
-import type { BlockExportPart, BlockTypeDef, ReadContext } from '../blockType';
+import type { BlockExportPart, BlockTypeDef, ExportContext, ReadContext } from '../blockType';
 import type { ListInfoPart } from '../listInfo';
 import { drawingImage } from '../paint';
 import { htmlPlainText } from '../plainText';
@@ -14,8 +14,9 @@ import { reportDrawing } from './paint';
 /**
  * The sigil block (`lib/blocks/sigil.ts`) through its interfaces: the
  * target date in the info line (also while hidden), as a panel row and as a
- * value to sort and filter by; the charge's effect on the entry; search and
- * export without what the charge conceals; its references. A copy needs
+ * value to sort and filter by; the charge's effect on the entry; search
+ * without what the charge conceals, export with it covered in HTML and
+ * left out elsewhere; its references. A copy needs
  * nothing of its own: what the charge locks and conceals is named by the
  * block's own ID, so a copy's charge acts on the copy's parts.
  */
@@ -33,9 +34,10 @@ function rankedTargetDate(block: BlockInstance) {
 }
 
 /**
- * The parts the block shows and does not conceal today. Only its own charge
- * conceals a sigil's parts, so its own effect is enough here — the view reads
- * the same answer from the entry's folded effects.
+ * The parts the block shows and does not conceal today, for the search. Only
+ * its own charge conceals a sigil's parts, so its own effect is enough here —
+ * the view and the export read the same answer from the entry's folded
+ * effects (`ExportContext.concealed`).
  */
 function visibleParts(block: BlockInstance, ctx: ReadContext): Record<SigilPartName, boolean> {
   const shown = shownSigilParts(block);
@@ -62,19 +64,45 @@ function sigilRefs(block: BlockInstance, report: RefReporter): void {
   if (isSigilBroken(block)) report.imagesIn(block.attrs[BLOCK_ATTR.data], 'default');
 }
 
-const partHeading = (part: SigilPartName): BlockExportPart => ({ kind: 'heading', labelKey: `blocks.types.sigil.parts.${part}` });
+const partLabelKey = (part: SigilPartName) => `blocks.types.sigil.parts.${part}`;
+const partHeading = (part: SigilPartName): BlockExportPart => ({ kind: 'heading', labelKey: partLabelKey(part) });
 
-function sigilExport(block: BlockInstance, ctx: ReadContext): BlockExportPart[] {
+/** Calculator or drawing as the export shows it, before concealing; empty if it holds nothing. */
+function toolExport(block: BlockInstance, part: 'calc' | 'drawing'): BlockExportPart[] {
+  const value = sigilPartBlock(block, part);
+  if (part === 'calc') {
+    // The calculator's stored markup is already its read version (intention, letters).
+    return value.html ? [{ kind: 'html', html: value.html }] : [];
+  }
+  const drawing = drawingImage(value);
+  return drawing ? [{ kind: 'image', file: drawing, altKey: partLabelKey('drawing') }] : [];
+}
+
+/**
+ * The parts the block shows, as read mode shows them. What the charge
+ * conceals today goes out as a `concealed` part: missing in PDF and
+ * Markdown; in HTML there, covered under its heading as read mode covers it,
+ * and the reader may uncover it — concealing a sigil is the user's own
+ * discipline, not a lock.
+ */
+function sigilExport(block: BlockInstance, ctx: ExportContext): BlockExportPart[] {
   // Unreadable: its markup, as read mode shows it (an unreadable sigil conceals nothing).
   if (isSigilBroken(block)) return block.html ? [{ kind: 'html', html: block.html }] : [];
-  const visible = visibleParts(block, ctx);
+  const shown = shownSigilParts(block);
   const parts: BlockExportPart[] = [];
-  const calc = visible.calc ? sigilPartBlock(block, 'calc').html : '';
-  // The calculator's stored markup is already its read version (intention, letters).
-  if (calc) parts.push(partHeading('calc'), { kind: 'html', html: calc });
-  const drawing = visible.drawing ? drawingImage(sigilPartBlock(block, 'drawing')) : null;
-  if (drawing) parts.push(partHeading('drawing'), { kind: 'image', file: drawing, altKey: 'blocks.types.sigil.parts.drawing' });
-  if (visible.charge) {
+  for (const part of ['calc', 'drawing'] as const) {
+    if (!shown[part]) continue;
+    const id = sigilPartId(block.id, part);
+    const body = toolExport(block, part);
+    if (!body.length) continue;
+    if (ctx.concealed.has(id)) {
+      parts.push({ kind: 'concealed', labelKey: partLabelKey(part), until: ctx.concealed.get(id) ?? null, parts: body });
+    } else {
+      parts.push(partHeading(part), ...body);
+    }
+  }
+  // A loaded charge is never concealed (it must stay reachable to unload); the check is only a guard.
+  if (shown.charge && !ctx.concealed.has(sigilPartId(block.id, 'charge'))) {
     const charge = parseSigilCharge(sigilPartBlock(block, 'charge'));
     if (!charge.broken) {
       parts.push(

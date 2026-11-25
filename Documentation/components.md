@@ -297,7 +297,7 @@ The bars, columns and panels of the text and canvas editors; what each editor is
   - `types.ts` (`BlockInstance`, `TEXT_BLOCK_TYPE`), `blockType.ts` (`BlockTypeDef`: the interfaces a type brings), `kinds/` (one file per built-in type), `blockTypes.ts` (the registry: `registerBlockType`, `resolveBlockType` — `undefined` for an unknown type or too-new data version — and the one place that asks a block: search text, storage, actions, copies, upgrades), `toolkit.ts` (`RefReporter`, `blockContext`, settings, data version), `entryProperties.ts` (what the blocks suggest for the properties, by user, block, category).
   - `blockHtml.ts` — `parseBlocks`/`serializeBlocks`/`createTextBlock`, `DOMParser`-free, tested by `npm run check:blocks`.
   - `blockAttrs.ts` — instance-attribute and naming rules for stack, sidebar and export (`isBlockHidden`, `customBlockTitle`, `showsTitleInRead`, `withBlockAttr`, `blockLabel`/`blockTypeLabel`/`elementLabel`, …).
-  - `exportRender.ts` — `renderBlocksForExport`, one serializer per type, by the read-mode rules.
+  - `exportRender.ts` — `renderBlocksForExport(content, format, text)`: asks each block's `export` for its parts in the format and lays them out; knows no block type. Covered content is the `.export-concealed` box (cover, switch, body), switched by the HTML file's script.
   - `fields.ts` — the fields block (`parseFields`/`serializeFields`/`createFieldsBlock`, `isElementEmpty`/`isHiddenInRead`, `linkFromSlot`/`imageFromSlot`).
   - `presets.ts` — `BLOCK_PRESETS` (what "add block" offers), `createFromPreset` (including `def:<id>`), `ELEMENT_KIND_ICONS`, `blockIcon`.
   - `definitions.ts` — user-built blocks (`instantiateDefinition`).

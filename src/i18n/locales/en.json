@@ -1548,7 +1548,11 @@
       "print": "Print",
       "toggleTheme": "Light / dark",
       "toggleSidebar": "Sidebar",
-      "exportedOn": "Exported from {{app}} on {{date}}"
+      "exportedOn": "Exported from {{app}} on {{date}}",
+      "concealedUntil": "Hidden until {{date}}",
+      "concealed": "Hidden",
+      "reveal": "Uncover",
+      "conceal": "Cover"
     }
   },
   "emeraldKey": {

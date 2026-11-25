@@ -1,7 +1,7 @@
 import { Frame, ImageDown } from 'lucide-react';
 import { AltarIcon } from '../../altarIcon';
 import { isRecord } from '../../helpers';
-import type { BlockActionDef, BlockTypeDef } from '../blockType';
+import type { BlockActionDef, BlockExportPart, BlockTypeDef } from '../blockType';
 import {
   ALTAR_BLOCK_TYPE, CANVAS_BLOCK_TYPE, canvasBackgroundFile, canvasElementFile, parseCanvasBlock, withoutCanvasFile,
 } from '../canvas';
@@ -44,6 +44,11 @@ const canvasLike = {
   group: 'media',
   dataVersion: 1,
   defaultShowTitle: false,
+  // The rendered picture, named after the block; the pictures behind it are only references.
+  export: (block: BlockInstance): BlockExportPart[] => {
+    const { render } = parseCanvasBlock(block);
+    return render ? [{ kind: 'image', file: render }] : [];
+  },
   refs: canvasRefs,
   withoutImage: withoutCanvasFile,
   actions: CANVAS_ACTIONS,

@@ -1548,7 +1548,11 @@
       "print": "Drucken",
       "toggleTheme": "Hell / Dunkel",
       "toggleSidebar": "Seitenleiste",
-      "exportedOn": "Exportiert aus {{app}} am {{date}}"
+      "exportedOn": "Exportiert aus {{app}} am {{date}}",
+      "concealedUntil": "Verborgen bis {{date}}",
+      "concealed": "Verborgen",
+      "reveal": "Aufdecken",
+      "conceal": "Zudecken"
     }
   },
   "emeraldKey": {

@@ -1,6 +1,6 @@
 import { Brush } from 'lucide-react';
 import type { BlockTypeDef } from '../blockType';
-import { PAINT_BLOCK_TYPE, parseDrawing } from '../paint';
+import { drawingImage, PAINT_BLOCK_TYPE, parseDrawing } from '../paint';
 import { blockTypeTextKey, type RefReporter } from '../toolkit';
 import type { BlockInstance } from '../types';
 
@@ -25,5 +25,10 @@ export const paintBlockType: BlockTypeDef = {
   group: 'media',
   dataVersion: 1,
   defaultShowTitle: false,
+  // The rendered picture, named after the block.
+  export: (block) => {
+    const file = drawingImage(block);
+    return file ? [{ kind: 'image', file }] : [];
+  },
   refs: reportDrawing,
 };

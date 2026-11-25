@@ -455,7 +455,12 @@ export interface FallbackText {
   moonName: (phase: MoonPhase) => string;
 }
 
-/** The value of a field as HTML (not a slot) — `null` for empty. Fallback and export share it. */
+/** A checklist as readable markup — fallback and export alike. */
+export function checklistHtml(items: readonly ChecklistItem[]): string {
+  return `<ul>${items.map((item) => `<li>${item.checked ? '☑' : '☐'} ${escapeHtml(item.text)}</li>`).join('')}</ul>`;
+}
+
+/** The value of a field as HTML (not a slot) — `null` for empty — for the readable fallback. The export maps the same kinds to values (`fieldExportValue` in `kinds/fields.ts`). */
 export function fieldValueHtml(element: ElementDef, model: FieldsModel, text: FallbackText): string | null {
   if (isElementEmpty(element, model)) return null;
   const value = model.values[element.id];
@@ -470,9 +475,7 @@ export function fieldValueHtml(element: ElementDef, model: FieldsModel, text: Fa
     case 'toggle':
       return escapeHtml(value === true ? text.yes : text.no);
     case 'checklist':
-      return `<ul>${(value as ChecklistItem[])
-        .map((item) => `<li>${item.checked ? '☑' : '☐'} ${escapeHtml(item.text)}</li>`)
-        .join('')}</ul>`;
+      return checklistHtml(value as ChecklistItem[]);
     case 'moon':
       return `${MOON_PHASE_SYMBOLS[value as MoonPhase]} ${escapeHtml(text.moonName(value as MoonPhase))}`;
     default:

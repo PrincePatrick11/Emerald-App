@@ -49,24 +49,54 @@ export type BlockValue =
 
 /* ---------------- 2 Export ---------------- */
 
+/** The formats a block is asked for (`.emerald` carries the block itself, unasked). */
+export type BlockExportFormat = 'pdf' | 'html' | 'markdown';
+
 /**
  * One piece of what a block shows in PDF, HTML, Markdown — the app lays them
- * out per format and words them (#151). A `row` is "label: value" (a missing
- * value shows as a dash); `html` is markup the block already holds in its
- * readable form (a link chip, an escaped text).
+ * out per format and words them (#151):
+ * - `row` is "label: value" (a missing value shows as a dash), labelled by a
+ *   text key or by a name the user gave (a field's),
+ * - `html` is markup the block already holds in its readable form (a link
+ *   chip, an escaped text),
+ * - `image` is a stored picture, its alt text a key or — without one — the
+ *   block's title,
+ * - `concealed` is content the reader uncovers: in HTML covered under its
+ *   heading (`labelKey`, if any), with a switch to uncover it; in the formats
+ *   without one (PDF, Markdown) it is left out, heading and all. A block that
+ *   wants it missing even in HTML leaves it out itself.
  */
 export type BlockExportPart =
   | { kind: 'text'; text: string }
   | { kind: 'html'; html: string }
-  | { kind: 'image'; file: string; altKey: string }
+  | { kind: 'image'; file: string; altKey?: string }
   | { kind: 'heading'; labelKey: string }
   | { kind: 'row'; labelKey: string; value: BlockExportValue | null }
-  | { kind: 'note'; textKey: string };
+  | { kind: 'row'; label: string; value: BlockExportValue | null }
+  | { kind: 'note'; textKey: string }
+  | { kind: 'concealed'; labelKey?: string; until: string | null; parts: BlockExportPart[] };
 
-/** The value of an export row: a value the app formats, or markup the block holds in readable form. */
-export type BlockExportValue = BlockValue | { kind: 'html'; html: string };
+/**
+ * The value of an export row: a value the app formats, markup the block holds
+ * in readable form, a stored picture (its alt text the row's label unless
+ * given), or a text the app words by its key
+ * (after an optional symbol).
+ */
+export type BlockExportValue =
+  | BlockValue
+  | { kind: 'html'; html: string }
+  | { kind: 'image'; file: string; alt?: string }
+  | { kind: 'phrase'; key: string; symbol?: string };
 
-/** What the search and the export need to know of where they read: today, for what is concealed until a day. */
+/** Where a block is exported: the format asked for, and what the entry's blocks conceal today. */
+export interface ExportContext {
+  format: BlockExportFormat;
+  today: string;
+  /** Block or part IDs concealed by the entry's effects (`entryEffects`), until a day or (`null`) until lifted. */
+  concealed: ReadonlyMap<string, string | null>;
+}
+
+/** What the search and the entry's effects need to know of where they read: today, for what is concealed until a day. */
 export interface ReadContext {
   today: string;
   /**
@@ -228,8 +258,13 @@ export interface BlockTypeDef {
 
   /** 1 — what the block adds to its entry's info line in lists. */
   listInfo?: ListInfoProvider;
-  /** 2 — how the block appears in PDF, HTML and Markdown (#151); without it, its readable markup. What its entry's effects conceal is left out already. */
-  export?: (block: BlockInstance, ctx: ReadContext) => BlockExportPart[];
+  /**
+   * 2 — how the block appears in PDF, HTML and Markdown, per format (#151);
+   * without it, its readable markup. A part of the block the entry's effects
+   * conceal (`ctx.concealed`) is the block's own to show covered or leave
+   * out; a block concealed as a whole the export covers (HTML) or leaves out.
+   */
+  export?: (block: BlockInstance, ctx: ExportContext) => BlockExportPart[];
   /** 3 — rows and suggested values for the entry's properties; the panel shows them, a suggested value marked as the block's. */
   properties?: BlockProperties;
   /** 4 / 9 — values to filter and sort dashboards by; the dashboard's controls for them come with #117. */

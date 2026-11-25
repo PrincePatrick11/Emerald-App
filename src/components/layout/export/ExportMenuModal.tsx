@@ -203,7 +203,7 @@ function ExportMenuBody({ target }: { target: ExportTarget }) {
         const linkedIds = new Set(linkedChosen.map((e) => e.id));
         const items = [];
         for (const entry of [...roots, ...linkedChosen]) {
-          const data = await collectExportDataFor(entry.id);
+          const data = await collectExportDataFor(entry.id, fmt);
           if (data) items.push({ data, images: linkedIds.has(entry.id) ? linkedImageMode(s) : s.images });
         }
         const file = { bundle: scope === 'bulk' ? bundleName() : undefined, typography, order: s.order };
