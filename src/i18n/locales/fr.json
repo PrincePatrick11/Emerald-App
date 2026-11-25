@@ -896,7 +896,10 @@
     "cropArea": "Zone de recadrage",
     "cropZoom": "Zoom",
     "cropHint": "Faites glisser pour déplacer l'image ; la molette ou le curseur règlent le zoom.",
-    "cropApply": "Appliquer"
+    "cropApply": "Appliquer",
+    "fromBlock": "Du bloc « {{name}} »",
+    "fromBlockUnnamed": "D’un bloc",
+    "fromBlockFixed": "Défini par le bloc « {{name}} » – non modifiable ici"
   },
   "filters": {
     "all": "Toutes",
@@ -1581,6 +1584,10 @@
     "newEntry": "Nouvelle entrée",
     "settings": "Réglages du tableau de bord",
     "name": "Nom",
+    "infoLine": "Ligne d’informations",
+    "infoLineHint": "Ce que les blocs ajoutent aux lignes et aux cartes, comme la date cible d’un sigil. La liste de gauche l’affiche toujours en bref.",
+    "infoShort": "Bref",
+    "infoLong": "Détaillé",
     "allHasNoFilter": "« Toutes les entrées » montre chaque entrée et n’a pas de filtre.",
     "filterCategories": "Catégories",
     "filterCategoriesHint": "Montre les entrées des catégories cochées. « Toutes » montre chaque catégorie.",

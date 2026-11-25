@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type MouseEvent, type PointerEvent, type R
 import { useTranslation } from 'react-i18next';
 import { Check, Eye, EyeOff, CopyPlus, GripVertical, MoreHorizontal, Pencil, Plus, Puzzle, Type } from 'lucide-react';
 import ContextMenu, { type ContextMenuAction } from '../ui/ContextMenu';
+import { fromBlockTitle } from '../ui/FromBlockMark';
 import SidebarSection, { SidebarItemRow } from '../sidebar/fields/SidebarSection';
 import { useUIStore } from '../../store/uiStore';
 import { useBlockSessionStore, useSelectedBlockId, type BlockSession } from '../../store/blockSessionStore';
@@ -63,8 +64,9 @@ export default function BlockSidebarArea() {
 /**
  * The blocks' actions while reading (`BlockTypeDef.actions` with `inRead`),
  * in a section of the properties panel of their own: one row per action and
- * block. Where several blocks of a type offer it, each row names its block.
- * Carried out by the block's view in the stack (`api.runAction`).
+ * block, like the panel's other rows. Where several blocks offer the same
+ * action, each row names its block; the tooltip always does. Carried out by
+ * the block's view in the stack (`api.runAction`).
  */
 export function BlockReadActions() {
   const { t } = useTranslation();
@@ -91,6 +93,7 @@ export function BlockReadActions() {
             icon={<Icon size={14} />}
             label={t(action.labelKey)}
             meta={meta}
+            title={fromBlockTitle(t, meta ?? name)}
             onClick={() => session.api.runAction(block.id, action.id)}
           />
         );

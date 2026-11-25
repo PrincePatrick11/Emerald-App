@@ -896,7 +896,10 @@
     "cropArea": "Crop area",
     "cropZoom": "Zoom",
     "cropHint": "Drag to move the picture, use the scroll wheel or the slider to zoom.",
-    "cropApply": "Apply"
+    "cropApply": "Apply",
+    "fromBlock": "From the block “{{name}}”",
+    "fromBlockUnnamed": "From a block",
+    "fromBlockFixed": "Set by the block “{{name}}” – cannot be changed here"
   },
   "filters": {
     "all": "All",
@@ -1581,6 +1584,10 @@
     "newEntry": "New entry",
     "settings": "Dashboard settings",
     "name": "Name",
+    "infoLine": "Info line",
+    "infoLineHint": "What blocks add to rows and cards, such as a sigil's target date. The list on the left always shows it short.",
+    "infoShort": "Short",
+    "infoLong": "Detailed",
     "allHasNoFilter": "“All entries” shows every entry and has no filter.",
     "filterCategories": "Categories",
     "filterCategoriesHint": "Shows entries of the ticked categories. “All” shows every category.",

@@ -896,7 +896,10 @@
     "cropArea": "Bildausschnitt",
     "cropZoom": "Zoom",
     "cropHint": "Ziehen verschiebt das Bild, Mausrad oder Regler zoomen.",
-    "cropApply": "Übernehmen"
+    "cropApply": "Übernehmen",
+    "fromBlock": "Vom Block „{{name}}“",
+    "fromBlockUnnamed": "Von einem Block",
+    "fromBlockFixed": "Vom Block „{{name}}“ festgelegt – hier nicht änderbar"
   },
   "filters": {
     "all": "Alle",
@@ -1581,6 +1584,10 @@
     "newEntry": "Neuer Eintrag",
     "settings": "Dashboard-Einstellungen",
     "name": "Name",
+    "infoLine": "Infozeile",
+    "infoLineHint": "Was Blöcke zu Zeilen und Karten beitragen, etwa das Zieldatum einer Sigille. Die linke Liste zeigt es immer knapp.",
+    "infoShort": "Knapp",
+    "infoLong": "Ausführlich",
     "allHasNoFilter": "„Alle Einträge“ zeigt jeden Eintrag und hat keinen Filter.",
     "filterCategories": "Kategorien",
     "filterCategoriesHint": "Zeigt Einträge der angehakten Kategorien. „Alle“ zeigt jede Kategorie.",

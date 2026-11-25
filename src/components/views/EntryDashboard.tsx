@@ -7,7 +7,7 @@ import { useCollapsedSet } from '../../hooks/useCollapsedSet';
 import { useDashboardEntries } from '../../hooks/useDashboardEntries';
 import { useDashboardPrefs } from '../../hooks/useDashboardPrefs';
 import { useEntryItems, useEntryRows } from '../../hooks/useEntryRows';
-import { dashboardDateField } from '../../lib/dashboards';
+import { DEFAULT_DISPLAY, dashboardDateField } from '../../lib/dashboards';
 import { categoriesUsedBy, categoryLabel, hasUncategorized, lookupCategory } from '../../lib/categories';
 import { sortItems } from '../../lib/sortItems';
 import { isCardView } from '../../lib/viewMode';
@@ -52,7 +52,8 @@ export default function EntryDashboard({ dashboard, title, newLabel, onNew, empt
   const [{ view, sort, grouping }, setPrefs] = useDashboardPrefs(dashboard, dateField);
   const rows = useEntryRows({ dashboardId: dashboard?.id, dateField });
   const dateOf = rows.date;
-  const { render, menu } = useEntryItems(rows, entries);
+  // Short or long info line: the dashboard's setting.
+  const { render, menu } = useEntryItems(rows, entries, (dashboard?.display ?? DEFAULT_DISPLAY).info);
   const [search, setSearch] = useSessionState(`${scope}.search`, '');
   const [filterCatIds, setFilterCatIds] = useSessionState<string[]>(`${scope}.filter`, []);
   const { isCollapsed: isCatCollapsed, toggle: toggleCatCollapse } = useCollapsedSet(scope);

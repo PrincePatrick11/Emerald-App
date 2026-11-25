@@ -27,7 +27,7 @@ writeFileSync(
    export { TEXT_BLOCK_TYPE, BLOCK_ATTR } from '${root}/src/lib/blocks/types';
    export { parseFields, serializeFields, createFieldsBlock, isElementEmpty, isHiddenInRead, linkFromSlot, imageFromSlot } from '${root}/src/lib/blocks/fields';
    export { instantiateDefinition, parseDefinitionElements, parseDefinitionDisplay, remapDefinitionDefaults, definitionImageRefs } from '${root}/src/lib/blocks/definitions';
-   export { entryBlockSummary } from '${root}/src/lib/blocks/entrySummary';
+   export { entryBlockSummary, entryBlockValue } from '${root}/src/lib/blocks/entrySummary';
    export { extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock, createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed, letterList, sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, withChargesCoveringOnly } from '${root}/src/lib/blocks/sigil';
    export { paintDocFromJson, paintDocToJson, emptyPaintDoc, isPaintDocEmpty, thinPoints, transformStroke, mergeDown, canMergeDown, strokeSamples, inPolygon, symmetricCopies, mirrorStroke, splitStroke } from '${root}/src/lib/paint/document';
    export { symbolFromDrawing } from '${root}/src/components/editors/canvas/symbols/fromDrawing';
@@ -37,7 +37,7 @@ writeFileSync(
    export { createPaintBlock, PAINT_BLOCK_TYPE, parseDrawing, withDrawing, withDrawingImage, isSigilDrawing, drawingImage } from '${root}/src/lib/blocks/paint';
    export { resolveBlockType, registerBlockType, upgradeBlock, blockSearchText, blockStorageTag, blockActionsOf, withDuplicatedBlock, copiedBlock } from '${root}/src/lib/blocks/blockTypes';
    export { readBlockSettings, withBlockSetting, RefReporter } from '${root}/src/lib/blocks/toolkit';
-   export { entryProperties } from '${root}/src/lib/blocks/entryProperties';
+   export { blockSuggestions, resolveProperty } from '${root}/src/lib/blocks/entryProperties';
    export { createCanvasBlock, parseCanvasBlock, withCanvasScene, withCanvasParts, withCanvasStripTag, withoutCanvasFile, CANVAS_BLOCK_TYPE, ALTAR_BLOCK_TYPE } from '${root}/src/lib/blocks/canvas';
    export { resolveStartTemplate, instantiateTemplateBlocks, templateStart, mergeTemplateTags, areBlocksEmpty, fieldsWithTemplate, fieldsWithoutTemplate } from '${root}/src/lib/blocks/templates';
    export { internalLinkChipHtml } from '${root}/src/lib/internalLinkHtml';
@@ -71,7 +71,7 @@ const {
   parseBlocks, serializeBlocks, createTextBlock, neutralizeSectionTags, TEXT_BLOCK_TYPE, BLOCK_ATTR, extractInternalLinks,
   parseFields, serializeFields, createFieldsBlock, isElementEmpty, isHiddenInRead, linkFromSlot, imageFromSlot,
   internalLinkChipHtml,
-  instantiateDefinition, parseDefinitionElements, parseDefinitionDisplay, entryBlockSummary,
+  instantiateDefinition, parseDefinitionElements, parseDefinitionDisplay, entryBlockSummary, entryBlockValue,
   extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock,
   createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed,
   drawingImage, withDrawingImage, isSigilDrawing, letterList, renderBlocksForExport, parseDrawing, withDrawing,
@@ -86,7 +86,7 @@ const {
   createCanvasBlock, parseCanvasBlock, withCanvasScene, withCanvasParts, withCanvasStripTag, withoutCanvasFile, CANVAS_BLOCK_TYPE, ALTAR_BLOCK_TYPE,
   createPaintBlock, PAINT_BLOCK_TYPE, resolveBlockType,
   registerBlockType, upgradeBlock, blockSearchText, blockStorageTag, blockActionsOf, withDuplicatedBlock, copiedBlock,
-  readBlockSettings, withBlockSetting, RefReporter, entryProperties, blockTagsOf, linkedIdsOf, blockWithoutImage,
+  readBlockSettings, withBlockSetting, RefReporter, blockSuggestions, resolveProperty, blockTagsOf, linkedIdsOf, blockWithoutImage,
   toBlockRow, fromBlockRow, htmlPlainText, blockRefs, withoutImage, keyBetween, evenKeys, positionsFor, isPositionKey,
   blocksOfContent, planBlockWrite, clearSavedBlocks, contentOf,
   contentToBlocks, blocksToContent, parseManifest, renameStoredFiles, relinkWithinFile, gentlestImageMode, storedNameStem,
@@ -385,8 +385,10 @@ console.log('\n4d. Custom blocks: copies\n');
   check('a copy from before keeps working with its old markers',
     parseFields({ ...filled, attrs: { ...filled.attrs, 'data-block-origin': 'def-1', 'data-block-rev': '1' } }).values['e-result'] === 'gut');
 
-  const plainSummary = entryBlockSummary('x', content);
-  check('a summary without sigil blocks is empty', plainSummary.sigil === null && plainSummary.listInfo.length === 0);
+  const plainSummary = entryBlockSummary({ id: 'x', content, created_at: '2026-01-01T12:00:00Z' });
+  check('a summary without sigil blocks is empty',
+    plainSummary.sigil === null && plainSummary.info.short.length === 0 && plainSummary.info.long.length === 0
+      && plainSummary.properties.rows.length === 0 && plainSummary.values.length === 0);
 
   check('definition columns: broken JSON yields the defaults',
     parseDefinitionElements('{kaputt').length === 0 && parseDefinitionDisplay('nope').showTitle === true &&
@@ -821,16 +823,35 @@ console.log('\n4h. Sigils as parts of custom blocks\n');
     mixed.concealed.has(sigilPartId(block.id, 'draw')) && !mixed.concealed.has(sigilPartId(block.id, 'calc'))
       && parseSigilCharge(chargeUnit(parseBlocks(serializeBlocks([standaloneCharge]))[0])).targets?.[0] === sigilPartId(block.id, 'draw'), mixed);
 
-  const summary = entryBlockSummary('sigil-part', content, '2029-12-31');
+  const sigilEntry = (id, c) => ({ id, content: c, created_at: '2029-12-01T12:00:00Z' });
+  const summary = entryBlockSummary(sigilEntry('sigil-part', content), '2029-12-31');
   check('the summary knows the sigil in the part (lock, target date)',
     summary.sigil?.lockEntry === true
       && !('image' in summary.sigil), summary.sigil);
-  check('the charge puts its target date into the info line of lists',
-    summary.listInfo.length === 1 && summary.listInfo[0].key === 'sigil.targetDate'
-      && summary.listInfo[0].value.iso === '2030-01-01', summary.listInfo);
+  check('the charge puts its target date into both forms of the info line',
+    ['short', 'long'].every((form) => summary.info[form].length === 1 && summary.info[form][0].key === 'sigil.targetDate'
+      && summary.info[form][0].value.iso === '2030-01-01'), summary.info);
+  check('the charge adds its target date as a row of the properties panel',
+    summary.properties.rows.length === 1 && summary.properties.rows[0].labelKey === 'creation.targetDate'
+      && summary.properties.rows[0].value.iso === '2030-01-01' && summary.properties.icon === null, summary.properties);
+  check('the charge offers its target date to filter and sort by',
+    entryBlockValue(sigilEntry('sigil-part', content), 'sigil.targetDate')?.iso === '2030-01-01'
+      && summary.values.every((v) => v.filter && v.sort), summary.values);
+  {
+    // Two charges: an unloaded one first, then a loaded one — the loaded one's date speaks, as in the info line.
+    const unloadedFirst = chargeOf({ loaded: false, revealDate: '2031-01-01', lock: 'entry', technique: null, targets: null });
+    const loadedSecond = chargeOf({ loaded: true, revealDate: '2032-06-01', lock: 'entry', technique: null, targets: null });
+    const both = sigilEntry('two-charges', serializeBlocks([unloadedFirst, loadedSecond]));
+    const twoSummary = entryBlockSummary(both, '2029-12-31');
+    check('of two charges the loaded one gives the value to sort by, as in the info line',
+      entryBlockValue(both, 'sigil.targetDate')?.iso === '2032-06-01' && twoSummary.info.long[0]?.value.iso === '2032-06-01',
+      { values: twoSummary.values, info: twoSummary.info.long });
+  }
   const hiddenSigil = serializeBlocks(parseBlocks(content).map((b) => (b.type === 'core.fields' ? { ...b, attrs: { ...b.attrs, [BLOCK_ATTR.hidden]: '1' } } : b)));
-  check('a hidden sigil block still shows its target date in lists',
-    entryBlockSummary('sigil-hidden', hiddenSigil, '2029-12-31').listInfo[0]?.value.iso === '2030-01-01');
+  const hiddenSummary = entryBlockSummary(sigilEntry('sigil-hidden', hiddenSigil), '2029-12-31');
+  check('a hidden sigil block still shows its target date in lists and still sorts by it, but adds no panel row',
+    hiddenSummary.info.short[0]?.value.iso === '2030-01-01' && hiddenSummary.values[0]?.value?.iso === '2030-01-01'
+      && hiddenSummary.properties.rows.length === 0, hiddenSummary);
   const dupId = 'dup-block';
   const targeted = setPart(parseBlocks(unloaded)[1], 'charge', (p) => serializeSigilCharge(p, {
     ...parseSigilCharge(p), targets: [sigilPartId(block.id, 'calc'), 'fremd-block'],
@@ -1268,6 +1289,13 @@ console.log('\n7b. Block interfaces: registry, toolkit, copies, actions, setting
       rows: (_b, ctx) => [{ key: 'day', labelKey: 'x', value: { kind: 'date', iso: ctx.entryDate ?? '' } }],
       overridable: { icon: false, cover: true },
     },
+    listInfo: {
+      mayContribute: (c) => c.includes('test.tagger'),
+      parts: () => [
+        { key: 'both', rank: 0, icon: resolveBlockType(createTextBlock('')).icon, labelKey: 'x', value: { kind: 'text', text: 'b' } },
+        { key: 'long', rank: 0, icon: resolveBlockType(createTextBlock('')).icon, labelKey: 'x', value: { kind: 'text', text: 'l' }, forms: ['long'] },
+      ],
+    },
     settings: [
       { key: 'show', labelKey: 'x', kind: 'toggle', initial: true },
       { key: 'mode', labelKey: 'x', kind: 'select', options: [{ value: 'a', labelKey: 'a' }, { value: 'b', labelKey: 'b' }], initial: 'a' },
@@ -1300,14 +1328,22 @@ console.log('\n7b. Block interfaces: registry, toolkit, copies, actions, setting
       && parseBlocks(serializeBlocks([set]))[0].attrs['data-block-settings'] === set.attrs['data-block-settings']);
 
   const ctx = { entryId: 'e', entryDate: '2026-11-25', today: '2026-11-25' };
-  const props = entryProperties({ icon: '🔥', cover_image: 'own.png' }, [tagger], { emoji: '📓' }, ctx);
+  const suggested = blockSuggestions([tagger], ctx);
+  const icon = resolveProperty('🔥', suggested.icon, '📓');
   check('a block\'s icon that may not be overridden stands before the user\'s',
-    props.icon?.value === '🌕' && props.icon.source === 'block' && props.icon.blockId === 'tg', props.icon);
-  check('without a block value the user\'s stands, without that the category\'s',
-    props.cover?.source === 'user' && entryProperties({}, [], { emoji: '📓' }, ctx).icon?.source === 'category', props.cover);
-  check('a hidden block suggests nothing', entryProperties({}, [{ ...tagger, attrs: { 'data-block-hidden': '1' } }], null, ctx).icon === null);
+    icon?.value === '🌕' && icon.source === 'block' && icon.blockId === 'tg', icon);
+  const overridable = { ...suggested.icon, overridable: true };
+  check('the user\'s value stands before an overridable block value, that before the category\'s',
+    resolveProperty('🔥', overridable, '📓')?.source === 'user' && resolveProperty('', overridable, '📓')?.source === 'block'
+      && resolveProperty(null, blockSuggestions([], ctx).icon, '📓')?.source === 'category');
+  check('a hidden block suggests nothing', blockSuggestions([{ ...tagger, attrs: { 'data-block-hidden': '1' } }], ctx).icon === null);
   check('a block\'s rows come with its context',
-    props.rows.length === 1 && props.rows[0].value.iso === '2026-11-25' && props.rows[0].blockId === 'tg', props.rows);
+    suggested.rows.length === 1 && suggested.rows[0].value.iso === '2026-11-25' && suggested.rows[0].blockId === 'tg', suggested.rows);
+  const taggerSummary = entryBlockSummary({ id: 'tagger-entry', content: serializeBlocks([tagger]), created_at: '2026-11-25T12:00:00Z' });
+  check('a part meant for the long form only stays out of the short one',
+    taggerSummary.info.short.map((p) => p.key).join() === 'both' && taggerSummary.info.long.map((p) => p.key).join() === 'both,long',
+    taggerSummary.info);
+  check('the summary carries what the visible blocks suggest', taggerSummary.properties.icon?.value === '🌕', taggerSummary.properties);
 }
 
 {

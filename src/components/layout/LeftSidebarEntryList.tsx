@@ -150,9 +150,9 @@ function useEntriesConfig(entries: readonly Entry[], dashboardId: string): Entry
     getId: (e) => e.id,
     getTitle: rows.title,
     getEditTitle: rows.editTitle,
-    // Narrow: what the blocks add comes as icon and short value after it.
-    getDateStr: rows.shortMeta,
-    getInfo: rows.shortInfo,
+    // Narrow: always the short info line — icon and short value after the date.
+    getDateStr: rows.narrowMeta,
+    getInfo: (e) => rows.info(e, 'short'),
     getIcon: (e) => {
       const icon = rows.icon(e);
       return isImageIcon(icon)

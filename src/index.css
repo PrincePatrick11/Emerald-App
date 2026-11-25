@@ -394,13 +394,28 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     color: var(--text-subtle);
   }
 
-  /* What a block adds to the left list's date line (a sigil's target date): icon and short value, never cut. */
+  /* The mark of a value in the properties panel that comes from a block (`FromBlockMark`). */
+  .from-block-mark {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    color: var(--text-subtle);
+  }
+
+  /* What a block adds to an entry's info line (a sigil's target date) in lists and cards: never cut. */
   .entry-list-info {
     display: inline-flex;
     align-items: center;
     gap: 3px;
     flex-shrink: 0;
     white-space: nowrap;
+  }
+
+  /* In a card a part may wrap inside itself when the card is narrower than it — still never cut. */
+  .card-info .entry-list-info {
+    white-space: normal;
+    flex-shrink: 1;
+    min-width: 0;
   }
 
   /* Next to the rail, the list on the left needs little margin of its own — the rail

@@ -6,6 +6,7 @@ import { categoryLabel } from '../../../lib/categories';
 import SidebarSection, { SidebarPropertyRow } from './SidebarSection';
 import { LinkedEntriesSection } from './LinkedEntriesField';
 import { TagsSection } from './TagsField';
+import type { BlockTagChip } from '../../ui/TagInput';
 import { BlockReadActions } from '../../blocks/BlockSidebarArea';
 
 /**
@@ -14,16 +15,18 @@ import { BlockReadActions } from '../../blocks/BlockSidebarArea';
  * the blocks below (`BlockSidebarArea`) follow at the same spacing.
  * Without `properties` the properties section is omitted.
  */
-export default function EntryReadSections({ properties, content, tags }: {
+export default function EntryReadSections({ properties, content, tags, blockTags }: {
   properties?: ReactNode;
   content: string;
   tags: string[];
+  /** The tags the entry's blocks give, marked as theirs. */
+  blockTags?: readonly BlockTagChip[];
 }) {
   return (
     <>
       {properties && <PropertiesSection>{properties}</PropertiesSection>}
       <LinkedEntriesSection content={content} />
-      <TagsSection tags={tags} />
+      <TagsSection tags={tags} blockTags={blockTags} />
       <BlockReadActions />
     </>
   );

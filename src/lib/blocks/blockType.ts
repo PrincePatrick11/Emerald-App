@@ -16,7 +16,7 @@ import type { BlockInstance, BlockTypeId } from './types';
  * - **The user before the block before the category.** Where a block
  *   suggests something the user or the category can also set (icon, cover),
  *   the user's own value wins — unless the type says its value is not to be
- *   overridden — and the block's beats the category's (`entryProperties`).
+ *   overridden — and the block's beats the category's (`resolveProperty`).
  *
  * Built-in types (`origin: 'core'`) fix their behaviour here; a user-built
  * block is a `core.fields` whose settings decide more. The shape is meant to
@@ -68,14 +68,14 @@ export interface BlockPropertyRow {
 /**
  * What a block adds to the entry's properties: rows of its own, and values it
  * suggests for icon, cover and tags. Suggested values are told apart from
- * the user's (`entryProperties` returns where each one comes from).
+ * the user's (`resolveProperty` says where each one comes from).
  *
  * Tags of a block hold only while the block is there: they are never
  * written into the entry's own tags, but count in dashboard filters and the
  * tags view. They are reported with the block's references (`block_refs`,
  * kind `tag`), which is why `tags` reads the block alone, without context.
  * A hidden block is still there: it keeps giving its tags, while its rows,
- * icon and cover are not shown (`entryProperties`).
+ * icon and cover are not shown (`blockSuggestions`).
  */
 export interface BlockProperties {
   /** The cheap pre-check on the raw content, as `ListInfoProvider.mayContribute`: lists stay fast. */
@@ -100,6 +100,19 @@ export interface BlockFieldValue {
   value: BlockValue | null;
   filter: boolean;
   sort: boolean;
+  /** Of several values under one key, the lowest rank (then the first) is the entry's — as in the info line; 0 if missing. */
+  rank?: number;
+}
+
+/**
+ * The values a block offers to filter and sort by. Data, not display: a
+ * hidden block still has them (a concealed sigil still sorts by its target
+ * date). Read through `entryBlockValues` (`entrySummary.ts`).
+ */
+export interface BlockValues {
+  /** The cheap pre-check on the raw content, as `ListInfoProvider.mayContribute`. */
+  mayContribute: (content: string) => boolean;
+  read: (block: BlockInstance, ctx: BlockContext) => BlockFieldValue[];
 }
 
 /* ---------------- 6 Effect on the entry ---------------- */
@@ -186,10 +199,10 @@ export interface BlockTypeDef {
   listInfo?: ListInfoProvider;
   /** 2 — how the block appears in an export (#151). */
   export?: (block: BlockInstance, ctx: BlockContext) => BlockExportPart[];
-  /** 3 — rows and suggested values for the entry's properties; the panel shows them (#181). */
+  /** 3 — rows and suggested values for the entry's properties; the panel shows them, a suggested value marked as the block's. */
   properties?: BlockProperties;
-  /** 4 / 9 — values to filter and sort dashboards by (#181). */
-  values?: (block: BlockInstance, ctx: BlockContext) => BlockFieldValue[];
+  /** 4 / 9 — values to filter and sort dashboards by; the dashboard's controls for them come with #117. */
+  values?: BlockValues;
   /** 6 — what the block does to the whole entry (#182). */
   entryEffect?: (block: BlockInstance, blocks: readonly BlockInstance[], ctx: BlockContext) => BlockEntryEffect;
   /** 7 — the tag the block's pictures go under. */

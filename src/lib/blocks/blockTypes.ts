@@ -1,5 +1,4 @@
-import type { BlockActionDef, BlockCopyContext, BlockProperties, BlockSettingDef, BlockTypeDef } from './blockType';
-import type { ListInfoProvider } from './listInfo';
+import type { BlockActionDef, BlockCopyContext, BlockSettingDef, BlockTypeDef } from './blockType';
 import { htmlPlainText } from './plainText';
 import { blockDataVersion, withDataVersion, withoutImageInMarkup, type RefReporter } from './toolkit';
 import { BLOCK_ATTR, type BlockInstance } from './types';
@@ -22,20 +21,20 @@ export type { BlockGroup, BlockTypeDef } from './blockType';
  * ask through the helpers here — `blockInterfaces` for the readers that
  * must also cover a block this version cannot read (`UNKNOWN_BLOCK`, or
  * `TOO_NEW_BLOCK` for a known type in a newer format) — or, for what only a
- * readable type has, `resolveBlockType(block)` (`entryProperties.ts`).
+ * readable type has, `resolveBlockType(block)` (`entryProperties.ts`, `entrySummary.ts`).
  */
 
 // A Map instead of an object: the type comes from stored content, and
 // `BLOCK_TYPES['constructor']` would otherwise find the prototype.
 const BLOCK_TYPES = new Map<string, BlockTypeDef>();
-/** `listInfoProviders()`, made once per state of the registry: lists ask it for every entry. */
-let providers: ListInfoProvider[] | null = null;
+/** The pre-checks of `mayShowOutside`, made once per state of the registry: lists ask it for every entry. */
+let preChecks: ((content: string) => boolean)[] | null = null;
 
 /** Adds a type. Built-in ones register below; the ID must be new. */
 export function registerBlockType(def: BlockTypeDef): void {
   if (BLOCK_TYPES.has(def.id)) throw new Error(`block type ${def.id} is already registered`);
   BLOCK_TYPES.set(def.id, def);
-  providers = null;
+  preChecks = null;
 }
 
 for (const def of [textBlockType, fieldsBlockType, canvasBlockType, paintBlockType, altarBlockType]) registerBlockType(def);
@@ -89,15 +88,15 @@ export function blockInterfaces(block: BlockInstance): BlockReaders {
   return resolveBlockType(block) ?? (BLOCK_TYPES.has(block.type) ? TOO_NEW_BLOCK : UNKNOWN_BLOCK);
 }
 
-/** What every block type adds to the info line in lists — for the summary's pre-check. */
-export function listInfoProviders(): readonly ListInfoProvider[] {
-  providers ??= [...BLOCK_TYPES.values()].flatMap((def) => def.listInfo ?? []);
-  return providers;
-}
-
-/** What every type adds to the entry's properties — for the pre-check of `entryProperties`. */
-export function propertyProviders(): BlockProperties[] {
-  return [...BLOCK_TYPES.values()].flatMap((def) => def.properties ?? []);
+/**
+ * Can any block of this content show something outside itself — in the info
+ * line (1), the properties (3), the values to filter and sort by (4/9)? The
+ * cheap pre-check of `entryBlockSummary`: most entries fail it and are not
+ * parsed at all.
+ */
+export function mayShowOutside(content: string): boolean {
+  preChecks ??= [...BLOCK_TYPES.values()].flatMap((def) => [def.listInfo, def.properties, def.values].flatMap((i) => i?.mayContribute ?? []));
+  return preChecks.some((check) => check(content));
 }
 
 /** The settings the block's type describes (none for an unknown type). */

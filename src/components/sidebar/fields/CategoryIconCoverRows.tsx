@@ -5,6 +5,8 @@ import { categoryLabel } from '../../../lib/categories';
 import { useShrunkIcon } from '../../../hooks/useShrunkIcon';
 import { isDiscarding, trackEntryWrite } from '../../../store/entryEdit';
 import { EditPropertyRow, MediaPropertyRow, PropertySelect } from './EditProperties';
+import type { EntryBlockSources } from './BlockSourced';
+import type { Suggestion } from '../../../lib/blocks/entryProperties';
 
 /** The "no category" entry of the menu; not a valid value of the column. */
 const NO_CATEGORY = '__none__';
@@ -17,11 +19,13 @@ interface Patch {
 
 /**
  * Category, icon and cover image when editing, in the "Properties" section
- * of every entry. A category change leaves the content as it is.
+ * of every entry. A category change leaves the content as it is. Icon and
+ * cover show what a block suggests while the user has set nothing (`blocks`).
  */
-export default function CategoryIconCoverRows({ entry, update }: {
+export default function CategoryIconCoverRows({ entry, update, blocks }: {
   entry: { id: string; category_id: string | null; icon?: string; cover_image?: string };
   update: (patch: Patch) => Promise<void>;
+  blocks: EntryBlockSources;
 }) {
   const { t } = useTranslation();
   const categories = useCategoryStore((s) => s.categories);
@@ -34,6 +38,8 @@ export default function CategoryIconCoverRows({ entry, update }: {
   const setIcon = (icon: string) => trackEntryWrite(entry.id, shrinkIcon(icon));
   // A category in the trash no longer resolves and counts as "None".
   const category = categories.find((c) => c.id === entry.category_id);
+
+  const suggested = (s: Suggestion | null) => s && { value: s.value, blockName: blocks.blockName(s.blockId), fixed: !s.overridable };
 
   const changeCategory = (next: string) => {
     const categoryId = next === NO_CATEGORY ? null : next;
@@ -61,6 +67,7 @@ export default function CategoryIconCoverRows({ entry, update }: {
         label={t('properties.icon')}
         kind="icon"
         value={entry.icon}
+        suggested={suggested(blocks.suggestions.icon)}
         onChange={(icon) => void setIcon(icon)}
         onRemove={() => void setIcon('')}
       />
@@ -69,6 +76,7 @@ export default function CategoryIconCoverRows({ entry, update }: {
         label={t('properties.coverImage')}
         kind="cover"
         value={entry.cover_image}
+        suggested={suggested(blocks.suggestions.cover)}
         onChange={(cover_image) => void update({ cover_image })}
         onRemove={() => void update({ cover_image: undefined })}
       />

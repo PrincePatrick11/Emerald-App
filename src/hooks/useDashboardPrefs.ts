@@ -21,7 +21,7 @@ export function useDashboardPrefs(
   const setPrefs = (patch: Partial<ListPrefs>) => {
     if (!dashboard) return;
     void updateDashboard(dashboard.id, {
-      display: { view: patch.view ?? display.view, grouping: patch.grouping ?? display.grouping },
+      display: { ...display, view: patch.view ?? display.view, grouping: patch.grouping ?? display.grouping },
       sort: patch.sort ? sortFromMode(patch.sort, sort, dateField) : sort,
     }).catch((e: unknown) => console.error('[useDashboardPrefs] saving failed:', e));
   };

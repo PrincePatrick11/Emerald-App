@@ -137,7 +137,7 @@ Views over entries by filter rules (`lib/dashboards.ts`, `store/dashboardStore.t
 | position | INTEGER | order in the rail |
 | filter | TEXT | JSON `{ categories?: string[], tags?: string[] }`; a missing key does not narrow, so `{}` shows every entry; an empty category or tag list is kept and matches nothing (a filter whose categories or tags were all deleted); the settings dialog drops an empty list only when the user changes that rule and saves |
 | sort | TEXT | JSON `{ by: 'created' \| 'title' \| 'updated', dir }` |
-| display | TEXT | JSON `{ view: 'list' \| 'cards' \| 'cards_wide' \| 'timeline', grouping: 'grouped' \| 'flat' }` — the list's view and grouping; missing or broken JSON reads as list/flat (`parseDashboardDisplay`) |
+| display | TEXT | JSON `{ view: 'list' \| 'cards' \| 'cards_wide' \| 'timeline', grouping: 'grouped' \| 'flat', info: 'short' \| 'long' }` — the list's view, grouping and the form of the blocks' info line; missing or broken values read as list/flat/long (`parseDashboardDisplay`) |
 | created_at / updated_at | TEXT | ISO 8601 |
 | deleted_at | TEXT | NULL = active; a dashboard in the Trash is purged after the retention period (`CLEANUP_TABLES`) and removed when the Trash is emptied — "All entries" never gets there |
 

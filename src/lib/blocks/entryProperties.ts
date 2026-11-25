@@ -1,7 +1,6 @@
 import { isBlockHidden } from './blockAttrs';
-import { parseBlocks } from './blockHtml';
 import type { BlockContext, BlockPropertyRow } from './blockType';
-import { propertyProviders, resolveBlockType } from './blockTypes';
+import { resolveBlockType } from './blockTypes';
 import type { BlockInstance } from './types';
 
 /**
@@ -9,8 +8,12 @@ import type { BlockInstance } from './types';
  * interface 3), folded with the entry's own values and its category's:
  * **the user before the block before the category** — unless the block's
  * type says its value is not to be overridden, then the block's stands.
- * Each value says where it comes from, so the panel can show a suggested
- * one as the block's (#181 draws it; this step delivers the values).
+ * Each value says where it comes from, so the panel can mark a suggested
+ * one as the block's.
+ *
+ * Two halves: `blockSuggestions` reads the blocks (cached per entry with
+ * the rest of what lists want, `entryBlockSummary`), `resolveProperty`
+ * folds one suggestion with the user's and the category's value.
  *
  * The tags a block gives are not folded in here: they are references
  * (`block_refs`, kind `tag`) and come with the entry (`Entry.block_tags`).
@@ -25,46 +28,51 @@ export interface SourcedValue {
   blockId?: string;
 }
 
-export interface EntryBlockProperties {
-  icon: SourcedValue | null;
-  cover: SourcedValue | null;
-  /** The rows the blocks add, in stack order. */
-  rows: (BlockPropertyRow & { blockId: string })[];
-}
-
-interface Suggestion {
+/** A value a block suggests for a fixed property. */
+export interface Suggestion {
   value: string;
   blockId: string;
+  /** May the user's own value take its place? */
   overridable: boolean;
 }
 
-/** User, block, category — a block value that may not be overridden first of all. */
-function decide(user: string | null | undefined, block: Suggestion | null, category: string | null | undefined): SourcedValue | null {
+/** A row a block adds, with the block it comes from. */
+export type SourcedPropertyRow = BlockPropertyRow & { blockId: string };
+
+/** What the visible blocks of an entry suggest and add. */
+export interface BlockSuggestions {
+  icon: Suggestion | null;
+  cover: Suggestion | null;
+  /** The rows the blocks add, in stack order. */
+  rows: readonly SourcedPropertyRow[];
+}
+
+export const NO_SUGGESTIONS: BlockSuggestions = { icon: null, cover: null, rows: [] };
+
+/**
+ * User, block, category — a block value that may not be overridden first of all.
+ * `null` without any of them.
+ */
+export function resolveProperty(
+  user: string | null | undefined,
+  block: Suggestion | null,
+  category: string | null | undefined,
+): SourcedValue | null {
   if (block && !block.overridable) return { value: block.value, source: 'block', blockId: block.blockId };
   if (user) return { value: user, source: 'user' };
   if (block) return { value: block.value, source: 'block', blockId: block.blockId };
   return category ? { value: category, source: 'category' } : null;
 }
 
-/** Can any block type say something about this content? The cheap pre-check, as for the info line. */
-export function mayHaveBlockProperties(content: string): boolean {
-  return propertyProviders().some((properties) => properties.mayContribute(content));
-}
-
 /**
- * The entry's properties with what its visible blocks suggest. The first
- * block (in stack order) that suggests an icon or a cover is the one asked;
- * a hidden block suggests nothing.
+ * What the visible blocks suggest. The first block (in stack order) that
+ * suggests an icon or a cover is the one asked; a hidden block suggests
+ * nothing and adds no rows.
  */
-export function entryProperties(
-  entry: { icon?: string | null; cover_image?: string | null },
-  blocks: readonly BlockInstance[],
-  category: { emoji: string } | null | undefined,
-  ctx: BlockContext,
-): EntryBlockProperties {
+export function blockSuggestions(blocks: readonly BlockInstance[], ctx: BlockContext): BlockSuggestions {
   let icon: Suggestion | null = null;
   let cover: Suggestion | null = null;
-  const rows: EntryBlockProperties['rows'] = [];
+  const rows: SourcedPropertyRow[] = [];
   for (const block of blocks) {
     const properties = resolveBlockType(block)?.properties;
     if (!properties || isBlockHidden(block)) continue;
@@ -78,19 +86,5 @@ export function entryProperties(
     }
     for (const row of properties.rows?.(block, ctx) ?? []) rows.push({ ...row, blockId: block.id });
   }
-  return {
-    icon: decide(entry.icon, icon, category?.emoji),
-    cover: decide(entry.cover_image, cover, null),
-    rows,
-  };
-}
-
-/** `entryProperties` from a content, without parsing it when no type can contribute. */
-export function entryPropertiesOf(
-  entry: { icon?: string | null; cover_image?: string | null; content: string },
-  category: { emoji: string } | null | undefined,
-  ctx: BlockContext,
-): EntryBlockProperties {
-  const blocks = mayHaveBlockProperties(entry.content) ? parseBlocks(entry.content) : [];
-  return entryProperties(entry, blocks, category, ctx);
+  return icon || cover || rows.length ? { icon, cover, rows } : NO_SUGGESTIONS;
 }

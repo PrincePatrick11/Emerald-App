@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { entryBlockSummary } from '../../lib/blocks/entrySummary';
+import { resolveProperty } from '../../lib/blocks/entryProperties';
 import { imageSrc } from '../../lib/images';
 import { formatEntryDate } from '../../lib/formatDate';
 import { displayTitle } from '../../lib/entryTitle';
@@ -49,7 +50,10 @@ export default function EntryView() {
   // the title is shown, and the block stack only mounts with the real content.
   const contentReady = useEntryContentReady(entry?.id);
   // A loaded sigil with the "whole entry" lock never opens in edit mode.
-  const locked = !!entry && !!entryBlockSummary(entry.id, entry.content).sigil?.lockEntry;
+  const summary = entry ? entryBlockSummary(entry) : null;
+  const locked = !!summary?.sigil?.lockEntry;
+  // The user's cover — or the one a block suggests (`resolveProperty`).
+  const cover = entry && summary ? resolveProperty(entry.cover_image, summary.properties.cover, null)?.value : undefined;
   const isEditing = activeView.mode === 'edit' && !locked;
 
   const [title, setTitle] = useState('');
@@ -169,10 +173,10 @@ export default function EntryView() {
           <span>{formatEntryDate(date)}</span>
         </>
       )}
-      aboveTitle={!isEditing && entry.cover_image && (
+      aboveTitle={!isEditing && cover && (
         <div className="flex-shrink-0 px-8 pt-5">
           <img
-            src={imageSrc(entry.cover_image)}
+            src={imageSrc(cover)}
             alt=""
             className="w-full max-h-48 object-cover rounded-lg border border-edge"
           />

@@ -80,7 +80,7 @@ Top-level keys of `en.json`, with the conventions worth knowing:
 | `undo` | Undo toast messages |
 | `nav` | Navigation labels, including `allEntries`, `categories`, `all` and `vaults`; `allEntries`/`journal`/`practice`/`knowledge` are also the names of the built-in dashboards (`dashboardLabel`) as long as they have no name of their own. A rail entry needs its `nav.<id>` key in all four locales, since `TASKS_VIEW`/`AUX_VIEWS` resolve the label dynamically |
 | `sidebar` | Left sidebar strings (`allEmpty`, `tasksEmpty`, `dashboardEmpty`) |
-| `dashboards` | Dashboards: the settings dialog (`settingsTitle`, `name`, `filterCategories`/`filterTags` with their hints, `newCategory`/`addCategory`, `allHasNoFilter`), the rail menu (`settings`, `moveUp`, `moveDown`), `newEntry`, the plus's `dashboard` tile, `defaultName` for a new one and `unnamed` for one without a name |
+| `dashboards` | Dashboards: the settings dialog (`settingsTitle`, `name`, `filterCategories`/`filterTags` with their hints, `newCategory`/`addCategory`, `allHasNoFilter`, `infoLine` with its hint and `infoShort`/`infoLong`), the rail menu (`settings`, `moveUp`, `moveDown`), `newEntry`, the plus's `dashboard` tile, `defaultName` for a new one and `unnamed` for one without a name |
 | `entries`, `tasks` | Entry and task UI strings. Their `untitled` key is what `displayTitle` (`src/lib/entryTitle.ts`) shows for an empty title — display text only, never stored |
 | `creation` | The sigil creation tools (intention, letters, canvas, charge) |
 | `blocks` | Content-block UI and the Blocks view: `types.*` (block types), `kinds.*` (one per `ElementKind`, shared by the "Add block" menu and the builder's element picker), `fields.*` (field block), `sigil.*` (calculator, drawing and charge, on their own or as parts of a block), `canvas.*` (the Canvas and Altar blocks), `paint.*` (the Painting block), `library.*` (the Blocks builder and its update/remove-copies notices) |
@@ -91,7 +91,7 @@ Top-level keys of `en.json`, with the conventions worth knowing:
 | `templates` | Templates dashboard and page; `builtin.sigil` and `builtin.altar` name the built-in `core-sigil` and `core-altar` templates the way `categories.builtin.*` names a category; `insert.*` is the editor's picker and apply flow |
 | `lexicon` | Lexicon dashboard, language page and translate field. `wordCount` counts vocabulary rows; the translated text's own count is `textWordCount` |
 | `tags` | Tags view (`new`, `name`, `nameTaken`, `color`, `unused`; the usage filter `usage`, `inEntries` and the `onlyIn*`, `*Filter` and `*Hint` keys, one set per state; `deleteWarning` before deleting a tag still on entries, `entrySort` for the sort of the entries under the tags) |
-| `properties` | Right sidebar Properties panel |
+| `properties` | Right sidebar Properties panel; `fromBlock`/`fromBlockUnnamed`/`fromBlockFixed` are the tooltips of the "from a block" mark |
 | `filters` | Filter panel; `all` is the "All" row every `FilterList` shows on top |
 | `vault` | `VaultPicker`: list/switch, edit, create, open/relocate, delete, the way back. Some keys (`chooseFolder`, `defaultFolder`, `alreadyOpen`, `accessDenied`, `folderHasVault`, `folderNotEmpty`) also serve the backup import's add-vault mode via `VaultLocationRow` and `NEW_VAULT_TARGET_ERROR_KEY`. `outdated` and `tooNew` are what a vault of an earlier or a newer version is refused with (`vaultOpenErrorKey`) |
 | `settings` | Settings modal, and on the start page the keys its sections share with it (language, theme, custom themes, updates, tagline, website) |

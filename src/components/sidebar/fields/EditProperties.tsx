@@ -11,6 +11,7 @@ import { ImageTooLargeError, imageSizeLabel, prepareImageDataUrl, readIconFile }
 import { reportImageError } from '../../../store/imageNoticeStore';
 import { RowIcon } from './SidebarSection';
 import IconCropDialog from './IconCropDialog';
+import FromBlockMark from '../../ui/FromBlockMark';
 
 /**
  * The building blocks of the edit sidebar, the counterpart to
@@ -100,8 +101,13 @@ function MediaPreview({ kind, value }: { kind: 'icon' | 'cover'; value: string }
  * With `fallback`, "Remove" resets to this icon instead of to nothing and
  * is absent while it already applies: a custom block and a template always
  * carry an icon.
+ *
+ * `suggested` is what a block of the entry suggests (interface 3): shown,
+ * marked as the block's, while the user has set nothing — choosing one of
+ * their own takes its place. A `fixed` one may not be overridden: it stands
+ * whatever the user set, without a menu.
  */
-export function MediaPropertyRow({ rowIcon, label, kind, value, onChange, onRemove, fallback }: {
+export function MediaPropertyRow({ rowIcon, label, kind, value, onChange, onRemove, fallback, suggested }: {
   rowIcon: ReactNode;
   label: string;
   kind: 'icon' | 'cover';
@@ -110,6 +116,7 @@ export function MediaPropertyRow({ rowIcon, label, kind, value, onChange, onRemo
   onRemove?: () => void;
   /** The default icon that "Remove" resets to (instead of `onRemove`). */
   fallback?: string;
+  suggested?: { value: string; blockName: string; fixed: boolean } | null;
 }) {
   const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -164,7 +171,7 @@ export function MediaPropertyRow({ rowIcon, label, kind, value, onChange, onRemo
   ];
 
   // An empty cover image opens the file picker right away, no menu.
-  const opensMenu = kind === 'icon' || !!value;
+  const opensMenu = kind === 'icon' || !!value || !!suggested;
 
   const button = (toggleEmoji?: () => void) => (
     <button
@@ -173,14 +180,19 @@ export function MediaPropertyRow({ rowIcon, label, kind, value, onChange, onRemo
       aria-expanded={opensMenu ? menu !== null : undefined}
       aria-label={label}
       title={label}
-      className={`prop-value-btn${value ? ' prop-value-btn--media' : ' prop-value-btn--muted'}`}
+      className={`prop-value-btn${value || suggested ? ' prop-value-btn--media' : ' prop-value-btn--muted'}`}
       onClick={(e) => {
         if (!opensMenu) { pickFile(); return; }
         const r = e.currentTarget.getBoundingClientRect();
         setMenu({ x: r.right, y: r.bottom + 4, toggleEmoji });
       }}
     >
-      {value ? <MediaPreview kind={kind} value={value} /> : (
+      {value ? <MediaPreview kind={kind} value={value} /> : suggested ? (
+        <>
+          <MediaPreview kind={kind} value={suggested.value} />
+          <FromBlockMark name={suggested.blockName} />
+        </>
+      ) : (
         <>
           <Plus size={14} />
           <span className="min-w-0 truncate">{t('properties.add')}</span>
@@ -192,16 +204,26 @@ export function MediaPropertyRow({ rowIcon, label, kind, value, onChange, onRemo
   return (
     <>
       <EditPropertyRow icon={rowIcon} label={label}>
-        <input ref={inputRef} type="file" accept={ACCEPTED_IMAGE_MIME} className="hidden" onChange={handleUpload} />
-        {kind === 'icon' ? (
-          <EmojiPicker
-            value={value && !isImageIcon(value) ? value : ''}
-            onChange={onChange}
-            align="right"
-            wrapperClassName="relative min-w-0"
-            trigger={({ toggle }) => button(toggle)}
-          />
-        ) : button()}
+        {suggested?.fixed ? (
+          // The block's value stands: shown, marked, nothing to choose — sized like `.prop-value-btn--media`, without its hover.
+          <span className="inline-flex items-center gap-1.5 h-7 px-1">
+            <MediaPreview kind={kind} value={suggested.value} />
+            <FromBlockMark name={suggested.blockName} fixed />
+          </span>
+        ) : (
+          <>
+            <input ref={inputRef} type="file" accept={ACCEPTED_IMAGE_MIME} className="hidden" onChange={handleUpload} />
+            {kind === 'icon' ? (
+              <EmojiPicker
+                value={value && !isImageIcon(value) ? value : ''}
+                onChange={onChange}
+                align="right"
+                wrapperClassName="relative min-w-0"
+                trigger={({ toggle }) => button(toggle)}
+              />
+            ) : button()}
+          </>
+        )}
       </EditPropertyRow>
       {notice && <p className="pl-[9px] pr-3 text-xs text-danger">{notice}</p>}
       {cropping && (

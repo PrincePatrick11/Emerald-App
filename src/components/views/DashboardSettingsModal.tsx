@@ -6,6 +6,7 @@ import Button from '../ui/Button';
 import EditDialogFooter from '../ui/EditDialogFooter';
 import TagInput, { commitDraftTags, type DraftTag } from '../ui/TagInput';
 import FilterList from '../ui/FilterList';
+import SegmentedControl from '../ui/SegmentedControl';
 import Favicon from '../sidebar/fields/Favicon';
 import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
 import { useShrunkIcon } from '../../hooks/useShrunkIcon';
@@ -28,7 +29,9 @@ export function DashboardSettingsHost() {
 }
 
 /**
- * Name, icon and filter of a dashboard: which categories and tags it shows.
+ * Name, icon, info line and filter of a dashboard: which categories and tags
+ * it shows, and whether its rows and cards show what the blocks add in the
+ * short or the long form (the left list always shows the short one).
  * Everything deselected shows every entry. Saved on "Save"; a category
  * created here exists at once and is ticked in the filter, so it shows up in
  * this dashboard. "All entries" has no filter and cannot be deleted.
@@ -43,6 +46,7 @@ function DashboardSettingsModal({ dashboard, onClose }: { dashboard: Dashboard; 
   // A built-in without a name of its own shows the translated one — as the placeholder, so the field stays empty.
   const [name, setName] = useState(dashboard.name);
   const [icon, setIcon] = useState(dashboard.icon);
+  const [info, setInfo] = useState(dashboard.display.info);
   // An uploaded picture becomes a 128px file in `icons/`; the row only names it. Save waits for it.
   const shrinkIcon = useShrunkIcon(setIcon, 'DashboardSettingsModal');
   const pendingIcon = useRef<Promise<void>>(Promise.resolve());
@@ -72,6 +76,7 @@ function DashboardSettingsModal({ dashboard, onClose }: { dashboard: Dashboard; 
     await updateDashboard(dashboard.id, {
       name: nextName,
       icon,
+      ...(info !== dashboard.display.info ? { display: { ...dashboard.display, info } } : {}),
       ...(categoriesTouched || tagsTouched
         ? { filter: { ...(categoriesRule && { categories: categoriesRule }), ...(tagsRule && { tags: tagsRule }) } }
         : {}),
@@ -128,6 +133,20 @@ function DashboardSettingsModal({ dashboard, onClose }: { dashboard: Dashboard; 
       <div>
         <p className="label-xs mb-2">{t('properties.icon')}</p>
         <Favicon value={icon} onChange={chooseIcon} onRemove={() => chooseIcon('')} />
+      </div>
+      <div>
+        <p className="label-xs mb-1">{t('dashboards.infoLine')}</p>
+        <p className="text-xs text-subtle mb-2">{t('dashboards.infoLineHint')}</p>
+        <SegmentedControl
+          className="w-fit"
+          options={[
+            { value: 'short', label: t('dashboards.infoShort') },
+            { value: 'long', label: t('dashboards.infoLong') },
+          ]}
+          value={info}
+          onChange={setInfo}
+          ariaLabel={t('dashboards.infoLine')}
+        />
       </div>
       {isAll ? (
         <p className="text-xs text-subtle">{t('dashboards.allHasNoFilter')}</p>

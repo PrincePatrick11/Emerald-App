@@ -896,7 +896,10 @@
     "cropArea": "Área de recorte",
     "cropZoom": "Zoom",
     "cropHint": "Arrastra para mover la imagen; usa la rueda del ratón o el control para hacer zoom.",
-    "cropApply": "Aplicar"
+    "cropApply": "Aplicar",
+    "fromBlock": "Del bloque «{{name}}»",
+    "fromBlockUnnamed": "De un bloque",
+    "fromBlockFixed": "Fijado por el bloque «{{name}}»: no se puede cambiar aquí"
   },
   "filters": {
     "all": "Todas",
@@ -1581,6 +1584,10 @@
     "newEntry": "Nueva entrada",
     "settings": "Ajustes del panel",
     "name": "Nombre",
+    "infoLine": "Línea de información",
+    "infoLineHint": "Lo que los bloques añaden a filas y tarjetas, como la fecha objetivo de un sigilo. La lista de la izquierda siempre lo muestra breve.",
+    "infoShort": "Breve",
+    "infoLong": "Detallada",
     "allHasNoFilter": "«Todas las entradas» muestra cada entrada y no tiene filtro.",
     "filterCategories": "Categorías",
     "filterCategoriesHint": "Muestra entradas de las categorías marcadas. «Todas» muestra todas las categorías.",

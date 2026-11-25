@@ -1,4 +1,3 @@
-import { CalendarClock } from 'lucide-react';
 import { escapeHtml } from '../internalLinkHtml';
 import { generateId } from '../helpers';
 import { neutralizeSectionTags, parseBlocks, serializeBlocks } from './blockHtml';
@@ -9,7 +8,6 @@ import {
 import { createSigilDrawingBlock, isSigilDrawing, PAINT_BLOCK_TYPE } from './paint';
 import { readBlockData, withBlockData } from './blockJson';
 import { BLOCK_ATTR, type BlockInstance } from './types';
-import type { ListInfoPart } from './listInfo';
 
 /**
  * A sigil: calculator, drawing, charge.
@@ -200,21 +198,16 @@ export function serializeSigilCharge(block: BlockInstance, charge: Omit<SigilCha
 }
 
 /**
- * The info line of lists: the charge's target date. Of several charges in an
- * entry the first loaded one speaks, otherwise the first — a loaded one
- * without a date therefore shows none, even if an unloaded one has one.
+ * The charge's target date, for the info line, the properties panel and
+ * sorting (the fields block hands it on, `kinds/fields.ts`) — `null` for an
+ * element that is no charge or a broken one; `iso: null` for a charge
+ * without a date.
  */
-export function chargeListInfo(block: BlockInstance, element: ElementDef, model: FieldsModel): ListInfoPart[] {
-  if (!isSigilElement(element)) return [];
+export function chargeTargetDate(block: BlockInstance, element: ElementDef, model: FieldsModel): { iso: string | null; loaded: boolean } | null {
+  if (!isSigilElement(element)) return null;
   const charge = parseSigilCharge(sigilPartBlock(block, element, model));
-  if (charge.broken) return [];
-  return [{
-    key: 'sigil.targetDate',
-    rank: charge.loaded ? 0 : 1,
-    icon: CalendarClock,
-    labelKey: 'creation.targetDate',
-    value: charge.revealDate ? { kind: 'date', iso: charge.revealDate } : null,
-  }];
+  if (charge.broken) return null;
+  return { iso: charge.revealDate || null, loaded: charge.loaded };
 }
 
 /** Does the charge currently conceal: loaded, and the target date has not been reached (or there is none). */

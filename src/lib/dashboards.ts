@@ -27,7 +27,7 @@ const DEFAULT_SORT: DashboardSort = { by: 'updated', dir: 'desc' };
  * built-ins' own start values into their rows (`BUILTIN_DASHBOARDS`), and a
  * new dashboard starts with this.
  */
-export const DEFAULT_DISPLAY: DashboardDisplay = { view: 'list', grouping: 'flat' };
+export const DEFAULT_DISPLAY: DashboardDisplay = { view: 'list', grouping: 'flat', info: 'long' };
 
 const DISPLAY_VIEWS: readonly DashboardDisplay['view'][] = ['list', 'cards', 'cards_wide', 'timeline'];
 
@@ -73,6 +73,7 @@ export function parseDashboardDisplay(raw: unknown): DashboardDisplay {
   return {
     view: DISPLAY_VIEWS.includes(value.view as DashboardDisplay['view']) ? value.view as DashboardDisplay['view'] : DEFAULT_DISPLAY.view,
     grouping: value.grouping === 'grouped' || value.grouping === 'flat' ? value.grouping : DEFAULT_DISPLAY.grouping,
+    info: value.info === 'short' || value.info === 'long' ? value.info : DEFAULT_DISPLAY.info,
   };
 }
 
