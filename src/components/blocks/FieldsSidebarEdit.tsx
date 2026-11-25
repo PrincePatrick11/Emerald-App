@@ -1,16 +1,18 @@
 import { useTranslation } from 'react-i18next';
 import { elementLabel } from '../../lib/blocks/blockAttrs';
 import {
-  activeElements, canBeEmpty, elementKindLabelKey, parseFields, serializeFields, type ElementDef, type FieldsModel,
+  activeElements, canBeEmpty, elementKindLabelKey, parseFields, serializeFields, withFieldUse, type ElementDef, type FieldsModel,
 } from '../../lib/blocks/fields';
 import { useFieldFallbackText } from './useFieldFallbackText';
 import OptionsEditor from './OptionsEditor';
+import FieldUseToggles from './FieldUseToggles';
 import { SwitchRow } from '../ui/Switch';
 import type { BlockSidebarEditProps } from './blockSidebarViews';
 
 /**
  * The settings of a field block, expanded below its row in edit mode: per
- * element the label, for a choice the options, and whether it is hidden when empty in
+ * element the label, where it shows outside the block (info line, panel,
+ * filter and sort), for a choice the options, and whether it is hidden when empty in
  * read mode; for the whole block "completely
  * read-only". Every change rewrites the block (JSON + fallback)
  * via the stack, and Cancel rolls it back. Labels and inputs in the
@@ -47,6 +49,11 @@ export default function FieldsSidebarEdit({ block, update }: BlockSidebarEditPro
                 onChange={(e) => patchElement(element.id, { label: e.target.value })}
               />
             </label>
+
+            <div>
+              <span className="panel-field-label">{t('blocks.fields.uses.label')}</span>
+              <FieldUseToggles element={element} onChange={(use, on) => patchElement(element.id, { uses: withFieldUse(element, use, on).uses })} />
+            </div>
 
             {element.kind === 'select' && (
               <OptionsEditor variant="panel" options={element.options ?? []} onChange={(options) => patchElement(element.id, { options })} />

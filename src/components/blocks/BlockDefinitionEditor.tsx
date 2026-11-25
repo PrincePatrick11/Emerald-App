@@ -13,8 +13,8 @@ import { useBlockDraftStore, type DefinitionDraft } from '../../store/draftStore
 import { useDraftPage } from '../../hooks/useDraftPage';
 import { useShrunkIcon } from '../../hooks/useShrunkIcon';
 import {
-  canBeEmpty, defaultFromSlot, ELEMENT_KINDS, elementKindLabelKey, isSlotKind, slotFromDefault,
-  type ElementDef, type ElementKind, type FieldValue, type LinkCategoryFilter, normalizeLinkCategoryFilter,
+  canBeEmpty, defaultFromSlot, ELEMENT_KINDS, elementKindLabelKey, initialUses, isSlotKind, slotFromDefault,
+  type ElementDef, type ElementKind, type FieldUse, type FieldValue, type LinkCategoryFilter, normalizeLinkCategoryFilter, withFieldUse,
 } from '../../lib/blocks/fields';
 import { categoryLabel } from '../../lib/categories';
 import { useCategoryStore } from '../../store/categoryStore';
@@ -29,6 +29,7 @@ import OptionsEditor from './OptionsEditor';
 import BlockCheckbox from './BlockCheckbox';
 import FieldValueEditor from './FieldValueEditor';
 import FieldSlotEditor from './FieldSlotEditor';
+import FieldUseToggles from './FieldUseToggles';
 
 const draftOf = (d: DefinitionDraft): DefinitionDraft => ({
   name: d.name, icon: d.icon, elements: d.elements, display: d.display,
@@ -46,8 +47,8 @@ interface Props {
 
 /**
  * A custom block's page (`LibraryPageFrame`): name as title,
- * below it the fields (add, name, sort,
- * remove); in the sidebar icon and display rules.
+ * below it the fields (add, name, sort, remove, and where each shows
+ * outside the block); in the sidebar icon and display rules.
  *
  * A draft is edited (`useDraftPage`); only "Done" writes it. Nothing here
  * reaches an entry: what is already inserted is a copy of its own.
@@ -75,7 +76,8 @@ export default function BlockDefinitionEditor({ definition, onClose, onDelete, i
     setElements((els) => els.map((e) => (e.id === id ? { ...e, ...p } : e)));
 
   const addElement = (kind: ElementKind) => {
-    const element: ElementDef = { id: generateId(), kind, label: '' };
+    // Its start values written out: the copies keep them whatever later start values are.
+    const element: ElementDef = { id: generateId(), kind, label: '', uses: initialUses(kind) };
     if (kind === 'select') element.options = [];
     setElements((els) => [...els, element]);
   };
@@ -159,6 +161,8 @@ export default function BlockDefinitionEditor({ definition, onClose, onDelete, i
                 element={element}
                 blockHidesEmpty={draft.display.readHideEmpty}
                 onPatch={(p) => patchElement(element.id, p)}
+                // Against the field as it is then: two quick clicks both hold.
+                onUse={(use, on) => setElements((els) => els.map((e) => (e.id === element.id ? withFieldUse(e, use, on) : e)))}
                 onRemove={() => removeElement(element.id)}
               />
             ))}
@@ -175,10 +179,11 @@ export default function BlockDefinitionEditor({ definition, onClose, onDelete, i
   );
 }
 
-function ElementRow({ element, blockHidesEmpty, onPatch, onRemove }: {
+function ElementRow({ element, blockHidesEmpty, onPatch, onUse, onRemove }: {
   element: ElementDef;
   blockHidesEmpty: boolean;
   onPatch: (p: Partial<ElementDef>) => void;
+  onUse: (use: FieldUse, on: boolean) => void;
   onRemove: () => void;
 }) {
   const { t } = useTranslation();
@@ -213,6 +218,7 @@ function ElementRow({ element, blockHidesEmpty, onPatch, onRemove }: {
           aria-label={t('blocks.fields.label')}
           onChange={(e) => onPatch({ label: e.target.value })}
         />
+        <FieldUseToggles element={element} onChange={onUse} />
         <button
           type="button"
           className="block-row-action"

@@ -40,12 +40,34 @@ export interface BlockContext {
   today: string;
 }
 
-/** One value a block delivers — for property rows, filters and sorting. The app words and formats it. */
+/**
+ * One value a block delivers — for the info line, property rows, filters and
+ * sorting. The app words and formats it: a `link` by the name it was stored
+ * with, a `phrase` as a text key (after an optional symbol).
+ */
 export type BlockValue =
   | { kind: 'date'; iso: string }
   | { kind: 'text'; text: string }
   | { kind: 'number'; value: number }
-  | { kind: 'bool'; value: boolean };
+  | { kind: 'bool'; value: boolean }
+  | { kind: 'link'; id: string; label: string }
+  | { kind: 'phrase'; key: string; symbol?: string };
+
+/**
+ * What a value is called: a text key for a type's own names, or — for what
+ * the user named (a field of a custom block) — the name itself.
+ */
+export type BlockValueLabel = { labelKey: string; label?: never } | { label: string; labelKey?: never };
+
+/** The name of a value in the current language (`t` translates a key). */
+export function valueLabel(named: BlockValueLabel, t: (key: string) => string): string {
+  return named.label ?? t(named.labelKey);
+}
+
+/** A `phrase` value worded: its symbol, then its text. */
+export function phraseText(value: { key: string; symbol?: string }, t: (key: string) => string): string {
+  return value.symbol ? `${value.symbol} ${t(value.key)}` : t(value.key);
+}
 
 /* ---------------- 2 Export ---------------- */
 
@@ -71,22 +93,19 @@ export type BlockExportPart =
   | { kind: 'html'; html: string }
   | { kind: 'image'; file: string; altKey?: string }
   | { kind: 'heading'; labelKey: string }
-  | { kind: 'row'; labelKey: string; value: BlockExportValue | null }
-  | { kind: 'row'; label: string; value: BlockExportValue | null }
+  | ({ kind: 'row'; value: BlockExportValue | null } & BlockValueLabel)
   | { kind: 'note'; textKey: string }
   | { kind: 'concealed'; labelKey?: string; until: string | null; parts: BlockExportPart[] };
 
 /**
  * The value of an export row: a value the app formats, markup the block holds
- * in readable form, a stored picture (its alt text the row's label unless
- * given), or a text the app words by its key
- * (after an optional symbol).
+ * in readable form, or a stored picture (its alt text the row's label unless
+ * given).
  */
 export type BlockExportValue =
   | BlockValue
   | { kind: 'html'; html: string }
-  | { kind: 'image'; file: string; alt?: string }
-  | { kind: 'phrase'; key: string; symbol?: string };
+  | { kind: 'image'; file: string; alt?: string };
 
 /** Where a block is exported: the format asked for, and what the entry's blocks conceal today. */
 export interface ExportContext {
@@ -110,12 +129,11 @@ export interface ReadContext {
 /* ---------------- 3 Properties ---------------- */
 
 /** A row a block adds to the entry's properties panel. */
-export interface BlockPropertyRow {
+export type BlockPropertyRow = BlockValueLabel & {
   key: string;
-  labelKey: string;
   icon?: LucideIcon;
   value: BlockValue;
-}
+};
 
 /**
  * What a block adds to the entry's properties: rows of its own, and values it
@@ -146,15 +164,15 @@ export interface BlockProperties {
 /* ---------------- 4 / 9 Filter, sort, date ---------------- */
 
 /** A value a block offers dashboards to filter or sort by (later a calendar). */
-export interface BlockFieldValue {
+export type BlockFieldValue = BlockValueLabel & {
+  /** The same key in every entry for the same value (`sigil.targetDate`, a custom block's field): what a dashboard filters and sorts by. */
   key: string;
-  labelKey: string;
   value: BlockValue | null;
   filter: boolean;
   sort: boolean;
   /** Of several values under one key, the lowest rank (then the first) is the entry's — as in the info line; 0 if missing. */
   rank?: number;
-}
+};
 
 /**
  * The values a block offers to filter and sort by. Data, not display: a

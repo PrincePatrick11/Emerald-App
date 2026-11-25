@@ -22,6 +22,7 @@ import RenameField from '../components/ui/RenameField';
 import { useOpenInNewTabAction } from './useOpenInNewTabAction';
 import { useSaveAsTemplateAction } from './useSaveAsTemplateAction';
 import type { ActiveView, Entry } from '../types';
+import { valueLabel } from '../lib/blocks/blockType';
 
 interface EntryRowOptions {
   /** The dashboard the entries open in; without one, "All entries". */
@@ -59,9 +60,10 @@ export interface EntryRows {
   actions: (entry: Entry, startRename: () => void) => ContextMenuAction[];
 }
 
-/** A part of the info line in its short form: its icon and short value. */
+/** A part of the info line in its short form: its icon (if it has one) and short value. */
 function ShortInfo({ part, text }: { part: ShownListInfoPart; text: string }) {
-  return <><part.icon size={12} className="flex-shrink-0" aria-hidden />{text}</>;
+  const Icon = part.icon;
+  return <>{Icon && <Icon size={12} className="flex-shrink-0" aria-hidden />}{text}</>;
 }
 
 /**
@@ -87,7 +89,7 @@ export function useEntryRows({ dashboardId, dateField }: EntryRowOptions): Entry
   const category = (e: Entry) => categoryLabel(t, lookupCategory(catById, e.category_id));
   const meta = (e: Entry) => [category(e), formatEntryDate(date(e))].filter(Boolean).join(' · ');
   // "Label: value" as a key: French puts a space before the colon.
-  const longInfo = (part: ShownListInfoPart) => t('common.labelValue', { label: t(part.labelKey), value: blockValueText(t, part.value) });
+  const longInfo = (part: ShownListInfoPart) => t('common.labelValue', { label: valueLabel(part, t), value: blockValueText(t, part.value) });
 
   const duplicate = async (e: Entry) => {
     const copy = await duplicateEntry(e.id);
@@ -101,13 +103,17 @@ export function useEntryRows({ dashboardId, dateField }: EntryRowOptions): Entry
     meta,
     // #173: while the blocks add something, the date alone — so both dates fit.
     narrowMeta: (e) => (parts(e, 'short').length ? formatEntryDate(date(e)) : meta(e)),
-    info: (e, form) => parts(e, form).map((part) => (form === 'short'
-      ? (
-        <span key={part.key} className="entry-list-info" title={longInfo(part)}>
-          <ShortInfo part={part} text={blockValueText(t, part.value, 'short')} />
-        </span>
-      )
-      : <span key={part.key} className="entry-list-info">{longInfo(part)}</span>)),
+    info: (e, form) => parts(e, form).map((part) => {
+      // A typed text or a link's name may be cut; values of a known width (dates, numbers) never are.
+      const className = `entry-list-info${part.value.kind === 'text' || part.value.kind === 'link' ? ' entry-list-info--free' : ''}`;
+      return form === 'short'
+        ? (
+          <span key={part.key} className={className} title={longInfo(part)}>
+            <ShortInfo part={part} text={blockValueText(t, part.value, 'short')} />
+          </span>
+        )
+        : <span key={part.key} className={className} title={longInfo(part)}>{longInfo(part)}</span>;
+    }),
     date,
     view,
     rename: async (e, title) => {

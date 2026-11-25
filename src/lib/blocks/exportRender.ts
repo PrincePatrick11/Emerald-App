@@ -1,7 +1,7 @@
 import { escapeHtml } from '../internalLinkHtml';
 import { isBlockHidden, showsTitleInRead } from './blockAttrs';
 import { parseBlocks } from './blockHtml';
-import type { BlockExportFormat, BlockExportPart, BlockExportValue, ExportContext } from './blockType';
+import { phraseText, valueLabel, type BlockExportFormat, type BlockExportPart, type BlockExportValue, type ExportContext } from './blockType';
 import { entryEffects, resolveBlockType, type BlockTypeDef } from './blockTypes';
 import type { BlockInstance } from './types';
 import { localIsoDay } from '../helpers';
@@ -60,7 +60,8 @@ function valueHtml(value: BlockExportValue | null, label: string, text: ExportTe
   switch (value.kind) {
     case 'html': return value.html;
     case 'image': return imageHtml(value.file, value.alt ?? label);
-    case 'phrase': return escapeHtml(value.symbol ? `${value.symbol} ${text.t(value.key)}` : text.t(value.key));
+    case 'phrase': return escapeHtml(phraseText(value, text.t));
+    case 'link': return escapeHtml(value.label);
     case 'date': return escapeHtml(text.date(value.iso));
     case 'number': return escapeHtml(text.number(value.value));
     case 'bool': return escapeHtml(value.value ? text.yes : text.no);
@@ -91,7 +92,7 @@ function partsHtml(parts: readonly BlockExportPart[], format: BlockExportFormat,
   };
   for (const part of parts) {
     if (part.kind === 'row') {
-      const label = 'label' in part ? part.label : text.t(part.labelKey);
+      const label = valueLabel(part, text.t);
       rows += row(label, valueHtml(part.value, label, text));
       continue;
     }

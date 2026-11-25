@@ -1,3 +1,4 @@
+import { ListFilter, PanelRight, Rows3, type LucideIcon } from 'lucide-react';
 import { escapeHtml, extractInternalLinks, internalLinkChipHtml, isBlankContent, isValidLinkTarget, linkTargetKindOf, decodeHtmlAttr } from '../internalLinkHtml';
 import { generateId, isRecord } from '../helpers';
 import { storedImageName } from '../schema';
@@ -84,6 +85,69 @@ export interface ElementDef {
    * A link already set stays, whatever its category.
    */
   linkCategories?: LinkCategoryFilter;
+  /**
+   * How the field shows outside its block (`FieldUse`) — set in the builder
+   * and travelling with every copy like the rest of the element. A use not
+   * stored is off: nothing shows outside unasked. The builder writes the
+   * start values of a new field (`initialUses`) out.
+   */
+  uses?: Partial<FieldUses>;
+}
+
+/* ---------------- Uses outside the block ---------------- */
+
+/**
+ * The block's settings per field (interface 14, for user-built blocks): does
+ * the field appear in the entry's info line in lists, in the properties
+ * panel, among the values dashboards filter and sort by. The fields block
+ * reads them in its interfaces 1, 3 and 4/9 (`kinds/fields.ts`).
+ */
+export const FIELD_USES = ['info', 'panel', 'values'] as const;
+export type FieldUse = (typeof FIELD_USES)[number];
+export type FieldUses = Record<FieldUse, boolean>;
+
+/** How a field's setting is shown, alike in the builder and in the block's sidebar. */
+export const FIELD_USE_SETTINGS: Readonly<Record<FieldUse, { icon: LucideIcon; labelKey: string; hintKey: string }>> = {
+  info: { icon: Rows3, labelKey: 'blocks.fields.uses.info', hintKey: 'blocks.fields.uses.infoHint' },
+  panel: { icon: PanelRight, labelKey: 'blocks.fields.uses.panel', hintKey: 'blocks.fields.uses.panelHint' },
+  values: { icon: ListFilter, labelKey: 'blocks.fields.uses.values', hintKey: 'blocks.fields.uses.valuesHint' },
+};
+
+/** Kinds a new builder field offers to filter and sort by from the start (others may be switched on, as far as `canUse` allows). */
+const VALUES_ON_AT_START: ReadonlySet<ElementKind> = new Set<ElementKind>(['date', 'number', 'select', 'toggle', 'link', 'shorttext']);
+
+/**
+ * Can a field of this kind be used so? A picture has no value to show or
+ * filter by, a long text none to filter by.
+ */
+export function canUse(kind: ElementKind, use: FieldUse): boolean {
+  if (kind === 'image') return false;
+  return use !== 'values' || kind !== 'text';
+}
+
+/** The start values of a new field of a custom block: the panel on, filtering for short values, the info line off. */
+export function initialUses(kind: ElementKind): FieldUses {
+  return { info: false, panel: canUse(kind, 'panel'), values: VALUES_ON_AT_START.has(kind) };
+}
+
+/** A single field (added on its own) starts with every use off: it is shown in its block, not twice. */
+export const NO_USES: FieldUses = { info: false, panel: false, values: false };
+
+/** How the field is used — as stored, off where nothing is; never what its kind cannot do. */
+export function elementUses(element: ElementDef): FieldUses {
+  const used = (use: FieldUse) => canUse(element.kind, use) && element.uses?.[use] === true;
+  return { info: used('info'), panel: used('panel'), values: used('values') };
+}
+
+/** The field with one use switched; all three are stored from then on, so the field no longer depends on what is not stored. */
+export function withFieldUse(element: ElementDef, use: FieldUse, on: boolean): ElementDef {
+  return { ...element, uses: { ...elementUses(element), [use]: on } };
+}
+
+/** A field's name: the one the user gave it, else (as a text key) that of its kind. */
+export function fieldLabel(element: ElementDef): { label: string } | { labelKey: string } {
+  const label = element.label.trim();
+  return label ? { label } : { labelKey: elementKindLabelKey(element.kind) };
 }
 
 export interface LinkCategoryFilter {
@@ -220,6 +284,11 @@ function parseElement(raw: unknown): ElementDef | null {
       : [];
     const filter = normalizeLinkCategoryFilter({ categoryIds: ids, includeUncategorized: raw.linkCategories.includeUncategorized === true });
     if (filter) element.linkCategories = filter;
+  }
+  if (isRecord(raw.uses)) {
+    const uses: Partial<FieldUses> = {};
+    for (const use of FIELD_USES) if (typeof raw.uses[use] === 'boolean') uses[use] = raw.uses[use];
+    element.uses = uses;
   }
   if (raw.defaultValue !== undefined) {
     const value = parseDefault(element, raw.defaultValue);
@@ -559,9 +628,9 @@ export function withoutElementContent(block: BlockInstance, ids: ReadonlySet<str
   return { ...block, attrs, html };
 }
 
-/** A new field block with exactly one element of this kind. */
+/** A new field block with exactly one element of this kind — shown in its block only (`NO_USES`). */
 export function createFieldsBlock(kind: ElementKind): BlockInstance {
-  const element: ElementDef = { id: generateId(), kind, label: '' };
+  const element: ElementDef = { id: generateId(), kind, label: '', uses: { ...NO_USES } };
   if (kind === 'select') element.options = [];
   return {
     id: generateId(),

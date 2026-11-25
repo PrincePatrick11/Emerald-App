@@ -402,7 +402,7 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     color: var(--text-subtle);
   }
 
-  /* What a block adds to an entry's info line (a sigil's target date) in lists and cards: never cut. */
+  /* What a block adds to an entry's info line (a sigil's target date) in lists and cards: never cut, except a free-length value (below). */
   .entry-list-info {
     display: inline-flex;
     align-items: center;
@@ -416,6 +416,16 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     white-space: normal;
     flex-shrink: 1;
     min-width: 0;
+  }
+
+  /* A free-length value (a typed text, a link's name) has no width to rely on: in a row it is cut at the end when room runs out; in a card it wraps. */
+  .entry-list-info--free {
+    display: block;
+    /* Gives way long before the date does, so the date stays whole while there is any room. */
+    flex-shrink: 1000;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   /* Next to the rail, the list on the left needs little margin of its own — the rail

@@ -1,5 +1,5 @@
 import type { TFunction } from 'i18next';
-import type { BlockValue } from './blocks/blockType';
+import { phraseText, type BlockValue } from './blocks/blockType';
 import type { InfoForm } from './blocks/listInfo';
 import { formatIsoDate, formatIsoDateShort } from './formatDate';
 import i18n from '../i18n';
@@ -16,5 +16,7 @@ export function blockValueText(t: TFunction, value: BlockValue, form: InfoForm =
     case 'text': return value.text;
     case 'number': return value.value.toLocaleString(i18n.language);
     case 'bool': return t(value.value ? 'blocks.fields.yes' : 'blocks.fields.no');
+    case 'link': return value.label;
+    case 'phrase': return phraseText(value, t);
   }
 }

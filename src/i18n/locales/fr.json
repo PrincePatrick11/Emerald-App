@@ -233,7 +233,17 @@
       "removeOption": "Supprimer l'option",
       "hideEmpty": "Masquer si vide en mode lecture",
       "readOnly": "Entièrement en lecture seule",
-      "readOnlyHint": "Pas de cochage ni de bascule en mode lecture non plus"
+      "readOnlyHint": "Pas de cochage ni de bascule en mode lecture non plus",
+      "uses": {
+        "label": "Afficher hors du bloc",
+        "info": "Ligne d’information",
+        "infoHint": "Afficher la valeur dans les listes et les tableaux de bord, à côté de la date",
+        "panel": "Barre latérale",
+        "panelHint": "Afficher « Champ : valeur » dans les propriétés de l’entrée",
+        "values": "Filtrer et trier",
+        "valuesHint": "Proposer la valeur aux tableaux de bord pour filtrer et trier",
+        "unavailable": "impossible pour ce type de champ"
+      }
     },
     "library": {
       "defaultName": "Nouveau bloc",

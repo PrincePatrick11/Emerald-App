@@ -386,10 +386,77 @@ console.log('\n4d. Custom blocks: copies\n');
   check('a copy from before keeps working with its old markers',
     parseFields({ ...filled, attrs: { ...filled.attrs, 'data-block-origin': 'def-1', 'data-block-rev': '1' } }).values['e-result'] === 'gut');
 
-  const plainSummary = entryBlockSummary({ id: 'x', content, created_at: '2026-01-01T12:00:00Z' });
-  check('a summary without sigil blocks is empty',
+  const plainSummary = entryBlockSummary({ id: 'x', content: serializeBlocks([createTextBlock('<p>a</p>'), createFieldsBlock('number')]), created_at: '2026-01-01T12:00:00Z' });
+  check('a summary of text and a single field is empty: a single field starts with every use off',
     !plainSummary.effects.lockEntry && plainSummary.effects.concealed.size === 0 && plainSummary.info.short.length === 0 && plainSummary.info.long.length === 0
-      && plainSummary.properties.rows.length === 0 && plainSummary.values.length === 0);
+      && plainSummary.properties.rows.length === 0 && plainSummary.values.length === 0, plainSummary);
+
+  // A use not stored is off: a copy whose fields carry none shows nothing outside its block.
+  const bareSummary = entryBlockSummary({ id: 'x-copy', content, created_at: '2026-01-01T12:00:00Z' });
+  check('a field without stored uses shows nowhere outside its block',
+    bareSummary.properties.rows.length === 0 && bareSummary.info.long.length === 0 && bareSummary.values.length === 0, bareSummary);
+
+  // As the builder writes a new field's start values: panel on, filter for short values, info line off.
+  const startDef = {
+    ...def,
+    elements: def.elements.map((e) => ({ ...e, uses: { info: false, panel: true, values: true } })),
+  };
+  const startCopy = instantiateDefinition(startDef, text);
+  const startContent = serializeBlocks([serializeFields(startCopy, { ...parseFields(startCopy), values: { 'e-date': '2026-09-10', 'e-result': 'gut' } }, text)]);
+  const copySummary = entryBlockSummary({ id: 'x-start', content: startContent, created_at: '2026-01-01T12:00:00Z' });
+  check('a copy’s fields stand in the panel as "name: value", in block order, and are not in the info line',
+    copySummary.properties.rows.map((r) => `${r.label}=${r.value.kind}`).join() === 'Datum=date,Ergebnis=text'
+      && copySummary.info.long.length === 0, copySummary.properties);
+  check('a copy’s short fields offer their values to filter and sort by, keyed by the element',
+    copySummary.values.map((v) => `${v.key}:${v.filter}:${v.sort}`).join() === 'field:e-date:true:true,field:e-result:true:true'
+      && entryBlockValue({ id: 'x-start', content: startContent, created_at: '2026-01-01T12:00:00Z' }, 'field:e-date')?.iso === '2026-09-10', copySummary.values);
+
+  // Two copies of one block in an entry: the filled one speaks, even when the empty one comes first.
+  const infoDef = { ...def, elements: [{ id: 'e-date', kind: 'date', label: 'Datum', uses: { info: true, panel: true, values: true } }] };
+  const emptyCopy = instantiateDefinition(infoDef, text);
+  const fullCopy = serializeFields(instantiateDefinition(infoDef, text), { ...parseFields(emptyCopy), values: { 'e-date': '2026-11-01' } }, text);
+  const twoCopies = { id: 'x-two', content: serializeBlocks([emptyCopy, fullCopy]), created_at: '2026-01-01T12:00:00Z' };
+  check('of two copies, an empty field does not hide the filled one in the info line or the values',
+    entryBlockSummary(twoCopies).info.short.map((p) => p.value.iso).join() === '2026-11-01'
+      && entryBlockValue(twoCopies, 'field:e-date')?.iso === '2026-11-01', entryBlockSummary(twoCopies).info);
+
+  // A long text holding only a rule has no text to show.
+  const ruleDef = { ...def, elements: [{ id: 'e-note', kind: 'text', label: 'Notiz', uses: { info: true, panel: true } }] };
+  const ruleCopy = instantiateDefinition(ruleDef, text);
+  const ruleBlock = serializeFields(ruleCopy, { ...parseFields(ruleCopy), slots: { 'e-note': '<hr>' } }, text);
+  const ruleSummary = entryBlockSummary({ id: 'x-rule', content: serializeBlocks([ruleBlock]), created_at: '2026-01-01T12:00:00Z' });
+  check('a long text with only a rule gives no empty row or info part',
+    ruleSummary.properties.rows.length === 0 && ruleSummary.info.short.length === 0, ruleSummary);
+
+  const usesDef = {
+    ...def,
+    elements: parseDefinitionElements(JSON.stringify([
+      { id: 'u-date', kind: 'date', label: 'Datum', uses: { info: true, panel: false, values: false } },
+      { id: 'u-text', kind: 'text', label: 'Notiz', uses: { info: true, panel: true, values: true } },
+      { id: 'u-pic', kind: 'image', label: 'Bild', uses: { info: true, panel: true, values: true } },
+      { id: 'u-list', kind: 'checklist', label: '', uses: { info: true, panel: 'ja' } },
+      { id: 'u-sel', kind: 'select', label: 'Wahl', options: [{ id: 'o1', label: 'Eins' }], uses: { panel: true, values: true } },
+    ])),
+  };
+  check('stored uses are read per field; a value of a foreign shape is left out',
+    usesDef.elements[0].uses.info === true && usesDef.elements[3].uses.panel === undefined, usesDef.elements);
+  const usesCopy = instantiateDefinition(usesDef, text);
+  check('a copy carries the uses of its definition', parseFields(usesCopy).elements[0].uses?.info === true, usesCopy.attrs);
+  const usesModel = parseFields(usesCopy);
+  const usesFilled = serializeFields(usesCopy, {
+    ...usesModel,
+    values: { 'u-date': '2026-12-21', 'u-list': [{ id: 'i1', text: 'a', checked: true }, { id: 'i2', text: 'b', checked: false }], 'u-sel': 'o1' },
+    slots: { 'u-text': '<p>Ein <strong>langer</strong> Text</p>', 'u-pic': '<img src="x.png">' },
+  }, text);
+  const usesSummary = entryBlockSummary({ id: 'x-uses', content: serializeBlocks([usesFilled]), created_at: '2026-01-01T12:00:00Z' });
+  check('the info line holds the fields switched on, in block order, by value; a picture never',
+    usesSummary.info.short.map((p) => `${p.key}:${p.icon === undefined}`).join() === 'field:u-date:true,field:u-text:true,field:u-list:true'
+      && usesSummary.info.long[1].value.text === 'Ein langer Text' && usesSummary.info.long[2].value.text === '1/2'
+      && usesSummary.info.long[2].labelKey === 'blocks.kinds.checklist', usesSummary.info);
+  check('the panel leaves out a field switched off there, one not stored, and a picture',
+    usesSummary.properties.rows.map((r) => r.key).join() === 'field:u-text,field:u-sel', usesSummary.properties.rows);
+  check('a long text is never offered to filter by, a choice by its option’s name',
+    usesSummary.values.map((v) => v.key).join() === 'field:u-sel' && usesSummary.values[0].value.text === 'Eins', usesSummary.values);
 
   check('definition columns: broken JSON yields the defaults',
     parseDefinitionElements('{kaputt').length === 0 && parseDefinitionDisplay('nope').showTitle === true &&

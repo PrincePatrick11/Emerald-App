@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import type { BlockContext, BlockValue } from './blockType';
+import type { BlockContext, BlockValue, BlockValueLabel } from './blockType';
 import type { BlockInstance } from './types';
 
 /**
@@ -7,25 +7,24 @@ import type { BlockInstance } from './types';
  * and cards, under a tag, the left list) — after date and category. The
  * block decides; the lists only show what comes back. Pure data, in two
  * forms the lists choose between (`InfoForm`): the short one shows a part
- * as its icon and short value ("📅 Dec 12"), the long one as
- * "Label: value" ("Target date: Dec 12, 2026"). The left list always shows
+ * as its icon and short value ("📅 Dec 12" — a part without an icon by its
+ * value alone), the long one as "Label: value" ("Target date: Dec 12, 2026"). The left list always shows
  * the short form, a dashboard the one its settings say.
  */
 export type InfoForm = 'short' | 'long';
 
-export interface ListInfoPart {
+/** The label (`labelKey` or the user's own `label`) is that of the long form. */
+export type ListInfoPart = BlockValueLabel & {
   /** One part per key and entry: of several, the one with the lowest `rank` (then the first) is shown. */
   key: string;
   rank: number;
-  /** Shown before the value in the short form. */
-  icon: LucideIcon;
-  /** The i18n key of the label of the long form. */
-  labelKey: string;
+  /** Shown before the value in the short form; without one the short form is the value alone. */
+  icon?: LucideIcon;
   /** `null`: the block holds the key but has nothing to show (and keeps a lower-ranked part out). */
   value: BlockValue | null;
   /** The forms the part appears in; both if missing. */
   forms?: readonly InfoForm[];
-}
+};
 
 /** A part the lists show: `pickListInfo` has left out those without a value. */
 export type ShownListInfoPart = ListInfoPart & { value: BlockValue };

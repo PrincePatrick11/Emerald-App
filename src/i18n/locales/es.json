@@ -233,7 +233,17 @@
       "removeOption": "Eliminar opción",
       "hideEmpty": "Ocultar vacío en modo lectura",
       "readOnly": "Totalmente de solo lectura",
-      "readOnlyHint": "Tampoco marcar ni alternar en modo lectura"
+      "readOnlyHint": "Tampoco marcar ni alternar en modo lectura",
+      "uses": {
+        "label": "Mostrar fuera del bloque",
+        "info": "Línea de información",
+        "infoHint": "Mostrar el valor en listas y paneles junto a la fecha",
+        "panel": "Barra lateral",
+        "panelHint": "Mostrar «Campo: valor» en las propiedades de la entrada",
+        "values": "Filtrar y ordenar",
+        "valuesHint": "Ofrecer el valor a los paneles para filtrar y ordenar",
+        "unavailable": "no es posible con este tipo de campo"
+      }
     },
     "library": {
       "defaultName": "Nuevo bloque",

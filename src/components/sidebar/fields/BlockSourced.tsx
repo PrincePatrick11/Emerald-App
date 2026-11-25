@@ -6,6 +6,7 @@ import { resolveBlockType } from '../../../lib/blocks/blockTypes';
 import { entryBlockSummary } from '../../../lib/blocks/entrySummary';
 import type { BlockSuggestions } from '../../../lib/blocks/entryProperties';
 import { blockValueText } from '../../../lib/blockValueText';
+import { valueLabel } from '../../../lib/blocks/blockType';
 import { SidebarPropertyRow } from './SidebarSection';
 import FromBlockMark, { FROM_BLOCK_ICON } from '../../ui/FromBlockMark';
 import type { BlockTagChip } from '../../ui/TagInput';
@@ -56,7 +57,7 @@ export function BlockPropertyRows({ sources }: { sources: EntryBlockSources }) {
           <SidebarPropertyRow
             key={`${row.blockId}:${row.key}`}
             icon={<Icon size={14} />}
-            label={t(row.labelKey)}
+            label={valueLabel(row, t)}
             value={<><span className="min-w-0 truncate" title={value}>{value}</span><FromBlockMark name={sources.blockName(row.blockId)} /></>}
           />
         );

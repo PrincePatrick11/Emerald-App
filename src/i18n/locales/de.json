@@ -233,7 +233,17 @@
       "removeOption": "Option entfernen",
       "hideEmpty": "Leer im Lesemodus ausblenden",
       "readOnly": "Komplett schreibgeschützt",
-      "readOnlyHint": "Auch im Lesemodus nichts abhaken oder umschalten"
+      "readOnlyHint": "Auch im Lesemodus nichts abhaken oder umschalten",
+      "uses": {
+        "label": "Außerhalb des Blocks zeigen",
+        "info": "Infozeile",
+        "infoHint": "Wert in Listen und Dashboards neben dem Datum zeigen",
+        "panel": "Seitenleiste",
+        "panelHint": "„Feldname: Wert“ in den Eigenschaften des Eintrags zeigen",
+        "values": "Filtern und sortieren",
+        "valuesHint": "Wert Dashboards zum Filtern und Sortieren anbieten",
+        "unavailable": "bei dieser Feldart nicht möglich"
+      }
     },
     "library": {
       "defaultName": "Neuer Block",

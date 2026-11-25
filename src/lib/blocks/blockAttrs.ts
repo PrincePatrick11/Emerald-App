@@ -2,7 +2,7 @@ import type { TFunction } from 'i18next';
 import { BLOCK_ATTR, type BlockAttrName, type BlockInstance } from './types';
 import type { BlockTypeDef } from './blockTypes';
 import {
-  activeElements, elementKindLabelKey, FIELDS_BLOCK_TYPE, parseFields, type ElementDef, type FallbackText,
+  activeElements, fieldLabel, FIELDS_BLOCK_TYPE, parseFields, type ElementDef, type FallbackText,
 } from './fields';
 
 /**
@@ -78,7 +78,8 @@ export function definitionLabel(t: TFunction, def: { name: string }): string {
 
 /** The label of a field element: its own, otherwise the name of its kind. */
 export function elementLabel(t: TFunction, element: ElementDef): string {
-  return element.label.trim() || t(elementKindLabelKey(element.kind));
+  const named = fieldLabel(element);
+  return 'label' in named ? named.label : t(named.labelKey);
 }
 
 /** The attribute value for "hidden: `hidden`". */

@@ -233,7 +233,17 @@
       "removeOption": "Remove option",
       "hideEmpty": "Hide empty in read mode",
       "readOnly": "Fully read-only",
-      "readOnlyHint": "No ticking or toggling in read mode either"
+      "readOnlyHint": "No ticking or toggling in read mode either",
+      "uses": {
+        "label": "Show outside the block",
+        "info": "Info line",
+        "infoHint": "Show the value in lists and dashboards next to the date",
+        "panel": "Sidebar",
+        "panelHint": "Show “Field: value” in the entry’s properties",
+        "values": "Filter and sort",
+        "valuesHint": "Offer the value to dashboards for filtering and sorting",
+        "unavailable": "not possible for this kind of field"
+      }
     },
     "library": {
       "defaultName": "New block",
