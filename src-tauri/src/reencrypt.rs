@@ -1,5 +1,5 @@
-//! Putting a vault under a new key: encrypting one from before encryption,
-//! and changing the password — which replaces the vault key, so that an old
+//! Putting a vault under a new key: encrypting a plain vault, and changing
+//! the password — which replaces the vault key, so that an old
 //! copy of `vault.key` (cloud version history) plus the old password opens
 //! nothing written since.
 //!
@@ -57,8 +57,6 @@ const DB_SIDE_FILES: [&str; 3] = ["-journal", "-wal", "-shm"];
 
 /// What the vault is under now.
 #[derive(Clone, Copy)]
-// `Plain` is built only by the dev seed and the tests (`encrypt_dir`).
-#[cfg_attr(not(any(debug_assertions, test)), allow(dead_code))]
 enum Source<'a> {
     Plain,
     Key(&'a Key),
@@ -285,10 +283,15 @@ pub fn remove_leftovers(dir: &Path) {
 /// backup holding [`RUNNING`] is no reason to skip it: skipping would let the
 /// vault open half swapped.
 pub fn recover_if_idle(dir: &Path) -> Result<(), String> {
-    if REENCRYPTING.load(std::sync::atomic::Ordering::SeqCst) > 0 {
+    if is_reencrypting() {
         return Ok(());
     }
     recover_interrupted(dir)
+}
+
+/// Whether a re-encryption runs right now.
+pub(crate) fn is_reencrypting() -> bool {
+    REENCRYPTING.load(std::sync::atomic::Ordering::SeqCst) > 0
 }
 
 /// Whether a re-encryption of the vault in `dir` was cut short and waits for
@@ -730,10 +733,7 @@ async fn reencrypt(dir: &Path, source: Source<'_>, password: &str, kdf: KdfParam
     Ok(Reencrypted { vault_key, recovery_key })
 }
 
-/// Encrypts a plain vault in `dir` — only the seed vault of a dev build
-/// (`dev_seed`) and the tests: a plain vault of a user predates encryption,
-/// and with it the fresh start of the schema, so the app refuses it instead.
-#[cfg(any(debug_assertions, test))]
+/// Encrypts the plain vault in `dir` under a new vault key and `password`.
 async fn encrypt_dir(dir: &Path, password: &str, kdf: KdfParams, progress: OnProgress<'_>) -> Result<Reencrypted, String> {
     recover_interrupted(dir)?;
     if keys::is_encrypted_dir(dir) {
@@ -835,6 +835,25 @@ async fn rekey_command(app: &tauri::AppHandle, vault_id: &str, old_key: Key, new
             Err(e)
         }
     }
+}
+
+/// Encrypts a plain vault: everything is copied under a new vault key, checked,
+/// then swapped in (see the module comment). Returns the recovery key. There
+/// is no way back — no command decrypts a vault. The frontend reopens the
+/// vault afterwards.
+#[tauri::command]
+pub async fn vault_encrypt(
+    app: tauri::AppHandle,
+    vault_id: String,
+    password: zeroize::Zeroizing<String>,
+    remember_key: Option<bool>,
+) -> Result<keys::CreatedKey, String> {
+    keys::check_password(&password)?;
+    let _running = Reencrypting::begin().await;
+    let dir = vault_dir_checked(&app, &vault_id)?;
+    crate::db::close_vault(&app, &vault_id).await;
+    let done = encrypt_dir(&dir, &password, keys::DEFAULT_KDF, &progress_events(&app, &vault_id)).await?;
+    Ok(adopt(&app, &vault_id, done, remember_key).await)
 }
 
 /// Changes the password: checks the current one, then re-encrypts the vault

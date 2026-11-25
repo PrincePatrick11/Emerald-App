@@ -15,6 +15,8 @@ import { clearSavedBlocks } from './blockStore';
 export const VAULT_OUTDATED = 'VAULT_OUTDATED';
 /** A vault whose schema is newer than this app knows: it is not touched either. */
 export const VAULT_TOO_NEW = 'VAULT_TOO_NEW';
+/** An encrypted vault whose `vault.key` is gone (`keys::VAULT_KEY_MISSING`). */
+export const VAULT_KEY_MISSING = 'VAULT_KEY_MISSING';
 
 /** Whether an error says the vault's schema is from another version of the app. */
 export function vaultVersionErrorOf(err: unknown): typeof VAULT_OUTDATED | typeof VAULT_TOO_NEW | null {
@@ -24,10 +26,12 @@ export function vaultVersionErrorOf(err: unknown): typeof VAULT_OUTDATED | typeo
   return null;
 }
 
-/** The message for a vault that would not open: what is wrong with its version, or `fallback`. */
+/** The message for a vault that would not open: what is wrong with its version or its key file, or `fallback`. */
 export function vaultOpenErrorKey(err: unknown, fallback: string): string {
   const version = vaultVersionErrorOf(err);
-  return version === VAULT_OUTDATED ? 'vault.outdated' : version === VAULT_TOO_NEW ? 'vault.tooNew' : fallback;
+  if (version) return version === VAULT_OUTDATED ? 'vault.outdated' : 'vault.tooNew';
+  const message = err instanceof Error ? err.message : String(err);
+  return message.includes(VAULT_KEY_MISSING) ? 'vault.keyMissing' : fallback;
 }
 
 // Per-vault connection cache: vault id → Database instance with a checked schema

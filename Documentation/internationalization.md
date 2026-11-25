@@ -99,7 +99,7 @@ Top-level keys of `en.json`, with the conventions worth knowing:
 | `createItem` | The rail's plus: `CreateItemModal` |
 | `sync` | The sync placeholder: Settings → Sync and the start page's Server card |
 | `store` | The store placeholder on the start page |
-| `vaultKey` | `VaultKeyDialog` and its shared parts: unlock, create, recover, the recovery-key box, the "remember on this device" switch and the failure texts (`wrongPassword`, `tooShort` with `{{count}}`, …) |
+| `vaultKey` | `VaultKeyDialog` and its shared parts: unlock, create, recover, the recovery-key box, the "remember on this device" switch and the failure texts (`wrongPassword`, `empty`, …) |
 | `security` | Settings → Security: remember, lock, change password, each with a hint and a tooltip |
 | `backupKey` | `BackupUnlockDialog`: opening a `.emerald` file protected with a vault key |
 | `emptyState` | Per-dashboard and per-collection empty states (`title`, `description`, `action`), including `allEntries`, `dashboard` (every dashboard made by hand), `categories` and `symbols` |

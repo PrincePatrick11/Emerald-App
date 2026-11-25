@@ -16,8 +16,8 @@ import type { EmeraldKind } from './manifest';
  */
 
 /**
- * How the file is protected: not at all, with an own password (at least 8
- * characters), or with the key of the vault exported from — the file then
+ * How the file is protected: not at all, with an own password (any but an
+ * empty one), or with the key of the vault exported from — the file then
  * opens with that vault's password or recovery key, and without asking while
  * the vault is unlocked.
  */

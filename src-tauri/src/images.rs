@@ -495,12 +495,9 @@ fn serve(app: &tauri::AppHandle, request: &Request<Vec<u8>>) -> Response<Vec<u8>
     let Ok(bytes) = load(app, vault_id, kind, filename) else {
         return not_found();
     };
-    // Decrypted images do not belong in the WebView's disk cache — there
-    // they would sit in plain text outside the vault.
-    let encrypted = vault::vault_dir(app, vault_id)
-        .map(|dir| keys::is_encrypted_dir(&dir))
-        .unwrap_or(true);
-    let cache = if encrypted { "no-store" } else { "max-age=31536000, immutable" };
+    // Images do not belong in the WebView's disk cache — there they would
+    // sit in plain text outside the vault. Not even a plain vault's: it may
+    // be encrypted later, and cached copies would outlive that.
 
     Response::builder()
         .status(200)
@@ -513,9 +510,7 @@ fn serve(app: &tauri::AppHandle, request: &Request<Vec<u8>>) -> Response<Vec<u8>
         // these images come from the app's own storage, so allowing the read
         // gives the page nothing it could not already ask for.
         .header("Access-Control-Allow-Origin", "*")
-        // Unencrypted: the filename is the hash of the content, so a given URL
-        // can never return anything else.
-        .header("Cache-Control", cache)
+        .header("Cache-Control", "no-store")
         .body(bytes)
         .unwrap_or_else(|_| not_found())
 }

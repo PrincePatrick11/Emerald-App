@@ -19,7 +19,7 @@ Emerald uses one SQLite file per vault, always named `emerald.db`, inside the va
 - **Above `BASELINE_VERSION`** — a vault of a newer app: refused with `VAULT_TOO_NEW` (`vault.tooNew`), unchanged too.
 - **Between the two** — the steps of `MIGRATIONS` above the stored version run in order, each stamping `schema_version` with version, name and ISO timestamp. The list is empty today: `BASELINE_VERSION` equals `FRESH_START_VERSION`, and `runMigrations` throws at startup if the last step and `BASELINE_VERSION` disagree.
 
-An unencrypted vault with a database is refused the same way by the gate, before any password question: every such vault predates encryption, and with it the fresh start.
+Encryption does not decide this: an unencrypted vault (one created without it, see [Vault Encryption](features.md#vault-encryption)) runs through the same routes as an encrypted one. Its database starts as an empty file made by `vault_create_plain` and is then a new vault like any other.
 
 `runPeriodicCleanup(db)` is **not** a migration — idempotent, time-dependent, and run on the first `getDb()` of a session. It purges trashed rows older than the vault's trash retention (`trash.retentionDays` in `vaultSettings.ts`, default 30 days, or never). If the loaded settings belong to another vault it purges nothing (`null` = never), so one vault's retention can never empty another's trash. An expired tag takes its links with it (`ON DELETE CASCADE`) and is first dropped from the dashboards' filters (`replaceTagsInDashboards`). Afterwards it sweeps dangling `task_links`.
 

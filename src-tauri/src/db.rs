@@ -15,9 +15,11 @@
 //!
 //! An encrypted vault's databases open with a key derived from the vault key
 //! as SQLCipher's raw key (`PRAGMA key = "x'…'"`), which sqlx runs first on
-//! every connection of the pool. A locked vault does not open at all, and only
-//! an encrypted vault may create a database: a plain one would have to exist
-//! already.
+//! every connection of the pool. A locked vault does not open at all. A vault
+//! without `vault.key` is a plain one: its databases open as ordinary SQLite
+//! files, and its main database must exist already — only
+//! `keys::vault_create_plain` makes one, so a vault whose `vault.key` went
+//! missing never gets a fresh plain database slipped under it.
 //!
 //! Every connection also gets an authorizer ([`authorize`]) that refuses
 //! SQLCipher's key pragmas and `sqlcipher_export` — the webview runs arbitrary
@@ -78,23 +80,35 @@ pub async fn db_load(
     file: DbFile,
 ) -> Result<String, String> {
     let dir = vault::vault_dir(&app, &vault_id)?;
-    // Encrypted vaults only: a vault without `vault.key` is never opened —
-    // the frontend refuses it as one of an older version, and nothing here
-    // opens a plain-text database, not even when someone deleted `vault.key`
-    // and slipped one in.
-    let vault_key = keys::key_for(&app, &vault_id)?.ok_or_else(|| keys::VAULT_NOT_ENCRYPTED.to_string())?;
-    // The key in memory must belong to this folder: if the id now points
-    // elsewhere, a database would otherwise end up under a key that its
-    // `vault.key` does not know.
-    if !keys::read_key_file(&dir)?.is_some_and(|file| file.accepts(&vault_key)) {
-        return Err(keys::VAULT_LOCKED.to_string());
+    let vault_key = keys::key_for(&app, &vault_id)?;
+    let mut options = SqliteConnectOptions::new().filename(dir.join(file.name()));
+    match &vault_key {
+        Some(vault_key) => {
+            // The key in memory must belong to this folder: if the id now
+            // points elsewhere, a database would otherwise end up under a key
+            // that its `vault.key` does not know.
+            if !keys::read_key_file(&dir)?.is_some_and(|file| file.accepts(vault_key)) {
+                return Err(keys::VAULT_LOCKED.to_string());
+            }
+            let key = crypto::subkey(vault_key, Purpose::Database);
+            options = options.create_if_missing(true).pragma("key", sqlcipher_key(&key).to_string());
+        }
+        None => {
+            // A plain vault. Its database is made by `vault_create_plain`
+            // alone; the import's working copy may be created here.
+            if crate::reencrypt::is_reencrypting() {
+                return Err(keys::VAULT_REENCRYPTING.to_string());
+            }
+            // An encrypted database whose `vault.key` is gone: say so,
+            // rather than "file is not a database".
+            if matches!(file, DbFile::Main) && !keys::plain_database_or_none(&dir) {
+                return Err(keys::VAULT_KEY_MISSING.to_string());
+            }
+            options = options.create_if_missing(matches!(file, DbFile::ImportStaging));
+        }
     }
-    let key = crypto::subkey(&vault_key, Purpose::Database);
-    let options = SqliteConnectOptions::new()
-        .filename(dir.join(file.name()))
-        .create_if_missing(true)
+    let options = options
         .disable_statement_logging()
-        .pragma("key", sqlcipher_key(&key).to_string())
         // SQLCipher decrypts a page when it enters the page cache. With
         // SQLite's 2 MB, a pass over `entries` evicts its own pages, and
         // every further pass decrypts everything again (measured: 2000
@@ -110,8 +124,14 @@ pub async fn db_load(
     let handle = handle(&vault_id, file);
     let mut map = dbs.0.write().await;
     // Once more under the lock: a `vault_lock` during connecting removed
-    // the key, and this pool would otherwise outlive it.
-    if app.state::<keys::VaultKeys>().get(&vault_id).is_none() {
+    // the key, and this pool would otherwise outlive it. For a plain vault:
+    // a re-encryption (of any vault — the count is process-wide) that started
+    // meanwhile may be about to replace the file.
+    let still_valid = match vault_key {
+        Some(_) => app.state::<keys::VaultKeys>().get(&vault_id).is_some(),
+        None => !crate::reencrypt::is_reencrypting() && !keys::is_encrypted_dir(&dir),
+    };
+    if !still_valid {
         drop(map);
         pool.close().await;
         return Err(keys::VAULT_LOCKED.to_string());
@@ -137,15 +157,18 @@ fn raw_handle(vault_id: &str) -> String {
 /// Opens the unpacked database of a raw backup (`emerald_file.rs`) in
 /// `vault_dir` under the key of the vault it was taken from — not the key of
 /// the vault it lies in, which is why it is no [`DbFile`]: the frontend can
-/// read it through the handle, but never name it to `db_load`. A key that
-/// does not open it is a damaged file.
-pub(crate) async fn load_raw(app: &tauri::AppHandle, vault_id: &str, vault_dir: &Path, vault_key: &crypto::Key) -> Result<String, String> {
-    let key = crypto::subkey(vault_key, Purpose::Database);
-    let options = SqliteConnectOptions::new()
+/// read it through the handle, but never name it to `db_load`. `None`: the
+/// backup is a plain vault's, its database plain. A key that does not open
+/// it is a damaged file.
+pub(crate) async fn load_raw(app: &tauri::AppHandle, vault_id: &str, vault_dir: &Path, vault_key: Option<&crypto::Key>) -> Result<String, String> {
+    let mut options = SqliteConnectOptions::new()
         .filename(vault_dir.join(vault::RAW_IMPORT_FILE))
         .create_if_missing(false)
-        .disable_statement_logging()
-        .pragma("key", sqlcipher_key(&key).to_string());
+        .disable_statement_logging();
+    if let Some(vault_key) = vault_key {
+        let key = crypto::subkey(vault_key, Purpose::Database);
+        options = options.pragma("key", sqlcipher_key(&key).to_string());
+    }
     let pool = connect(options, vault_dir).await?;
     if pool.execute("SELECT count(*) FROM sqlite_master").await.is_err() {
         pool.close().await;

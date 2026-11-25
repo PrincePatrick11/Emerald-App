@@ -22,8 +22,8 @@ import { useUndoStore } from './undoStore';
 import { useSettingsStore } from './settingsStore';
 import { captureLegacySettings } from '../lib/vaultSettings';
 import { resolveOpenEdits } from '../lib/openEdits';
-import { changeVaultPassword, keyErrorOf, lockVault, type CreatedKey } from '../lib/vaultKeys';
-import { ensureVaultReady, VAULT_KEY_CANCELLED } from './vaultKeyStore';
+import { changeVaultPassword, encryptVault, keyErrorOf, lockVault, type CreatedKey } from '../lib/vaultKeys';
+import { ensureVaultReady, useVaultKeyStore, VAULT_KEY_CANCELLED } from './vaultKeyStore';
 import { hideSplash } from '../lib/splash';
 
 interface VaultStore {
@@ -62,9 +62,52 @@ interface VaultStore {
    * reloaded — the images are named differently. `null` if a running
    * edit should continue.
    */
-  changePassword: (currentPassword: string, newPassword: string) => Promise<(CreatedKey & { reopenFailed?: true }) | null>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<ReencryptResult | null>;
+  /**
+   * Encrypts the open plain vault under `password` — for good, there is no
+   * way back. Afterwards everything is reloaded, as after `changePassword`.
+   */
+  encryptActive: (password: string) => Promise<ReencryptResult | null>;
   /** Locks the open vault and asks for the password right away — even if it is remembered. */
   lockActive: () => Promise<void>;
+}
+
+/** A re-encryption's new recovery key — and whether reloading afterwards failed. */
+export type ReencryptResult = CreatedKey & { reopenFailed?: true };
+
+/**
+ * Runs a re-encryption of the open vault — new password, or encrypting a
+ * plain one — and reloads everything afterwards: the images are named
+ * differently. `null` if a running edit should continue.
+ */
+async function reencryptActive(id: string, run: () => Promise<CreatedKey>): Promise<ReencryptResult | null> {
+  // Like a switch: settle open edits, write drafts out —
+  // the re-encryption rewrites them under the new key.
+  if (!(await resolveOpenEdits())) return null;
+  await drainSerialized();
+  await detachDrafts();
+  let result: CreatedKey;
+  try {
+    result = await withDbClosed(run);
+    // Encrypted from here on, even if reloading fails below.
+    useVaultKeyStore.setState((s) => ({ encrypted: { ...s.encrypted, [id]: true } }));
+  } catch (err) {
+    // An error only occurs before the commit (afterwards Rust returns the new
+    // key in any case): the vault is as it was, and opens on the
+    // next `getDb()` as before.
+    await restoreDrafts(id);
+    throw err;
+  }
+  // The new recovery key is returned in any case — even
+  // if the reload fails: the vault is under it from now on.
+  try {
+    await openActiveVault();
+    return result;
+  } catch (err) {
+    console.error('[vault] reopen after re-encryption failed', err);
+    if (keyErrorOf(err) === VAULT_KEY_CANCELLED) await closeToSetup();
+    return { ...result, reopenFailed: true };
+  }
 }
 
 /**
@@ -299,33 +342,15 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
     return dirRemoved;
   },
 
-  changePassword: async (currentPassword, newPassword) => {
+  changePassword: (currentPassword, newPassword) => {
     const id = get().activeVaultId;
-    // Like a switch: settle open edits, write drafts out —
-    // the re-encryption rewrites them under the new key.
-    if (!(await resolveOpenEdits())) return null;
-    await drainSerialized();
-    await detachDrafts();
-    let result: CreatedKey;
-    try {
-      result = await withDbClosed(() => changeVaultPassword(id, currentPassword, newPassword));
-    } catch (err) {
-      // An error only occurs before the commit (afterwards Rust returns the new
-      // key in any case): the vault is as it was, and opens on the
-      // next `getDb()` with the old key.
-      await restoreDrafts(id);
-      throw err;
-    }
-    // The new recovery key is returned in any case — even
-    // if the reload fails: the vault is under it from now on.
-    try {
-      await openActiveVault();
-      return result;
-    } catch (err) {
-      console.error('[vault] reopen after password change failed', err);
-      if (keyErrorOf(err) === VAULT_KEY_CANCELLED) await closeToSetup();
-      return { ...result, reopenFailed: true };
-    }
+    return reencryptActive(id, () => changeVaultPassword(id, currentPassword, newPassword));
+  },
+
+  encryptActive: (password) => {
+    const id = get().activeVaultId;
+    // Not remembered: the switch in Settings → Security offers it afterwards.
+    return reencryptActive(id, () => encryptVault(id, password, undefined));
   },
 
   lockActive: async () => {

@@ -4,20 +4,20 @@
 
 Images are content-addressed, stored outside SQLite, and belong to one vault.
 
-- **Location**: `{vaultDir}/images/{hash}.{ext}` — see [Vault Layout](#vault-layout). The hash is a keyed hash of the image bytes, and the file is sealed ([`encryption.md`](encryption.md#sealed-files)); the name is 64 hex digits either way.
+- **Location**: `{vaultDir}/images/{hash}.{ext}` — see [Vault Layout](#vault-layout). The hash is a keyed hash of the image bytes, and the file is sealed ([`encryption.md`](encryption.md#sealed-files)); in an unencrypted vault it is the SHA-256 of the bytes and the file lies as it is. The name is 64 hex digits either way.
 - **What the database stores**: the bare filename, no directory or drive letter. That is what makes a vault folder copyable to another machine.
 - **Insert path**: `save_image` (data-URL) and `copy_image_file` (a file on disk) decode, hash, seal, write into the active vault's folder if absent, and return the filename. Both are reached through `src/lib/images.ts`, never invoked directly.
 - **Display path**: the `emerald-img` URI scheme. `imageSrc(filename)` builds `emerald-img://localhost/{vaultId}/{filename}` — on Windows `http://emerald-img.localhost/{vaultId}/{filename}`, since WebView2 serves custom schemes over `http` — and the webview fetches the bytes itself: no IPC round trip, no base64, no in-memory cache. The handler opens the sealed file before answering. See [`security.md`](../security.md#the-emerald-img-uri-scheme).
-- **Caching**: the handler answers with `Cache-Control: no-store`, so decrypted images do not land in the WebView's disk cache, in the clear and outside the vault. The filename is the content's keyed hash, so a name never returns anything else — the cache would be safe, but not private.
+- **Caching**: the handler answers with `Cache-Control: no-store`, so decrypted images do not land in the WebView's disk cache, in the clear and outside the vault — an unencrypted vault's too, since copies in the cache would outlive encrypting it later. The filename is the content's keyed hash, so a name never returns anything else — the cache would be safe, but not private.
 - **Canvas access**: the Canvas, Altar and sigil drawing blocks render their picture on a canvas and read it back, which fails once anything foreign is drawn on it — and custom-scheme images are foreign. That path uses `canvasImageSrc()`, which fetches the bytes as a data-URL (one IPC round trip per image, only when a picture is rendered). The handler's `Access-Control-Allow-Origin: *` is not relied on: wry registers the scheme as secure but not CORS-enabled, whether WebKitGTK and WKWebView honour the header for it is unverified, and a failure would be a silently empty export.
 - **Deduplication**: per vault. The same image in two vaults is two files — isolation is worth more than the bytes.
 - **Cleanup**: Settings → Storage → *Unused images*, on demand. `findUnusedImages()` diffs `list_image_files` (the vault's own folder) against `collectUsedImageFilenames(db)`, and `findUnusedIcons()` (`lib/icons.ts`) `list_icon_files` against `collectUsedIconFilenames(db)`; a file an open template or block draft names stays (`fileNamesHeldByDrafts` in `draftStore.ts`). Deliberately not automatic: an image that so far exists only in an unsaved editor buffer would count as unused. The check is safe because folder and used-set come from the same vault.
 ## Vault Layout
 
-A vault is a directory holding:
+A vault is a directory holding the files below. An unencrypted vault (see [`encryption.md`](encryption.md)) has the same layout without `vault.key`: a plain SQLite database, and images, icons and drafts unsealed, named by the SHA-256 of their bytes.
 
 - `emerald.db` — the SQLCipher database
-- `vault.key` — the vault key, wrapped by the password and by the recovery key, see [`encryption.md`](encryption.md#keys)
+- `vault.key` — the vault key, wrapped by the password and by the recovery key, see [`encryption.md`](encryption.md#keys); an encrypted vault's only
 - `images/` — sealed image files
 - `icons/` — sealed uploaded icons, 128px, named and sealed like the images but never listed in "Images" ([Icons](../database.md#icons))
 - `backups/` — where automatic backups go unless another folder was picked. Nothing that deletes, replaces or backs up the vault touches it: deleting a vault's files leaves it (and the folder with it, if it holds anything), an import's Replace swaps rows only, and a raw backup packs named files, never this folder

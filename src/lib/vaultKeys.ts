@@ -5,7 +5,10 @@
  * vault is unlocked, and everything that needs it names only the vault ID.
  * Only the password and the recovery key come in here. A
  * recovery key comes out exactly once — when it is created:
- * on creating, changing the password and after "Forgot password".
+ * on creating, encrypting, changing the password and after "Forgot password".
+ *
+ * Encryption is chosen when a vault is created. A plain vault has no key; it
+ * can be encrypted later (`encryptVault`), never decrypted.
  *
  * `rememberKey`: whether the key should be stored in the operating system's
  * keychain. `undefined` means "not touched" — then the keychain stays
@@ -25,7 +28,7 @@ interface VaultKeyStatus {
 export const KEY_ERRORS = {
   wrongPassword: 'WRONG_PASSWORD',
   wrongRecoveryKey: 'WRONG_RECOVERY_KEY',
-  passwordTooShort: 'PASSWORD_TOO_SHORT',
+  passwordEmpty: 'PASSWORD_EMPTY',
   /** Not enough space for the copy; followed by `:<needed>:<free>` in bytes. */
   notEnoughSpace: 'NOT_ENOUGH_SPACE',
 } as const;
@@ -38,7 +41,7 @@ export interface ReencryptProgress {
   total: number;
 }
 
-/** Progress of the re-encryption of `vaultId`: password change, "Forgot password". */
+/** Progress of the re-encryption of `vaultId`: encrypting, password change, "Forgot password". */
 export function onReencryptProgress(vaultId: string, handler: (p: ReencryptProgress) => void): Promise<UnlistenFn> {
   // The same name as `PROGRESS_EVENT` in `reencrypt.rs`.
   return listen<ReencryptProgress>('vault-reencrypt-progress', (e) => {
@@ -59,9 +62,6 @@ export interface CreatedKey {
   /** Is the new key stored in the keychain? */
   remembered: boolean;
 }
-
-/** Must match `MIN_PASSWORD_CHARS` in `keys.rs`. */
-export const MIN_PASSWORD_LENGTH = 8;
 
 export function keyErrorOf(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -85,6 +85,19 @@ export function createVaultKey(
   return invoke('vault_create_key', { vaultId, password, rememberKey });
 }
 
+/** Makes a new vault a plain one: an empty, unencrypted database, no key. */
+export function createPlainVault(vaultId: string): Promise<void> {
+  return invoke('vault_create_plain', { vaultId });
+}
+
+/**
+ * Encrypts a plain vault under a new key and `password`; returns the recovery
+ * key. There is no way back. The connections to the vault must be closed;
+ * image names change, so reload everything afterwards.
+ */
+export function encryptVault(vaultId: string, password: string, rememberKey: boolean | undefined): Promise<CreatedKey> {
+  return invoke('vault_encrypt', { vaultId, password, rememberKey });
+}
 
 export function unlockVault(vaultId: string, password: string, rememberKey: boolean | undefined): Promise<boolean> {
   return invoke('vault_unlock', { vaultId, password, rememberKey });

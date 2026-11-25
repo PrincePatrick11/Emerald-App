@@ -1,12 +1,12 @@
 import { create } from 'zustand';
 import { extendSplashDuring, hideSplash, resumeSplash } from '../lib/splash';
 import { lockVault, unlockRemembered, vaultKeyStatus } from '../lib/vaultKeys';
-import { openVaultDb, VAULT_OUTDATED, vaultVersionErrorOf } from '../lib/db';
+import { openVaultDb, vaultVersionErrorOf } from '../lib/db';
 
 /**
  * What `VaultKeyDialog` is currently asking.
  *
- * - `create`: a new vault gets its password.
+ * - `create`: a new vault is made encrypted (with a password) or plain.
  * - `unlock`: an encrypted vault is locked.
  */
 export type VaultKeyRequest = {
@@ -17,6 +17,12 @@ export type VaultKeyRequest = {
 
 interface VaultKeyStore {
   request: VaultKeyRequest | null;
+  /**
+   * Whether a vault is encrypted, by vault id — as the gate last found it.
+   * Missing until the vault went through the gate; what the views that
+   * depend on it (Security page, export menu) read.
+   */
+  encrypted: Record<string, boolean>;
   /** From the dialog: the vault is ready. */
   finish: () => void;
   /** From the dialog: the user cancels. */
@@ -35,6 +41,7 @@ let pending: {
 
 export const useVaultKeyStore = create<VaultKeyStore>((set) => ({
   request: null,
+  encrypted: {},
   finish: () => {
     const p = pending;
     pending = null;
@@ -95,18 +102,18 @@ async function askThenResumeSplash(request: VaultKeyRequest): Promise<void> {
 }
 
 /**
- * The one gate in front of every database: afterwards the vault is encrypted,
- * unlocked, and its database one this version can work with.
+ * The one gate in front of every database: afterwards the vault is unlocked
+ * (or plain), and its database one this version can work with.
  *
- * A new vault (no `emerald.db` yet) gets its password here, and a locked one
- * is unlocked with the remembered key or asks for the password. Then the
+ * A new vault (no `emerald.db` yet) is made here — encrypted with a password
+ * or plain, as the user chooses. A locked one is unlocked with the remembered
+ * key or asks for the password; a plain one opens without a question. Then the
  * database is opened and its schema checked (`openVaultDb`) — before anything
  * reads or writes the vault's settings or drafts. A vault from before the
  * fresh start of the schema ends with `VAULT_OUTDATED`, one from a newer app
- * with `VAULT_TOO_NEW`; both stay untouched and locked. So does an
- * unencrypted one: every such vault predates encryption, and with it the
- * fresh start. Ends with {@link VAULT_KEY_CANCELLED} if the user cancels; a
- * missing vault folder already fails at the status query.
+ * with `VAULT_TOO_NEW`; both stay untouched and locked. Ends with
+ * {@link VAULT_KEY_CANCELLED} if the user cancels; a missing vault folder
+ * already fails at the status query.
  *
  * Startup, switching, creating, opening and import as a new vault all pass
  * through here, because they all end up in `openActiveVault` or the startup in `AppShell`.
@@ -126,11 +133,11 @@ export async function ensureVaultReady(
       const remembered = !askPassword && (await unlockRememberedOnce(vault.id));
       if (!remembered) await askThenResumeSplash({ kind: 'unlock', vaultId: vault.id, vaultName: vault.name });
     }
-  } else if (status.hasDatabase) {
-    throw new Error(VAULT_OUTDATED);
-  } else {
+  } else if (!status.hasDatabase) {
     await askThenResumeSplash({ kind: 'create', vaultId: vault.id, vaultName: vault.name });
   }
+  // A new vault became what the user chose: ask again.
+  const encrypted = status.hasDatabase ? status.encrypted : (await vaultKeyStatus(vault.id)).encrypted;
   try {
     await openVaultDb(vault.id);
   } catch (err) {
@@ -140,4 +147,5 @@ export async function ensureVaultReady(
     hideSplash();
     throw err;
   }
+  useVaultKeyStore.setState((s) => ({ encrypted: { ...s.encrypted, [vault.id]: encrypted } }));
 }

@@ -1,20 +1,21 @@
 //! Raw backups: a vault's files as they lie on the disk, packed into a
 //! `.vault.emerald` of the kind `raw` (`emerald_file.rs`) — the database, its
-//! `vault.key`, its settings, its pictures and icons. Everything in it is
-//! encrypted already, so no password is asked when one is written; it opens
-//! only with that vault's password or recovery key.
+//! `vault.key`, its settings, its pictures and icons. An encrypted vault's
+//! files are encrypted already, so no password is asked when one is written;
+//! it opens only with that vault's password or recovery key. A plain vault's
+//! backup is plain, as the vault is, and has no `vault.key`.
 //!
 //! What goes in is never a half-written state:
 //!
-//! - **Open vault** (its key is in memory): the database is copied with
-//!   `VACUUM INTO` on a connection of its own — a read transaction, so the
-//!   copy is one consistent state while the app goes on writing. SQLCipher
-//!   writes the copy under the same key. The copy lies beside the database
+//! - **Open vault** (an encrypted one's key is in memory, a plain one's
+//!   database is open): the database is copied with `VACUUM INTO` on a
+//!   connection of its own — a read transaction, so the copy is one
+//!   consistent state while the app goes on writing. SQLCipher writes the
+//!   copy under the same key. The copy lies beside the database
 //!   (`emerald.db.snapshot`) until it is packed, and goes afterwards.
-//! - **Closed vault**: nothing can write without the key, so the database is
-//!   packed as it lies. Should the vault be unlocked and changed meanwhile,
-//!   the size or time of the database, its journal or its `vault.key` differ
-//!   afterwards, and the backup is thrown away before it comes into place
+//! - **Closed vault**: the database is packed as it lies. Should the vault
+//!   be opened (or unlocked) and changed meanwhile, the size or time of the
+//!   database, its journal or its `vault.key` differ afterwards, and the backup is thrown away before it comes into place
 //!   ([`BUSY`]: the scheduler tries again).
 //!
 //! Database first, pictures after: a picture the copy names was stored before
@@ -32,7 +33,7 @@ use tauri::Manager;
 use crate::crypto::{self, Key, Purpose};
 use crate::emerald_file::{self, RawContents, RawMember, RAW_JOURNAL};
 use crate::images::{self, Store};
-use crate::keys::{self, KeyFile};
+use crate::keys;
 use crate::vault;
 
 /// The vault changed while it was copied, or a re-encryption is running: try again.
@@ -79,9 +80,13 @@ fn pictures(dir: &Path) -> Vec<(Store, String, PathBuf)> {
     found
 }
 
-/// The vault's own files for the archive, the database from `database`.
-fn vault_files(dir: &Path, database: PathBuf, with_journal: bool) -> Vec<(RawMember, PathBuf)> {
-    let mut files = vec![(RawMember::Database, database), (RawMember::KeyFile, dir.join(keys::KEY_FILE))];
+/// The vault's own files for the archive, the database from `database`; the
+/// key file for an encrypted vault only.
+fn vault_files(dir: &Path, database: PathBuf, encrypted: bool, with_journal: bool) -> Vec<(RawMember, PathBuf)> {
+    let mut files = vec![(RawMember::Database, database)];
+    if encrypted {
+        files.push((RawMember::KeyFile, dir.join(keys::KEY_FILE)));
+    }
     if with_journal && stamp(&dir.join(RAW_JOURNAL)).is_some() {
         files.push((RawMember::Journal, dir.join(RAW_JOURNAL)));
     }
@@ -109,8 +114,9 @@ fn sql_string(path: &Path) -> String {
 }
 
 /// `VACUUM INTO` the snapshot file, on a connection of its own under the
-/// vault's database key. Read-only: the copy is all it does.
-async fn snapshot(dir: &Path, vault_key: &Key) -> Result<PathBuf, String> {
+/// vault's database key — none for a plain vault. Read-only: the copy is all
+/// it does.
+async fn snapshot(dir: &Path, vault_key: Option<&Key>) -> Result<PathBuf, String> {
     let target = dir.join(vault::SNAPSHOT_FILE);
     emerald_file::remove_sqlite_files(dir, vault::SNAPSHOT_FILE);
     // `VACUUM INTO` refuses a target that is there; one a virus scanner or a
@@ -118,13 +124,16 @@ async fn snapshot(dir: &Path, vault_key: &Key) -> Result<PathBuf, String> {
     if target.exists() {
         return Err(BUSY.into());
     }
-    let key = crypto::subkey(vault_key, Purpose::Database);
+    let mut options = SqliteConnectOptions::new()
+        .filename(dir.join(vault::DB_FILE))
+        .read_only(true)
+        .disable_statement_logging();
+    if let Some(vault_key) = vault_key {
+        let key = crypto::subkey(vault_key, Purpose::Database);
+        options = options.pragma("key", crate::db::sqlcipher_key(&key).to_string());
+    }
     let result = async {
-        let mut conn = SqliteConnectOptions::new()
-            .filename(dir.join(vault::DB_FILE))
-            .read_only(true)
-            .disable_statement_logging()
-            .pragma("key", crate::db::sqlcipher_key(&key).to_string())
+        let mut conn = options
             // As long as the app's own connection waits (`db.rs`): a long write,
             // such as an import's swap, is waited out instead of failing the backup.
             .busy_timeout(std::time::Duration::from_secs(60))
@@ -145,16 +154,25 @@ async fn snapshot(dir: &Path, vault_key: &Key) -> Result<PathBuf, String> {
     }
 }
 
-/// Writes a raw backup of the vault in `dir` to `target`. `vault_key` is the
-/// vault's key when it is unlocked — then the database is snapshotted;
-/// without it the files are packed as they lie, checked afterwards.
+/// How the database gets into the backup.
+enum DbCopy<'a> {
+    /// `VACUUM INTO` a snapshot — under the vault's key, or none for a plain vault.
+    Snapshot(Option<&'a Key>),
+    /// Packed as it lies, checked afterwards.
+    AsItLies,
+}
+
+/// Writes a raw backup of the vault in `dir` to `target`. The database is
+/// snapshotted when it can be read consistently: an encrypted vault whose
+/// `vault_key` (its key when unlocked) fits, or a plain vault that is open.
+/// Otherwise the files are packed as they lie and checked afterwards.
 /// `still_closed` says whether the vault's database is still not open.
 pub(crate) async fn write(
     dir: &Path,
     vault_id: &str,
     vault_key: Option<&Key>,
     target: &Path,
-    still_closed: impl Fn() -> bool + Send + 'static,
+    still_closed: impl Fn() -> bool + Send + Sync + 'static,
 ) -> Result<(), String> {
     // A password change swaps database and `vault.key`: never in the middle of it.
     let Ok(_running) = crate::reencrypt::RUNNING.try_lock() else {
@@ -170,7 +188,7 @@ async fn write_unguarded(
     vault_id: &str,
     vault_key: Option<&Key>,
     target: &Path,
-    still_closed: impl Fn() -> bool + Send + 'static,
+    still_closed: impl Fn() -> bool + Send + Sync + 'static,
 ) -> Result<(), String> {
     vault::directory_state(dir)?;
     // A password change cut short: database and `vault.key` may not belong
@@ -179,15 +197,36 @@ async fn write_unguarded(
     if crate::reencrypt::interrupted(dir) {
         return Err(INTERRUPTED.into());
     }
-    let key_file_text = std::fs::read_to_string(dir.join(keys::KEY_FILE)).map_err(|_| keys::VAULT_NOT_ENCRYPTED.to_string())?;
-    let key_file = KeyFile::from_json(&key_file_text)?;
+    // A plain vault has no key file: its backup is as plain as it is.
+    let key_file = keys::read_key_file(dir)?;
+    let encrypted = key_file.is_some();
+    // An encrypted vault that lost `vault.key` is no plain vault: a backup
+    // of it could never be restored, and would push the good ones out.
+    if !encrypted && !keys::plain_database_or_none(dir) {
+        return Err(keys::VAULT_KEY_MISSING.into());
+    }
     let manifest = manifest(vault_id);
     let target = target.to_path_buf();
 
-    match vault_key.filter(|key| key_file.accepts(key)) {
-        Some(key) => {
+    // A snapshot where one can be read: an encrypted vault whose key fits, a
+    // plain vault while it is open. Whether it is open is asked off the async
+    // task: `still_closed` may block.
+    let still_closed = std::sync::Arc::new(still_closed);
+    let copy = match &key_file {
+        None => {
+            let still_closed = still_closed.clone();
+            let open = tauri::async_runtime::spawn_blocking(move || !still_closed()).await.map_err(|e| e.to_string())?;
+            if open { DbCopy::Snapshot(None) } else { DbCopy::AsItLies }
+        }
+        Some(file) => match vault_key.filter(|key| file.accepts(key)) {
+            Some(key) => DbCopy::Snapshot(Some(key)),
+            None => DbCopy::AsItLies,
+        },
+    };
+    match copy {
+        DbCopy::Snapshot(key) => {
             let database = snapshot(dir, key).await?;
-            let (dir, files) = (dir.to_path_buf(), vault_files(dir, database, false));
+            let (dir, files) = (dir.to_path_buf(), vault_files(dir, database, encrypted, false));
             tauri::async_runtime::spawn_blocking(move || {
                 let pictures = pictures(&dir);
                 let done = emerald_file::place_raw(&target, RawContents { key_file, manifest, files, pictures }, || Ok(()));
@@ -197,14 +236,14 @@ async fn write_unguarded(
             .await
             .map_err(|e| e.to_string())?
         }
-        None => {
+        DbCopy::AsItLies => {
             let dir = dir.to_path_buf();
             tauri::async_runtime::spawn_blocking(move || {
                 let before = fingerprint(&dir);
                 if before.database.is_none() {
                     return Err(format!("no database in {}", dir.display()));
                 }
-                let files = vault_files(&dir, dir.join(vault::DB_FILE), true);
+                let files = vault_files(&dir, dir.join(vault::DB_FILE), encrypted, true);
                 let pictures = pictures(&dir);
                 let unchanged = || {
                     if still_closed() && fingerprint(&dir) == before {
@@ -229,7 +268,7 @@ pub(crate) fn key_in_memory(app: &tauri::AppHandle, vault_id: &str) -> Option<Ke
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::keys::KdfParams;
+    use crate::keys::{KdfParams, KeyFile};
     use sqlx::sqlite::SqliteConnection;
     use sqlx::Row;
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -353,6 +392,38 @@ mod tests {
         let target = scratch().join("interrupted.vault.emerald");
         assert_eq!(write_unguarded(&dir, "v1", None, &target, || true).await.unwrap_err(), INTERRUPTED);
         assert!(!target.exists());
+    }
+
+    #[tokio::test]
+    async fn a_plain_vault_is_backed_up_plain_open_or_closed() {
+        let dir = scratch();
+        let mut db = SqliteConnectOptions::new()
+            .filename(dir.join(vault::DB_FILE))
+            .create_if_missing(true)
+            .pragma("journal_mode", "DELETE")
+            .connect()
+            .await
+            .unwrap();
+        db.execute("CREATE TABLE notes (id INTEGER PRIMARY KEY, text TEXT); INSERT INTO notes (text) VALUES ('plain')").await.unwrap();
+        db.close().await.unwrap();
+        // Closed (packed as it lies) and open (snapshotted).
+        for (name, closed) in [("closed", true), ("open", false)] {
+            let target = scratch().join(format!("{name}.vault.emerald"));
+            write_unguarded(&dir, "v1", None, &target, move || closed).await.unwrap();
+            let bytes = std::fs::read(&target).unwrap();
+            let start = 4 + 1 + 4 + u32::from_le_bytes(bytes[5..9].try_into().unwrap()) as usize;
+            let header: serde_json::Value = serde_json::from_slice(&bytes[9..start]).unwrap();
+            assert_eq!(header["kind"], "raw");
+            assert!(header.get("keyFile").is_none(), "{header}");
+            let mut zip = zip::ZipArchive::new(std::io::Cursor::new(bytes[start..].to_vec())).unwrap();
+            assert!(zip.by_name(keys::KEY_FILE).is_err());
+            let out = scratch().join("restored.db");
+            std::io::copy(&mut zip.by_name(vault::DB_FILE).unwrap(), &mut std::fs::File::create(&out).unwrap()).unwrap();
+            let mut db = SqliteConnectOptions::new().filename(&out).connect().await.unwrap();
+            let text: String = sqlx::query("SELECT text FROM notes").fetch_one(&mut db).await.unwrap().get(0);
+            db.close().await.unwrap();
+            assert_eq!(text, "plain", "{name}");
+        }
     }
 
     #[tokio::test]

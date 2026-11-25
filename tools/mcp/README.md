@@ -120,7 +120,7 @@ A new instance would open on the vault picker, with nothing to test a view again
 
 The fixture names its rows readably (`seed-entry-moon`); the builder turns every such id into a stable UUID wherever it occurs, because the app follows internal links only to UUIDs. Trashed rows are dated about a day before the build, since a fixed date would age past the trash retention and the app would purge them on opening.
 
-A plain vault is never opened, so the dev build encrypts the test vault on its first start with the test password `emerald-seed` and unlocks it with that from then on. The launcher passes folder and password as `EMERALD_DEV_SEED_VAULT` and `EMERALD_DEV_SEED_PASSWORD`; release builds do not read them, and every other vault still asks for its own password.
+So that the test vault behaves like an encrypted one, the dev build encrypts it on its first start with the test password `emerald-seed` and unlocks it with that from then on. The launcher passes folder and password as `EMERALD_DEV_SEED_VAULT` and `EMERALD_DEV_SEED_PASSWORD`; release builds do not read them, and every other vault still asks for its own password.
 
 The vault is created once. `seed/provision.mjs` stops as soon as the instance has a `vaults.json`, so an instance that has been worked in is never touched; `EMERALD_MCP_SEED=force` empties the vault folder and builds it anew. `seed/check_seed.mjs <emerald.db>` checks a built database before the app has encrypted it.
 

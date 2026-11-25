@@ -34,6 +34,7 @@ const ERROR_KEYS: Record<AutoBackupError, string> = {
   dirMissing: 'autoBackup.errorDirMissing',
   vaultMissing: 'autoBackup.errorVaultMissing',
   interrupted: 'autoBackup.errorInterrupted',
+  keyMissing: 'autoBackup.errorKeyMissing',
   failed: 'autoBackup.errorFailed',
 };
 

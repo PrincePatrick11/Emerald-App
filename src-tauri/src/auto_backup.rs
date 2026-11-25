@@ -363,6 +363,7 @@ async fn back_up(app: &tauri::AppHandle, vault_id: &str, vault_dir: &Path, state
         Ok(()) => {}
         Err(e) if e == crate::raw_backup::BUSY => return Outcome::Busy,
         Err(e) if e == crate::raw_backup::INTERRUPTED => return Outcome::Failed("interrupted"),
+        Err(e) if e == crate::keys::VAULT_KEY_MISSING => return Outcome::Failed("keyMissing"),
         Err(e) => {
             eprintln!("[auto-backup] {vault_id} failed: {e}");
             return Outcome::Failed("failed");
@@ -536,8 +537,9 @@ pub struct VaultBackupStatus {
     /// The day of its newest automatic backup there.
     newest: Option<String>,
     running: bool,
-    /// `dirMissing`, `vaultMissing`, `interrupted` (a password change cut short) or
-    /// `failed` — the last run's, until one succeeds.
+    /// `dirMissing`, `vaultMissing`, `interrupted` (a re-encryption cut short),
+    /// `keyMissing` (an encrypted database without `vault.key`) or `failed` —
+    /// the last run's, until one succeeds.
     error: Option<&'static str>,
 }
 

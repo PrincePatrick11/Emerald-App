@@ -1,13 +1,16 @@
 //! Vault keys: `vault.key`, unlocking, and the keys held while a vault is open.
 //!
-//! Every encrypted vault has one random 256-bit vault key. It encrypts the
-//! database (SQLCipher, raw key) and every sealed file (`crypto.rs`). It is
-//! never stored in the clear: `vault.key` holds it twice, wrapped
+//! Encryption is chosen when a vault is created. A plain vault has no
+//! `vault.key` and no key; it can be encrypted later (`reencrypt::vault_encrypt`),
+//! never the other way round. Every encrypted vault has one random 256-bit
+//! vault key. It encrypts the database (SQLCipher, raw key) and every sealed
+//! file (`crypto.rs`). It is never stored in the clear: `vault.key` holds it
+//! twice, wrapped
 //!
 //! - under a key derived from the password with Argon2id, and
 //! - under the recovery key, 32 random bytes shown to the user once.
 //!
-//! Changing the password rewraps the vault key; nothing else is re-encrypted.
+//! Changing the password puts the vault under a new vault key (`reencrypt.rs`).
 //! A `check` value (an HMAC of a fixed label under the vault key) lets a key
 //! from the OS keychain be verified before anything is opened with it.
 //!
@@ -51,10 +54,33 @@ pub const VAULT_LOCKED: &str = "VAULT_LOCKED";
 pub const VAULT_ALREADY_ENCRYPTED: &str = "VAULT_ALREADY_ENCRYPTED";
 pub const VAULT_NOT_ENCRYPTED: &str = "VAULT_NOT_ENCRYPTED";
 pub const VAULT_NOT_NEW: &str = "VAULT_NOT_NEW";
-pub const PASSWORD_TOO_SHORT: &str = "PASSWORD_TOO_SHORT";
+pub const PASSWORD_EMPTY: &str = "PASSWORD_EMPTY";
+/// `db_load` and `key_for` of a plain vault while a re-encryption runs — of
+/// any vault, as the run is counted process-wide: its files may be about to
+/// be replaced.
+pub const VAULT_REENCRYPTING: &str = "VAULT_REENCRYPTING";
+/// A vault without `vault.key` whose database is not plain SQLite: an
+/// encrypted vault that lost its key file.
+pub const VAULT_KEY_MISSING: &str = "VAULT_KEY_MISSING";
 
-/// The frontend asks for more; this is the floor no caller gets under.
-const MIN_PASSWORD_CHARS: usize = 8;
+/// For a vault without `vault.key`: whether its database is really plain —
+/// empty (a new plain vault) or starting with SQLite's header. An encrypted
+/// vault that lost `vault.key` fails here instead of being opened or backed
+/// up as plain. No database at all counts as plain: nothing to mistake.
+pub(crate) fn plain_database_or_none(dir: &Path) -> bool {
+    use std::io::Read;
+    let Ok(mut file) = std::fs::File::open(dir.join(vault::DB_FILE)) else { return true };
+    let mut head = [0u8; 16];
+    let mut got = 0;
+    while got < head.len() {
+        match file.read(&mut head[got..]) {
+            Ok(0) => break,
+            Ok(n) => got += n,
+            Err(_) => return false,
+        }
+    }
+    got == 0 || (got == head.len() && &head == b"SQLite format 3\0")
+}
 
 // ── Argon2id ─────────────────────────────────────────────────────────────────
 
@@ -179,9 +205,10 @@ fn key_check(key: &Key) -> String {
     B64.encode(crypto::keyed_hash(key, CHECK_LABEL))
 }
 
+/// Any password but an empty one: its strength is the user's choice.
 pub(crate) fn check_password(password: &str) -> Result<(), String> {
-    if password.chars().count() < MIN_PASSWORD_CHARS {
-        return Err(PASSWORD_TOO_SHORT.into());
+    if password.is_empty() {
+        return Err(PASSWORD_EMPTY.into());
     }
     Ok(())
 }
@@ -322,11 +349,23 @@ impl VaultKeys {
 }
 
 /// The vault key of a vault: `Ok(None)` for an unencrypted vault,
-/// [`VAULT_LOCKED`] for an encrypted one that is not unlocked. Callers derive
-/// what they need from it with [`crypto::subkey`].
+/// [`VAULT_LOCKED`] for an encrypted one that is not unlocked — and for a
+/// plain one whose encryption was cut short, [`VAULT_REENCRYPTING`] while
+/// a re-encryption runs. Callers derive what they need from it with
+/// [`crypto::subkey`].
 pub fn key_for(app: &tauri::AppHandle, vault_id: &str) -> Result<Option<Key>, String> {
     let dir = vault::vault_dir(app, vault_id)?;
     if !is_encrypted_dir(&dir) {
+        // A plain vault whose encryption still has to finish its swap, or
+        // any re-encryption running (counted process-wide, so this holds for
+        // every plain vault): whatever is written now in the clear could be
+        // thrown away by a swap.
+        if crate::reencrypt::interrupted(&dir) {
+            return Err(VAULT_LOCKED.to_string());
+        }
+        if crate::reencrypt::is_reencrypting() {
+            return Err(VAULT_REENCRYPTING.to_string());
+        }
         return Ok(None);
     }
     app.state::<VaultKeys>()
@@ -459,9 +498,21 @@ pub struct CreatedKey {
     pub(crate) remembered: bool,
 }
 
+/// Refuses a vault that is not new: one with `vault.key` or a database.
+fn check_new(dir: &Path) -> Result<(), String> {
+    if is_encrypted_dir(dir) {
+        return Err(VAULT_ALREADY_ENCRYPTED.to_string());
+    }
+    if dir.join(vault::DB_FILE).exists() {
+        return Err(VAULT_NOT_NEW.to_string());
+    }
+    Ok(())
+}
+
 /// Creates `vault.key` for a new vault and unlocks it. Refuses a vault that is
 /// encrypted already, and one that has a database: that database is plain,
-/// and a key would only make it unopenable.
+/// and a key would only make it unopenable — a plain vault is encrypted by
+/// `reencrypt::vault_encrypt`.
 #[tauri::command]
 pub async fn vault_create_key(
     app: tauri::AppHandle,
@@ -473,12 +524,7 @@ pub async fn vault_create_key(
         let dir = vault::vault_dir(&app, &vault_id)?;
         vault::directory_state(&dir)?;
         let _guard = CREATE_LOCK.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-        if is_encrypted_dir(&dir) {
-            return Err(VAULT_ALREADY_ENCRYPTED.to_string());
-        }
-        if dir.join(vault::DB_FILE).exists() {
-            return Err(VAULT_NOT_NEW.to_string());
-        }
+        check_new(&dir)?;
         let (file, vault_key, recovery_key) = KeyFile::create(&password, DEFAULT_KDF)?;
         write_key_file(&dir, &file)?;
         let remembered = apply_remember(&vault_id, &vault_key, remember_key);
@@ -487,6 +533,32 @@ pub async fn vault_create_key(
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+/// Makes a new vault a plain one: an empty, unencrypted `emerald.db` and no
+/// `vault.key`. The only place a plain database is created — `db_load`
+/// opens a plain vault's database but never makes one.
+#[tauri::command]
+pub async fn vault_create_plain(app: tauri::AppHandle, vault_id: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let dir = vault::vault_dir(&app, &vault_id)?;
+        vault::directory_state(&dir)?;
+        let _guard = CREATE_LOCK.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        create_plain(&dir)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+fn create_plain(dir: &Path) -> Result<(), String> {
+    check_new(dir)?;
+    // An empty file is an empty SQLite database; the schema follows on open.
+    std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(dir.join(vault::DB_FILE))
+        .and_then(|file| file.sync_all())
+        .map_err(|e| format!("create {}: {e}", vault::DB_FILE))
 }
 
 fn load_key_file(app: &tauri::AppHandle, vault_id: &str) -> Result<(std::path::PathBuf, KeyFile), String> {
@@ -600,8 +672,36 @@ mod tests {
     }
 
     #[test]
-    fn short_passwords_are_refused() {
-        assert_eq!(KeyFile::create("short", TEST_KDF).err().unwrap(), PASSWORD_TOO_SHORT);
+    fn any_password_but_an_empty_one_is_taken() {
+        assert_eq!(KeyFile::create("", TEST_KDF).err().unwrap(), PASSWORD_EMPTY);
+        let (file, key, _) = KeyFile::create("x", TEST_KDF).unwrap();
+        assert_eq!(*file.unlock_with_password("x").unwrap(), *key);
+    }
+
+    #[test]
+    fn a_plain_vault_is_made_only_where_nothing_is() {
+        let dir = std::env::temp_dir().join(format!("emerald-keys-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        create_plain(&dir).unwrap();
+        assert!(dir.join(vault::DB_FILE).is_file());
+        assert!(!is_encrypted_dir(&dir));
+        assert_eq!(create_plain(&dir).unwrap_err(), VAULT_NOT_NEW);
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn only_a_plain_database_counts_as_plain() {
+        let dir = std::env::temp_dir().join(format!("emerald-keys-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        assert!(plain_database_or_none(&dir), "no database");
+        create_plain(&dir).unwrap();
+        assert!(plain_database_or_none(&dir), "empty");
+        std::fs::write(dir.join(vault::DB_FILE), b"SQLite format 3\0and pages").unwrap();
+        assert!(plain_database_or_none(&dir), "plain");
+        // SQLCipher pages look like noise from the first byte on.
+        std::fs::write(dir.join(vault::DB_FILE), crypto::random_bytes::<32>()).unwrap();
+        assert!(!plain_database_or_none(&dir), "encrypted");
+        std::fs::remove_dir_all(&dir).ok();
     }
 
     #[test]

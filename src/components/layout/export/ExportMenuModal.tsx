@@ -27,6 +27,7 @@ import { displayTitle } from '../../../lib/entryTitle';
 import { exportFilename, safeFileBase } from '../../../lib/helpers';
 import { IMAGE_MODES, type ImageMode } from '../../../lib/emerald/manifest';
 import type { EmeraldProtection } from '../../../lib/emerald/file';
+import { useVaultKeyStore } from '../../../store/vaultKeyStore';
 import { EXPORT_FONT_OPTIONS, EXPORT_FONT_SIZES, type ExportFontId } from '../../../lib/exportFonts';
 import {
   EXPORT_FORMATS, PRESET_PERIODS, TYPESET_FORMATS, bulkEntries, byCreated, effectiveSettings, exportTypography, freeFilter,
@@ -161,9 +162,16 @@ function ExportMenuBody({ target }: { target: ExportTarget }) {
   const count = scope === 'vault' ? null : template ? 1 : roots.length + linkedChosen.length;
 
   // ── Protection ──
-  const passwordProblem = sealed && prefs.protection === 'password' ? newPasswordProblem(t, password, repeat) : '';
-  const protection: EmeraldProtection = prefs.protection === 'password' ? { type: 'password', password }
-    : prefs.protection === 'vaultKey' ? { type: 'vaultKey' }
+  // A plain vault has no password to seal with: unprotected unless an own
+  // password is chosen. The remembered choice stays for when it is encrypted.
+  // As the gate found it on opening — the open vault always went through it.
+  // Unknown counts as plain: then the vault-key option, which would fail, is hidden.
+  const vaultEncrypted = useVaultKeyStore((s) => s.encrypted[vaultId]) ?? false;
+  const protectionChoices = vaultEncrypted ? (['vaultKey', 'password', 'none'] as const) : (['password', 'none'] as const);
+  const protectionChoice = !vaultEncrypted && prefs.protection === 'vaultKey' ? 'none' : prefs.protection;
+  const passwordProblem = sealed && protectionChoice === 'password' ? newPasswordProblem(t, password, repeat) : '';
+  const protection: EmeraldProtection = protectionChoice === 'password' ? { type: 'password', password }
+    : protectionChoice === 'vaultKey' ? { type: 'vaultKey' }
     : { type: 'none' };
 
   const canExport = !busy && !passwordProblem && linkedReady && (count === null || count > 0) && !(scope === 'bulk' && range.invalid);
@@ -487,13 +495,13 @@ function ExportMenuBody({ target }: { target: ExportTarget }) {
         {sealed && (
           <Part title={t('exportMenu.protection.label')}>
             <SegmentedControl className="w-fit"
-              options={(['vaultKey', 'password', 'none'] as const).map((value) => ({ value, label: t(`exportMenu.protection.${value}`) }))}
-              value={prefs.protection}
+              options={protectionChoices.map((value) => ({ value, label: t(`exportMenu.protection.${value}`) }))}
+              value={protectionChoice}
               onChange={(protection) => update({ protection })}
               ariaLabel={t('exportMenu.protection.label')}
             />
-            <p className="text-xs text-subtle leading-snug">{t(`exportMenu.protection.${prefs.protection}Desc`)}</p>
-            {prefs.protection === 'password' && (
+            <p className="text-xs text-subtle leading-snug">{t(`exportMenu.protection.${protectionChoice}Desc`)}</p>
+            {protectionChoice === 'password' && (
               <div className="space-y-3 pt-1">
                 <NewPasswordFields
                   t={t}

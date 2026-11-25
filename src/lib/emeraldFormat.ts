@@ -144,8 +144,8 @@ export interface EmeraldExportItem {
  * - `images`: what happens to the pictures (`ImageMode`); each item can
  *   override it, so linked entries can have a setting of their own. A picture
  *   two items share gets the gentlest setting either asks for.
- * - `protection`: none (the default), an own password of at least 8
- *   characters, or the vault's key — the file then opens with the vault's
+ * - `protection`: none (the default), an own password (any but an empty
+ *   one), or the vault's key — the file then opens with the vault's
  *   password or recovery key.
  * - `blockDefinitions`: the custom blocks the items' copies came from
  *   (`FieldsModel.definition`) go along, so that the importing vault has them

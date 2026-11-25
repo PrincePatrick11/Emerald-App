@@ -58,8 +58,8 @@ Version 0.2.0 is a fresh start: the database, backups and `.emerald` files have 
 - **Cut a picture to an icon.** Choosing your own picture as an icon (entries, templates, blocks, languages, dashboards) first opens a small crop window: move the picture (drag or arrow keys) and zoom (slider, scroll wheel, + and −) until the part you want sits in the icon's frame, then Apply. Cancel keeps the previous icon. Only the square cut-out is kept, at most 128px; to change it, choose the picture again. An animated GIF becomes a still picture; existing icons and cover images are untouched.
 
 ### Security and vaults
-- **Every vault is encrypted** (SQLCipher; pictures and drafts sealed too). A password and a recovery key, "Remember on this device" via the system keychain, Lock now, Change password with progress and a check for free space.
-- **Automatic backups stay encrypted** as the vault lies on disk and open with the vault's password or its recovery key.
+- **Vaults are encrypted unless chosen otherwise when created** (SQLCipher; pictures and drafts sealed too); an unencrypted vault can be encrypted later, never decrypted. A password of any length but empty and a recovery key, "Remember on this device" via the system keychain, Lock now, Change password with progress and a check for free space.
+- **Automatic backups stay as encrypted as the vault** lies on disk; an encrypted vault's open with its password or its recovery key.
 - **Fonts ship with the app;** no request leaves the device on start. Imports go through the same HTML filter; a crafted file can no longer freeze the app.
 
 ### Import, export and backup

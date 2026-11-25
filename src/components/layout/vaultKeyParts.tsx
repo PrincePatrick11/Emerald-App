@@ -5,7 +5,7 @@ import i18n from '../../i18n';
 import { isWindows } from '../../lib/platform';
 import ProgressBar from '../ui/ProgressBar';
 import {
-  KEY_ERRORS, MIN_PASSWORD_LENGTH, keyErrorOf, onReencryptProgress, spaceShortfall, type ReencryptProgress,
+  KEY_ERRORS, keyErrorOf, onReencryptProgress, spaceShortfall, type ReencryptProgress,
 } from '../../lib/vaultKeys';
 
 /**
@@ -71,7 +71,7 @@ export function NewPasswordFields({ t, password, repeat, onPassword, onRepeat, d
 
 /** What is wrong with a new password, or `''`. */
 export function newPasswordProblem(t: TFunction, password: string, repeat: string): string {
-  if (password.length < MIN_PASSWORD_LENGTH) return t('vaultKey.tooShort', { count: MIN_PASSWORD_LENGTH });
+  if (!password) return t('vaultKey.empty');
   if (password !== repeat) return t('vaultKey.mismatch');
   return '';
 }
@@ -81,7 +81,7 @@ export function keyErrorText(t: TFunction, err: unknown, fallbackKey: string): s
   const code = keyErrorOf(err);
   if (code === KEY_ERRORS.wrongPassword) return t('vaultKey.wrongPassword');
   if (code === KEY_ERRORS.wrongRecoveryKey) return t('vaultKey.wrongRecoveryKey');
-  if (code === KEY_ERRORS.passwordTooShort) return t('vaultKey.tooShort', { count: MIN_PASSWORD_LENGTH });
+  if (code === KEY_ERRORS.passwordEmpty) return t('vaultKey.empty');
   const space = spaceShortfall(err);
   if (space) return t('vaultKey.notEnoughSpace', { needed: diskSize(space.needed), free: diskSize(space.free) });
   console.error('[vault-key]', err);

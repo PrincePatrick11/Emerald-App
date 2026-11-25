@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { KeyRound, Loader2, Smartphone } from 'lucide-react';
+import { KeyRound, Loader2, Lock, Smartphone } from 'lucide-react';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import { SwitchRow } from '../ui/Switch';
@@ -10,13 +10,13 @@ import {
 } from './vaultKeyParts';
 import { useVaultKeyStore, type VaultKeyRequest } from '../../store/vaultKeyStore';
 import {
-  createVaultKey, keychainAvailable, recoverVault, unlockVault, type CreatedKey,
+  createPlainVault, createVaultKey, keychainAvailable, recoverVault, unlockVault, type CreatedKey,
 } from '../../lib/vaultKeys';
 import { hideSplash } from '../../lib/splash';
 
 /**
- * Set a password, unlock, set a new password with the recovery key —
- * the questions of `ensureVaultReady`.
+ * Create a vault — encrypted with a password, or plain —, unlock, set a new
+ * password with the recovery key: the questions of `ensureVaultReady`.
  *
  * Sits above everything, including the vault picker: a vault that is about to
  * be opened cannot go any further without this answer.
@@ -35,6 +35,7 @@ const FAILED_KEY = {
   unlock: 'vaultKey.unlockFailed',
   recover: 'vaultKey.recoverFailed',
   create: 'vaultKey.createFailed',
+  createPlain: 'vaultKey.createPlainFailed',
 } as const;
 
 function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
@@ -46,6 +47,8 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
   const [password, setPassword] = useState('');
   const [repeat, setRepeat] = useState('');
   const [recoveryInput, setRecoveryInput] = useState('');
+  // A new vault is encrypted unless the user switches it off.
+  const [encrypt, setEncrypt] = useState(true);
   // On when creating — the usual wish on one's own
   // computer. Off when unlocking, but only displayed: as long as nobody moves
   // the switch, the keychain stays as it is (`rememberTouched`).
@@ -116,6 +119,12 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
     setStep('showRecovery');
   });
   const submitRecover = () => submitNewKey('recover');
+
+  /** A new vault without encryption: no password, no recovery key. */
+  const submitPlain = () => attempt('createPlain', async () => {
+    await createPlainVault(request.vaultId);
+    finish();
+  });
 
   const title = {
     unlock: t('vaultKey.unlockTitle', { name: request.vaultName }),
@@ -226,19 +235,27 @@ function VaultKeyDialogBody({ request }: { request: VaultKeyRequest }) {
       </>
     );
   } else if (step === 'create') {
-    const submit = () => submitNewKey('create');
+    const submit = encrypt ? () => submitNewKey('create') : submitPlain;
     body = (
       <>
-        <p className="text-sm text-secondary">{t('vaultKey.createHint')}</p>
-        {passwordFields(submit, true)}
-        {rememberRow}
+        <SwitchRow
+          variant="panel"
+          icon={Lock}
+          label={t('vaultKey.encrypt')}
+          hint={encrypt ? t('vaultKey.createHint') : t('vaultKey.plainHint')}
+          checked={encrypt}
+          disabled={busy}
+          onChange={(next) => { setEncrypt(next); setError(''); }}
+        />
+        {encrypt && passwordFields(submit, true)}
+        {encrypt && rememberRow}
         {errorLine}
       </>
     );
     actions = (
-      <Button tone="jade" disabled={!password || busy} onClick={submit}>
+      <Button tone="jade" disabled={(encrypt && !password) || busy} onClick={submit}>
         {busyIcon}
-        {t('vaultKey.createSubmit')}
+        {encrypt ? t('vaultKey.createSubmit') : t('vaultKey.createPlainSubmit')}
       </Button>
     );
   } else if (step === 'showRecovery') {
