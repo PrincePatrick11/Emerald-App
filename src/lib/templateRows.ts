@@ -5,7 +5,7 @@ import { fromRow, type DbRow } from './row';
 import { readContents, replaceOwnerBlocks } from './blockStore';
 import { ALTAR_CATEGORY_ID, SIGIL_CATEGORY_ID } from './schema';
 import { serializeBlocks } from './blocks/blockHtml';
-import { translatedOr } from './blocks/blockAttrs';
+import { translatedOr } from './blocks/toolkit';
 import { createSigilBlock } from './blocks/sigil';
 import { altarBlockSet } from './blocks/canvas';
 import { ALTAR_TEMPLATE_ID, SIGIL_TEMPLATE_ID, templateToRow, type Template } from './blocks/templates';

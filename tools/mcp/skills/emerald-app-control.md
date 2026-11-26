@@ -236,6 +236,11 @@ A click on a row (`.panel-interactive` in a dashboard, `.sidebar-item` in the le
 await mcp.call_tool("eval", { expression: "document.querySelector('.ProseMirror')?.innerText" });
 ```
 
+### Blocks of an entry
+The content is a stack of blocks (`.block-stack-item`, each a `.block-frame` with `.block-frame-header` — grip, label, "…" `.block-frame-menu` — and `.block-frame-body`). What a block can do comes from its type alone (see `Documentation/architecture/blocks.md`): "Add block" lists every type's offer; the "…" menu holds its actions and settings while editing, the properties panel's "Actions" section the read-mode ones. Block-given values — info line in lists, rows in the properties panel marked with the small "Blocks" icon, block tags — appear only where a type delivers them.
+
+A block this version cannot read (`.block-unreadable`) shows only a notice instead of its content — a newer data version or unknown type ("from a newer version"), or damaged data ("cannot be read"). To see it, write a block with a data version above its type's into an entry's content through the store, e.g. `data-block-v="99"` on an existing section, and reopen the entry: the notice must show, nothing of the block's content, and the search must not find its words. Undo it by removing the attribute again. Report it as a fault if any content of such a block shows, in the app or in an export.
+
 ### Right-click menus
 `click` with `button: "right"`, then `snapshot` with `selector: ".context-menu"`:
 

@@ -1,4 +1,6 @@
 import { rewriteInternalLinkIds } from '../internalLinkHtml';
+import { parseBlocks, serializeBlocks } from './blockHtml';
+import { blockTagsOf } from './blockRefs';
 import { BLOCK_ATTR, type BlockInstance } from './types';
 
 /**
@@ -12,9 +14,13 @@ import { BLOCK_ATTR, type BlockInstance } from './types';
  * (as `remapPaths` in `dbBackup.ts` does for the other columns).
  *
  * Links stand in two forms: as chips in the markup (`data-id`), and as plain
- * IDs in the JSON of config and data (a copy's link prefill, an altar's link
- * elements). The JSON is walked, and only a string that IS a known ID is
- * replaced, so text that merely contains one stays.
+ * IDs in the JSON of config and data (a copy's link prefill). The JSON is
+ * walked, and only a string that IS a known ID is replaced, so text that
+ * merely contains one stays.
+ *
+ * Tags a block gives its entry (`properties.tags`) are named by ID in its
+ * JSON; `tags` points them at the tags here — only the IDs the block's type
+ * says it gives, so no other value that happens to look like one changes.
  *
  * Pure and DOM-free: the schema harness runs the import under Node.
  */
@@ -24,6 +30,8 @@ export interface BlockRemap {
   images?: ReadonlyMap<string, string>;
   /** Entry or task ID in the file → ID here; `undefined` keeps it. */
   id?: (id: string) => string | undefined;
+  /** Tag ID in the file → the tag here, for the tags the block gives; `undefined` keeps it. */
+  tags?: (id: string) => string | undefined;
 }
 
 const patterns = new WeakMap<ReadonlyMap<string, string>, RegExp | null>();
@@ -89,7 +97,9 @@ function remapJsonAttr(raw: string, id: (id: string) => string | undefined): str
 
 const JSON_ATTRS: readonly string[] = [BLOCK_ATTR.config, BLOCK_ATTR.data];
 
-export function remapBlock(block: BlockInstance, { images, id }: BlockRemap): BlockInstance {
+export function remapBlock(block: BlockInstance, { images, id, tags }: BlockRemap): BlockInstance {
+  // Read before anything changes: the type names its tags in the block as it came.
+  const given = tags ? new Set(blockTagsOf([block])) : null;
   let html = block.html;
   const attrs: Record<string, string> = { ...block.attrs };
   if (images?.size) {
@@ -102,5 +112,20 @@ export function remapBlock(block: BlockInstance, { images, id }: BlockRemap): Bl
       if (attrs[name] !== undefined) attrs[name] = remapJsonAttr(attrs[name], id);
     }
   }
+  if (tags && given?.size) {
+    const tag = (value: string) => (given.has(value) ? tags(value) : undefined);
+    for (const name of JSON_ATTRS) {
+      if (attrs[name] !== undefined) attrs[name] = remapJsonAttr(attrs[name], tag);
+    }
+  }
   return { ...block, html, attrs };
+}
+
+/** A block stack with the tags its blocks give pointed at other tags (`remapBlock`'s `tags`); the same string if none changes. */
+export function retagContent(content: string, tags: (id: string) => string | undefined): string {
+  if (!content) return content;
+  const blocks = parseBlocks(content);
+  const next = blocks.map((block) => remapBlock(block, { tags }));
+  const changed = next.some((block, i) => JSON.stringify(block.attrs) !== JSON.stringify(blocks[i].attrs));
+  return changed ? serializeBlocks(next) : content;
 }

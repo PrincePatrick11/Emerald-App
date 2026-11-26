@@ -172,6 +172,10 @@
     "jumpTo": "Aller au bloc",
     "remove": "Supprimer le bloc",
     "unknown": "Bloc inconnu ({{type}})",
+    "unreadable": {
+      "newer": "Ce bloc provient d’une version plus récente d’Emerald. Mettez l’application à jour pour le voir.",
+      "broken": "Ce bloc ne peut pas être lu : ses données sont endommagées. Il reste tel quel."
+    },
     "types": {
       "text": {
         "label": "Texte",
@@ -186,6 +190,7 @@
         "label": "Sigil",
         "description": "Calculateur, dessin et charge d'un sigil — activez ou désactivez chaque partie dans le menu du bloc. Chargé, il masque le calculateur et le dessin et verrouille l'entrée ou seulement ce sigil.",
         "noParts": "Toutes les parties sont désactivées — activez-les dans le menu du bloc.",
+        "locksEntry": "Un sigil chargé verrouille cette entrée — déchargez-le d’abord",
         "parts": {
           "calc": "Calculateur",
           "drawing": "Dessin",
@@ -288,7 +293,6 @@
       "loadFailed": "Impossible de charger la peinture – fermez puis rouvrez l’entrée"
     },
     "canvas": {
-      "broken": "Cette toile n’a pas pu être lue. Elle reste telle quelle.",
       "savePicture": "Enregistrer comme image…",
       "empty": "Rien sur la toile pour l’instant.",
       "parts": "Proposé",
@@ -306,7 +310,7 @@
     "cancel": "Annuler",
     "delete": "Supprimer",
     "edit": "Modifier",
-    "lockedBySigil": "Un sigil chargé verrouille cette entrée — déchargez-le d’abord",
+    "lockedByBlock": "Un bloc verrouille cette entrée",
     "editing": "en cours de modification…",
     "confirm": "Confirmer",
     "editLink": "Modifier le lien",

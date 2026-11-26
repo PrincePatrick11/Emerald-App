@@ -1,7 +1,6 @@
-import type { BlockActionDef, BlockCopyContext, BlockSettingDef, BlockTypeDef, ReadContext } from './blockType';
-import { htmlPlainText } from './plainText';
-import { blockDataVersion, withDataVersion, withoutImageInMarkup, type RefReporter } from './toolkit';
-import { BLOCK_ATTR, type BlockInstance } from './types';
+import type { BlockActionDef, BlockCopyContext, BlockInstanceName, BlockPreset, BlockSettingDef, BlockTypeDef, ReadContext } from './blockType';
+import { blockDataVersion, withDataVersion, type RefReporter } from './toolkit';
+import type { BlockInstance } from './types';
 import { localIsoDay } from '../helpers';
 import { textBlockType } from './kinds/text';
 import { fieldsBlockType } from './kinds/fields';
@@ -21,9 +20,9 @@ export type { BlockGroup, BlockTypeDef } from './blockType';
  *
  * Views, lists and stores never switch over block types themselves: they
  * ask through the helpers here — `blockInterfaces` for the readers that
- * must also cover a block this version cannot read (`UNKNOWN_BLOCK`, or
- * `TOO_NEW_BLOCK` for a known type in a newer format) — or, for what only a
- * readable type has, `resolveBlockType(block)` (`entryProperties.ts`, `entrySummary.ts`).
+ * must also cover a block this version cannot read (`UNREADABLE_BLOCK`) —
+ * or, for what only a readable type has, `resolveBlockType(block)`
+ * (`entryProperties.ts`, `entrySummary.ts`).
  */
 
 // A Map instead of an object: the type comes from stored content, and
@@ -44,43 +43,73 @@ export function registerBlockType(def: BlockTypeDef): void {
 
 for (const def of [textBlockType, fieldsBlockType, canvasBlockType, paintBlockType, altarBlockType, sigilBlockType]) registerBlockType(def);
 
+/** What "Add block" offers of all types, in the order they were registered (`BlockTypeDef.presets`). */
+export function blockTypePresets(): BlockPreset[] {
+  return [...BLOCK_TYPES.values()].flatMap((def) => def.presets ?? []);
+}
+
+/* ---------------- 13 Readable or not ---------------- */
+
 /**
- * The type with which the app can render this block — or `undefined` for
- * an unknown type or a data format that is too new. Both are shown as a
- * fallback and written back unchanged.
+ * Whether this app can read a block — one rule for every type, with no
+ * knowledge of any:
+ * - `readable`: a registered type, at or below its data version, its data
+ *   intact;
+ * - `newer`: a type this app does not know (from a newer version or an
+ *   extension), or a known one in a data format above its version — the
+ *   upward direction; the downward one is `upgrade`;
+ * - `broken`: a known type whose stored data cannot be read (`isBroken`).
+ *
+ * An unreadable block shows only a notice (`UnreadableBlock`), is not found
+ * by the search, goes into no export as content and is saved as it is; once
+ * an app that can read it opens it, it is back as it was.
  */
-export function resolveBlockType(block: BlockInstance): BlockTypeDef | undefined {
+export type BlockReadState = 'readable' | 'newer' | 'broken';
+
+/** The text key of what an unreadable block says, by why — in the stack and the export alike. */
+export const UNREADABLE_NOTICE = { newer: 'blocks.unreadable.newer', broken: 'blocks.unreadable.broken' } as const;
+
+// Blocks are values: a changed block is a new object, so the answer per object holds.
+const readStates = new WeakMap<BlockInstance, BlockReadState>();
+
+export function blockReadState(block: BlockInstance): BlockReadState {
+  const cached = readStates.get(block);
+  if (cached) return cached;
   const def = BLOCK_TYPES.get(block.type);
-  return def && blockDataVersion(block) <= def.dataVersion ? def : undefined;
+  const state: BlockReadState = !def || blockDataVersion(block) > def.dataVersion ? 'newer'
+    : def.isBroken?.(block) ? 'broken'
+    : 'readable';
+  readStates.set(block, state);
+  return state;
 }
 
 /**
- * How a block this version cannot read behaves (an unknown type, or a data
- * format too new): its markup is what it shows — the search reads it, its
- * chips and pictures are its references, a picture named in an attribute is
- * its own — and "Images" may take a picture out of its markup. Not a type
- * one can register or insert; only the readers below fall back to it.
+ * The type through which the app reads and renders this block — `undefined`
+ * if it cannot read it (`blockReadState`). Every interface is asked through it.
+ */
+export function resolveBlockType(block: BlockInstance): BlockTypeDef | undefined {
+  return blockReadState(block) === 'readable' ? BLOCK_TYPES.get(block.type) : undefined;
+}
+
+/**
+ * The registered type of a block whether or not it can be read — only for
+ * what it is called and its icon (an unreadable sigil is still named "Sigil").
+ */
+export function registeredBlockType(block: BlockInstance): BlockTypeDef | undefined {
+  return BLOCK_TYPES.get(block.type);
+}
+
+/**
+ * How a block this version cannot read behaves in the readers that must
+ * cover every block: it finds nothing in the search (its markup may hold
+ * what its type conceals), and its references keep whatever it names —
+ * chips as links, every stored picture in its markup or attributes as
+ * `default`, so "Images" neither lists a picture as its own nor takes one out
+ * of a block that is saved unchanged. Not a type one can register or insert.
  */
 type BlockReaders = Pick<BlockTypeDef, 'refs' | 'searchText' | 'withoutImage' | 'properties'>;
 
-const UNKNOWN_BLOCK: BlockReaders = {
-  searchText: (block) => htmlPlainText(block.html),
-  refs: (block: BlockInstance, report: RefReporter) => {
-    report.markup(block.html);
-    for (const [name, value] of Object.entries(block.attrs)) report.imagesIn(value, name === BLOCK_ATTR.data ? 'content' : 'default');
-  },
-  withoutImage: withoutImageInMarkup,
-};
-
-/**
- * How a block of a known type in a format too new for this version behaves:
- * like an unknown one, except that its pictures are kept — they may be its
- * rendered picture or a drawing's layers, which "Images" must neither list as
- * pictures of its own nor take out (it is saved unchanged). Its pictures
- * count as `default`, its links as links.
- */
-const TOO_NEW_BLOCK: BlockReaders = {
-  searchText: UNKNOWN_BLOCK.searchText,
+const UNREADABLE_BLOCK: BlockReaders = {
   refs: (block: BlockInstance, report: RefReporter) => {
     report.links(block.html);
     report.imagesIn(block.html, 'default');
@@ -88,9 +117,26 @@ const TOO_NEW_BLOCK: BlockReaders = {
   },
 };
 
-/** The interfaces to ask about a block: its type's, or the fallback for one this version cannot read. */
+/** The interfaces to ask about a block: its type's, or those of a block this version cannot read. */
 export function blockInterfaces(block: BlockInstance): BlockReaders {
-  return resolveBlockType(block) ?? (BLOCK_TYPES.has(block.type) ? TOO_NEW_BLOCK : UNKNOWN_BLOCK);
+  return resolveBlockType(block) ?? UNREADABLE_BLOCK;
+}
+
+/** What one block is called (its own title aside) and its icon: what the type says of this block (`properties.name`), else nothing. */
+export function blockInstanceName(block: BlockInstance): BlockInstanceName {
+  return resolveBlockType(block)?.properties?.name?.(block) ?? {};
+}
+
+/* ---------------- 15 Text editors ---------------- */
+
+/** The keys of the text editors a block holds (`textEditors`): `''` is the block itself. */
+export function blockTextEditors(block: BlockInstance): string[] {
+  return resolveBlockType(block)?.textEditors?.(block) ?? [];
+}
+
+/** The block without its link to `target` (`withoutLink`); the same block if its type has none or it holds none. */
+export function blockWithoutLink(block: BlockInstance, target: string, t: (key: string) => string): BlockInstance {
+  return resolveBlockType(block)?.withoutLink?.(block, target, t) ?? block;
 }
 
 /**
@@ -112,13 +158,15 @@ export interface EntryEffects {
   lockEntry: boolean;
   /** The blocks that lock the entry: they may still write in read mode, so the lock can be lifted where it was set. */
   lockedBy: ReadonlySet<string>;
+  /** Why, as the first locking block words it (`lockReasonKey`); `null` without a lock or a reason. */
+  lockReasonKey: string | null;
   /** Block (or part) IDs that cannot be edited. */
   locked: ReadonlySet<string>;
   /** Block (or part) IDs concealed — in both modes, in the search and the export — until a day, or (`null`) until lifted. */
   concealed: ReadonlyMap<string, string | null>;
 }
 
-export const NO_EFFECTS: EntryEffects = { lockEntry: false, lockedBy: new Set(), locked: new Set(), concealed: new Map() };
+export const NO_EFFECTS: EntryEffects = { lockEntry: false, lockedBy: new Set(), lockReasonKey: null, locked: new Set(), concealed: new Map() };
 
 /** Of two blocks concealing the same thing, the longer one holds — "until lifted" is the longest. */
 function laterReveal(a: string | null, b: string | null): string | null {
@@ -139,20 +187,24 @@ export function mayAffectEntry(content: string): boolean {
  */
 export function entryEffects(blocks: readonly BlockInstance[], ctx: ReadContext): EntryEffects {
   const lockedBy = new Set<string>();
+  let lockReasonKey: string | null = null;
   const locked = new Set<string>();
   const concealed = new Map<string, string | null>();
   for (const block of blocks) {
     const read = resolveBlockType(block)?.entryEffect?.read;
     if (!read) continue;
     const effect = read(block, blocks, ctx);
-    if (effect.lockEntry) lockedBy.add(block.id);
+    if (effect.lockEntry) {
+      lockedBy.add(block.id);
+      lockReasonKey ??= effect.lockReasonKey ?? null;
+    }
     for (const id of effect.locked ?? []) locked.add(id);
     for (const [id, until] of effect.concealed ?? []) {
       concealed.set(id, concealed.has(id) ? laterReveal(concealed.get(id)!, until) : until);
     }
   }
   return lockedBy.size > 0 || locked.size > 0 || concealed.size > 0
-    ? { lockEntry: lockedBy.size > 0, lockedBy, locked, concealed }
+    ? { lockEntry: lockedBy.size > 0, lockedBy, lockReasonKey, locked, concealed }
     : NO_EFFECTS;
 }
 
@@ -174,8 +226,8 @@ export function upgradeBlock(block: BlockInstance): BlockInstance {
 /* ---------------- 8 Search ---------------- */
 
 /**
- * The text the search finds in a block — its type's `searchText`, none if
- * the type has no text; an unknown type is read as its markup.
+ * The text the search finds in a block — its type's `searchText`; none if
+ * the type has no text or the block cannot be read here.
  */
 export function blockSearchText(block: BlockInstance, ctx: ReadContext = { today: localIsoDay() }): string {
   return blockInterfaces(block).searchText?.(block, ctx) ?? '';

@@ -35,11 +35,21 @@ export function blockTagsOf(blocks: readonly BlockInstance[]): string[] {
   return [...tags];
 }
 
+/** Is the reference a link the block shows (a chip, a link field) — not a prefill or a picture? */
+export function isLinkRef(ref: BlockRef): boolean {
+  return ref.kind === 'entry' && ref.role === 'content';
+}
+
+/** Does the block link to this entry or task (`isLinkRef`)? */
+export function blockLinksTo(block: BlockInstance, id: string): boolean {
+  return blockRefs(block).some((ref) => isLinkRef(ref) && ref.target === id);
+}
+
 /** The entries and tasks a content links to, in order — what "Linked entries" lists. */
 export function linkedIdsOf(content: string): Set<string> {
   const ids = new Set<string>();
   for (const block of parseBlocks(content)) {
-    for (const ref of blockRefs(block)) if (ref.kind === 'entry' && ref.role === 'content') ids.add(ref.target);
+    for (const ref of blockRefs(block)) if (isLinkRef(ref)) ids.add(ref.target);
   }
   return ids;
 }

@@ -47,6 +47,8 @@ What to check:
 
 - Regressions: for each changed function, look at who else calls it. A changed default, return shape or side effect that a caller outside the diff relies on is a finding.
 
+- Blocks: an interface asked of a block that cannot be read (always through `resolveBlockType`, which gives `undefined` for `newer` and `broken`); a block view that writes over data its type could not read; tags a block gives that a write, import or tag merge leaves pointing at a tag that is gone or at another vault's ID.
+
 Method:
 
 - Read the diff first, then the full files it touches — a hunk rarely shows the state it depends on.

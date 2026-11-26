@@ -122,6 +122,39 @@ export function rewriteInternalLinkIds(html: string, next: (id: string) => strin
 }
 
 /**
+ * The markup with every chip to `id` replaced by its stored label as text —
+ * a link taken out while its word stays. Via the tags like
+ * `rewriteInternalLinkIds`, without a DOM; everything else stays byte for byte.
+ */
+export function withoutInternalLinksTo(html: string, id: string): string {
+  if (!html || !html.includes('internalLink')) return html;
+  let out = '';
+  let from = 0;
+  let open: { index: number; label: string } | null = null;
+  let depth = 0;
+  for (const t of htmlTags(html)) {
+    if (t.name.toLowerCase() !== 'span') continue;
+    if (open) {
+      if (!t.close) depth++;
+      else if (depth > 0) depth--;
+      else {
+        out += html.slice(from, open.index) + escapeHtml(open.label);
+        from = t.index + t.length;
+        open = null;
+      }
+      continue;
+    }
+    if (t.close) continue;
+    const tag = html.slice(t.index, t.index + t.length);
+    if (tagAttr(tag, 'data-type') === 'internalLink' && tagAttr(tag, 'data-id') === id) {
+      open = { index: t.index, label: decodeHtmlAttr(tagAttr(tag, 'data-label') ?? '') };
+      depth = 0;
+    }
+  }
+  return out + html.slice(from);
+}
+
+/**
  * Does the stored HTML carry visible content? A fresh entry is
  * `<p></p>` — in front of the first link block there belongs no separator line,
  * since it separates the text from the links, and there is no text yet.

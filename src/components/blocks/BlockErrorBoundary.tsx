@@ -1,6 +1,6 @@
 import { Component, type ReactNode } from 'react';
 import type { BlockInstance } from '../../lib/blocks/types';
-import UnknownBlock from './UnknownBlock';
+import UnreadableBlock from './UnreadableBlock';
 
 interface Props {
   block: BlockInstance;
@@ -12,9 +12,9 @@ interface State {
 }
 
 /**
- * Catches a block whose rendering throws: broken data from an
- * import, a bug in a block type. Instead of the whole app, only this
- * block fails and shows its sanitised fallback, like an unknown type.
+ * Catches a block whose rendering throws: data its type's `isBroken` did
+ * not catch, a bug in a block type. Instead of the whole app, only this
+ * block fails and shows the notice of a block that cannot be read.
  * Without it a single block would take the UI down with it, and because the tab is
  * restored on startup, again on every startup.
  *
@@ -37,6 +37,6 @@ export default class BlockErrorBoundary extends Component<Props, State> {
   }
 
   render() {
-    return this.state.failed ? <UnknownBlock block={this.props.block} /> : this.props.children;
+    return this.state.failed ? <UnreadableBlock reason="broken" /> : this.props.children;
   }
 }

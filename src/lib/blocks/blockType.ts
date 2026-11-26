@@ -42,15 +42,16 @@ export interface BlockContext {
 
 /**
  * One value a block delivers — for the info line, property rows, filters and
- * sorting. The app words and formats it: a `link` by the name it was stored
- * with, a `phrase` as a text key (after an optional symbol).
+ * sorting. The app words and formats it: a `link` by its target's current
+ * title (`linkValueTitle`; the name stored with it only once the target is
+ * gone), a `phrase` as a text key (after an optional symbol).
  */
 export type BlockValue =
   | { kind: 'date'; iso: string }
   | { kind: 'text'; text: string }
   | { kind: 'number'; value: number }
   | { kind: 'bool'; value: boolean }
-  | { kind: 'link'; id: string; label: string }
+  | { kind: 'link'; id: string; targetKind: string; label: string }
   | { kind: 'phrase'; key: string; symbol?: string };
 
 /**
@@ -137,7 +138,8 @@ export type BlockPropertyRow = BlockValueLabel & {
 
 /**
  * What a block adds to the entry's properties: rows of its own, and values it
- * suggests for icon, cover and tags. Suggested values are told apart from
+ * suggests for icon, cover and tags — and the block's own properties, its
+ * name and icon, where it carries them itself. Suggested values are told apart from
  * the user's (`resolveProperty` says where each one comes from).
  *
  * Tags of a block hold only while the block is there: they are never
@@ -159,6 +161,21 @@ export interface BlockProperties {
   tags?: (block: BlockInstance) => string[];
   /** May the user's own icon or cover take the place of the block's? */
   overridable: { icon: boolean; cover: boolean };
+  /**
+   * What this block is called and its icon in the frame, the block management
+   * and the menus, where it carries its own (a custom block's copy, a single
+   * field); else the type's. Read whether or not `mayContribute` holds.
+   */
+  name?: (block: BlockInstance) => BlockInstanceName;
+}
+
+/** A lucide icon, or an emoji or icon file the block carries itself. */
+export type BlockGlyph = LucideIcon | string;
+
+/** A block's own name and icon (`BlockProperties.name`); a part missing is the type's. */
+export interface BlockInstanceName {
+  name?: BlockValueLabel;
+  glyph?: BlockGlyph;
 }
 
 /* ---------------- 4 / 9 Filter, sort, date ---------------- */
@@ -190,6 +207,8 @@ export interface BlockValues {
 /** What a block does to the whole entry: lock it, lock or conceal blocks and parts of blocks. */
 export interface BlockEntryEffect {
   lockEntry?: boolean;
+  /** With `lockEntry`: the text key saying why and how to lift it ("unload the sigil first"). */
+  lockReasonKey?: string;
   /** Block (or part) IDs that cannot be edited. */
   locked?: readonly string[];
   /** Block (or part) IDs concealed, until a day or (`null`) until lifted. */
@@ -254,6 +273,18 @@ export type BlockSettingDef =
 
 export type BlockSettingValue = boolean | string;
 
+/** An entry of "Add block" and of the built-in blocks in the Blocks view. A type may offer several (the fields block one per kind of field). */
+export interface BlockPreset {
+  /** Stable: "Add block" and the Blocks view name an entry by it. */
+  id: string;
+  labelKey: string;
+  /** Explanation as a tooltip in the overview of the Blocks view — only where the label is not enough. */
+  descriptionKey?: string;
+  icon: LucideIcon;
+  group: BlockGroup;
+  create: () => BlockInstance;
+}
+
 /* ---------------- The type ---------------- */
 
 export interface BlockTypeDef {
@@ -265,14 +296,30 @@ export interface BlockTypeDef {
   group: BlockGroup;
   /** Show the title in read mode unless the instance says otherwise. */
   defaultShowTitle: boolean;
+  /** What "Add block" offers of the type, in this order; none: it is not offered. */
+  presets?: readonly BlockPreset[];
   /**
    * 13 — version of the stored data format (`data-block-v`, missing = 1). A
-   * block with a higher one comes from a newer app and is treated like an
-   * unknown type: shown as a fallback, saved unchanged. A lower one is
-   * brought up by `upgrade` when the block is read into a stack.
+   * lower one is brought up by `upgrade` when the block is read into a stack.
+   * A higher one comes from a newer app: the block is unreadable here
+   * (`blockReadState`), like one of an unknown type.
    */
   dataVersion: number;
   upgrade?: (block: BlockInstance, from: number) => BlockInstance;
+  /**
+   * 13 — is the block's stored data damaged (JSON that cannot be read)? Then
+   * it is unreadable (`blockReadState`): no interface of the type is asked,
+   * the app shows a notice and saves it unchanged. Missing: never.
+   */
+  isBroken?: (block: BlockInstance) => boolean;
+  /**
+   * 15 — the text editors the block holds, in order: `''` for the block
+   * itself (the text block), else a key below it (a custom block's text field,
+   * `<block ID>:<key>`). The stack hosts them all alike — toolbar, link
+   * requests, drops, the caret in a new block, the page's placeholder in the
+   * first one that is a block of its own.
+   */
+  textEditors?: (block: BlockInstance) => string[];
 
   /** 1 — what the block adds to its entry's info line in lists. */
   listInfo?: ListInfoProvider;
@@ -299,6 +346,13 @@ export interface BlockTypeDef {
   refs?: (block: BlockInstance, report: RefReporter) => void;
   /** 11 — the block without a picture where it shows it as one of its own; a drawing keeps its pictures. */
   withoutImage?: (block: BlockInstance, file: string) => BlockInstance;
+  /**
+   * 11 — the block without its link to an entry or task, where no mounted text
+   * editor holds it ("Linked entries" removing one): a link field emptied, a
+   * chip in a text turned into its word. `t` words what the block writes
+   * along (its readable markup). The same block if it holds none.
+   */
+  withoutLink?: (block: BlockInstance, target: string, t: (key: string) => string) => BlockInstance;
   /** 12 — the block as a copy (it already carries its new ID): what it points at inside the copied blocks follows. */
   copy?: (block: BlockInstance, ctx: BlockCopyContext) => BlockInstance;
   /** 14 — the settings the block offers. */

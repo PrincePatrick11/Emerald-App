@@ -1,13 +1,11 @@
 import type { TFunction } from 'i18next';
 import { BLOCK_ATTR, type BlockAttrName, type BlockInstance } from './types';
-import type { BlockTypeDef } from './blockTypes';
-import {
-  activeElements, fieldLabel, FIELDS_BLOCK_TYPE, parseFields, type ElementDef, type FallbackText,
-} from './fields';
+import { blockInstanceName, registeredBlockType, type BlockTypeDef } from './blockTypes';
+import { valueLabel, type BlockGlyph } from './blockType';
 
 /**
  * Reading and setting the instance attributes from `BLOCK_ATTR` — the same
- * rules for the stack, the sidebar and, later, the export.
+ * rules for the stack, the sidebar and the export.
  */
 
 /** Hidden: gone in read mode, greyed out in edit mode. The data stays. */
@@ -21,49 +19,29 @@ export function customBlockTitle(block: BlockInstance): string | null {
 }
 
 /**
- * What a block is called — one rule for frame, management list and
- * sidebar section: its own title, otherwise the type name, otherwise (type
- * unknown or data format too new — `meta` is then `undefined`) "Unknown
- * block (type)".
+ * What a block is called — one rule for frame, management list, sidebar
+ * section and export: its own title, otherwise its type's name for it.
  */
-export function blockLabel(t: TFunction, block: BlockInstance, meta: BlockTypeDef | undefined): string {
-  return customBlockTitle(block) ?? blockTypeLabel(t, block, meta);
+export function blockLabel(t: TFunction, block: BlockInstance): string {
+  return customBlockTitle(block) ?? blockTypeLabel(t, block);
 }
 
 /**
  * The type name alone — without its own title, e.g. as a placeholder when
- * renaming. The copy of a custom block is named like that block, a fields
- * block with exactly one element like that element.
+ * renaming: what the type calls this block (`instanceName`, a custom block's
+ * copy its name), otherwise the type's name — an unreadable block of a known
+ * type keeps it; a type this app does not know is "Unknown block (type)".
  */
-export function blockTypeLabel(t: TFunction, block: BlockInstance, meta: BlockTypeDef | undefined): string {
+export function blockTypeLabel(t: TFunction, block: BlockInstance): string {
+  const meta = registeredBlockType(block);
   if (!meta) return t('blocks.unknown', { type: block.type });
-  if (meta.id === FIELDS_BLOCK_TYPE) {
-    const model = parseFields(block);
-    if (model.name.trim()) return model.name.trim();
-    const elements = activeElements(model);
-    if (elements.length === 1) return elementLabel(t, elements[0]);
-  }
-  return t(meta.labelKey);
+  const name = blockInstanceName(block).name;
+  return name ? valueLabel(name, t) : t(meta.labelKey);
 }
 
-/**
- * `t(key)` — unless i18n is not ready yet and returns the key itself;
- * then `fallback`. For texts that end up permanently in content or a
- * definition: otherwise "blocks.fields.no" would stay there forever.
- */
-export function translatedOr(t: TFunction, key: string, fallback: string): string {
-  const value = t(key);
-  return typeof value === 'string' && value && value !== key ? value : fallback;
-}
-
-/** The texts with which `serializeFields` writes the readable fallback — in the language of `t`. */
-export function fieldFallbackText(t: TFunction): FallbackText {
-  return {
-    label: (element) => elementLabel(t, element),
-    yes: translatedOr(t, 'blocks.fields.yes', 'Yes'),
-    no: translatedOr(t, 'blocks.fields.no', 'No'),
-    moonName: (phase) => translatedOr(t, `moonPhase.${phase}`, phase),
-  };
+/** The glyph of a block: what its type shows for it (`instanceName`), else the type's icon; none for an unknown type. */
+export function blockIcon(block: BlockInstance): BlockGlyph | undefined {
+  return blockInstanceName(block).glyph ?? registeredBlockType(block)?.icon;
 }
 
 /** What a template is called: its name, otherwise "Untitled template". */
@@ -76,19 +54,13 @@ export function definitionLabel(t: TFunction, def: { name: string }): string {
   return def.name.trim() || t('blocks.library.untitled');
 }
 
-/** The label of a field element: its own, otherwise the name of its kind. */
-export function elementLabel(t: TFunction, element: ElementDef): string {
-  const named = fieldLabel(element);
-  return 'label' in named ? named.label : t(named.labelKey);
-}
-
 /** The attribute value for "hidden: `hidden`". */
 export function hiddenAttrValue(hidden: boolean): string | null {
   return hidden ? '1' : null;
 }
 
 /** Does the block show its title in read mode? The instance beats the type's default. */
-export function showsTitleInRead(block: BlockInstance, meta: BlockTypeDef | undefined): boolean {
+export function showsTitleInRead(block: BlockInstance, meta: BlockTypeDef | undefined = registeredBlockType(block)): boolean {
   const value = block.attrs[BLOCK_ATTR.showTitle];
   if (value === '1') return true;
   if (value === '0') return false;

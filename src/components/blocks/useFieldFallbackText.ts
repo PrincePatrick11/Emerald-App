@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { fieldFallbackText } from '../../lib/blocks/blockAttrs';
-import type { FallbackText } from '../../lib/blocks/fields';
+import { fieldFallbackText, type FallbackText } from '../../lib/blocks/fields';
 
 /**
  * The texts with which `serializeFields` writes the readable fallback of a

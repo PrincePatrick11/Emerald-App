@@ -4315,13 +4315,17 @@ html[data-theme] .block-manager-row--idle,
   color: var(--text-subtle);
 }
 
-.block-unknown {
-  font-family: var(--font-editor);
+/* A block the app cannot read: only the notice, never its content (`UnreadableBlock`). */
+.block-unreadable {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
   color: var(--text-muted);
-  /* Second layer behind the sanitize allowlist in UnknownBlock: whatever
-     slips through stays inside the block's box — even `position: fixed`. */
-  contain: paint;
-  overflow: hidden;
+}
+
+.block-unreadable svg {
+  flex-shrink: 0;
 }
 
 /* ── Light Mode Tailwind bridge ───────────────────────────────────────────── */

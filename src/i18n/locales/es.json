@@ -172,6 +172,10 @@
     "jumpTo": "Ir al bloque",
     "remove": "Eliminar bloque",
     "unknown": "Bloque desconocido ({{type}})",
+    "unreadable": {
+      "newer": "Este bloque proviene de una versión más reciente de Emerald. Actualiza la aplicación para verlo.",
+      "broken": "Este bloque no se puede leer: sus datos están dañados. Se queda como está."
+    },
     "types": {
       "text": {
         "label": "Texto",
@@ -186,6 +190,7 @@
         "label": "Sigilo",
         "description": "Calculadora, dibujo y carga de un sigilo — activa o desactiva cada parte en el menú del bloque. Cargado oculta la calculadora y el dibujo y bloquea la entrada o solo este sigilo.",
         "noParts": "Todas las partes están desactivadas — actívalas en el menú del bloque.",
+        "locksEntry": "Un sigilo cargado bloquea esta entrada: descárgalo primero",
         "parts": {
           "calc": "Calculadora",
           "drawing": "Dibujo",
@@ -288,7 +293,6 @@
       "loadFailed": "No se pudo cargar la pintura: cierra y vuelve a abrir la entrada"
     },
     "canvas": {
-      "broken": "Este lienzo no se pudo leer. Se queda como está.",
       "savePicture": "Guardar como imagen…",
       "empty": "Todavía no hay nada en el lienzo.",
       "parts": "Disponible",
@@ -306,7 +310,7 @@
     "cancel": "Cancelar",
     "delete": "Eliminar",
     "edit": "Editar",
-    "lockedBySigil": "Un sigilo cargado bloquea esta entrada: descárgalo primero",
+    "lockedByBlock": "Un bloque bloquea esta entrada",
     "editing": "editando…",
     "confirm": "Confirmar",
     "editLink": "Editar enlace",

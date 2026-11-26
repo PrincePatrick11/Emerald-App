@@ -5,6 +5,8 @@ import { getDb } from '../lib/db';
 import { fromRow, type DbRow } from '../lib/row';
 import { replaceTagId, tagNameKey, unlinkTags } from '../lib/tagRefs';
 import { replaceTagsInDashboards } from '../lib/schema';
+import { dropBlockTagStatements, retagBlocks, type BlockOwner } from '../lib/blockStore';
+import { retagContent } from '../lib/blocks/blockRemap';
 import { useDashboardStore } from './dashboardStore';
 import { useEntryStore } from './entryStore';
 import { useTemplateStore } from './templateStore';
@@ -34,24 +36,44 @@ const sameName = (a: string, b: string) => tagNameKey(a) === tagNameKey(b);
 
 /**
  * Drops the tags from every owner in memory — what the database did by
- * deleting links (CASCADE, `unlinkTags`). An entry that is currently open
+ * deleting links (CASCADE, `unlinkTags`), the tags the blocks give
+ * (`Entry.block_tags`) included — unless `includeBlockTags` is off (a revive,
+ * which unlinks only the owners' own tags). An entry that is currently open
  * receives the new list through its store.
  */
-function dropFromStores(ids: Iterable<string>, replacement: string | null = null): void {
+function dropFromStores(ids: Iterable<string>, replacement: string | null = null, { includeBlockTags = true }: { includeBlockTags?: boolean } = {}): void {
   const gone = new Set(ids);
   if (!gone.size) return;
   const swap = (tags: string[]): string[] => {
     if (!tags.some((t) => gone.has(t))) return tags;
     return [...new Set(tags.map((t) => (gone.has(t) ? replacement : t)).filter((t): t is string => t !== null))];
   };
-  const patch = <T extends { tags: string[] }>(items: T[]): T[] =>
+  const patch = <T extends { tags: string[]; block_tags?: string[] }>(items: T[]): T[] =>
     items.map((item) => {
       const tags = swap(item.tags);
-      return tags === item.tags ? item : { ...item, tags };
+      const given = includeBlockTags && item.block_tags ? swap(item.block_tags) : item.block_tags;
+      if (tags === item.tags && given === item.block_tags) return item;
+      const next = { ...item, tags };
+      if (given) next.block_tags = given;
+      return next;
     });
   useEntryStore.setState((s) => ({ entries: patch(s.entries) }));
   useTemplateStore.setState((s) => ({ templates: patch(s.templates) }));
   useImageStore.setState((s) => ({ images: patch(s.images) }));
+}
+
+/**
+ * The blocks in memory that gave `from` give `to` now — what `retagBlocks`
+ * wrote. Only the owners it names; an open view follows its store.
+ */
+function retagInStores(owners: readonly BlockOwner[], from: string, to: string): void {
+  if (!owners.length) return;
+  const ids = new Set(owners.map((o) => `${o.kind}:${o.id}`));
+  const retag = (content: string) => retagContent(content, (id) => (id === from ? to : undefined));
+  const patch = <T extends { id: string; content: string }>(kind: BlockOwner['kind'], items: T[]): T[] =>
+    items.map((item) => (ids.has(`${kind}:${item.id}`) && item.content ? { ...item, content: retag(item.content) } : item));
+  useEntryStore.setState((s) => ({ entries: patch('entry', s.entries) }));
+  useTemplateStore.setState((s) => ({ templates: patch('template', s.templates) }));
 }
 
 /** The tags in the trash with this name (case-insensitive). */
@@ -75,16 +97,24 @@ async function reviveTrashedNamesake(name: string): Promise<Tag | null> {
   if (!hit) return null;
   const db = await getDb();
   await unlinkTags(db, [hit.id]);
-  dropFromStores([hit.id]);
+  // What blocks give stays given: only the entries' own links went.
+  dropFromStores([hit.id], null, { includeBlockTags: false });
   await db.execute('UPDATE tags SET deleted_at=NULL WHERE id=$1', [hit.id]);
   return { id: hit.id, name: hit.name, color: hit.color };
 }
 
-/** Deletes tags permanently: the rows, their links with them (CASCADE), and their place in the dashboards' filters. */
+/**
+ * Deletes tags permanently: the rows, their links with them (CASCADE), the
+ * blocks' references to them (blocks still naming one give no tag), and their
+ * place in the dashboards' filters.
+ */
 async function purgeTags(ids: string[]): Promise<void> {
   if (!ids.length) return;
   const db = await getDb();
-  await db.batch(ids.map((id) => ['DELETE FROM tags WHERE id=$1', [id]] as [string, unknown[]]));
+  await db.batch([
+    ...ids.map((id) => ['DELETE FROM tags WHERE id=$1', [id]] as [string, unknown[]]),
+    ...dropBlockTagStatements(ids),
+  ]);
   await replaceTagsInDashboards(db, ids);
   await useDashboardStore.getState().fetchDashboards();
   dropFromStores(ids);
@@ -214,10 +244,13 @@ export const useTagStore = create<TagState>((set, get) => {
       const namesake = get().tags.find((t) => sameName(t.name, name));
       if (namesake) {
         await replaceTagId(db, id, namesake.id);
+        // The blocks that give it give the namesake from now on.
+        const owners = await retagBlocks(db, id, namesake.id);
         await db.execute('DELETE FROM tags WHERE id=$1', [id]);
         await replaceTagsInDashboards(db, [id], namesake.id);
         await useDashboardStore.getState().fetchDashboards();
         dropFromStores([id], namesake.id);
+        retagInStores(owners, id, namesake.id);
         return;
       }
       await db.execute('UPDATE tags SET deleted_at=NULL WHERE id=$1', [id]);

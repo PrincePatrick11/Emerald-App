@@ -1,16 +1,16 @@
 import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { elementLabel } from '../../lib/blocks/blockAttrs';
 import {
-  activeElements, imageFromSlot, isElementEmpty, isHiddenInRead, isSlotKind, linkFromSlot, parseFields, serializeFields,
+  elementLabel, isElementEmpty, isHiddenInRead, isSlotKind, parseFields, serializeFields,
   type ElementDef, type FieldValue, type FieldsModel,
 } from '../../lib/blocks/fields';
+import { imageFromSlot, linkFromSlot, textEditorKey } from '../../lib/blocks/toolkit';
 import { isBlankContent } from '../../lib/internalLinkHtml';
 import { formatIsoDateLong } from '../../lib/formatDate';
 import { TextEditor } from '../editors/text';
-import UnknownBlock from './UnknownBlock';
 import { LinkTarget } from './BlockLink';
 import FieldSlotEditor from './FieldSlotEditor';
+import BlockFieldRow from './BlockFieldRow';
 import { imageSrc } from '../../lib/images';
 import { MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
 import type { MoonPhase } from '../../types';
@@ -39,10 +39,6 @@ export default function FieldsBlock({ block, isEditing, onBlockChange, onPersist
   const text = useFieldFallbackText();
   const model = parseFields(block);
 
-  // Unreadable JSON: display like an unknown block and never write;
-  // the first change would otherwise overwrite the original data with "empty".
-  if (model.broken) return <UnknownBlock block={block} />;
-
   const canActInRead = !isEditing && !model.display.readOnly && !effects.lockEntry && !!onPersist;
   const write = (next: FieldsModel) => {
     const nextBlock = serializeFields(block, next, text);
@@ -62,36 +58,33 @@ export default function FieldsBlock({ block, isEditing, onBlockChange, onPersist
     write({ ...model, slots });
   };
 
-  const elements = isEditing ? activeElements(model) : model.elements.filter((el) => !isHiddenInRead(el, model));
+  const elements = isEditing ? model.elements : model.elements.filter((el) => !isHiddenInRead(el, model));
   if (elements.length === 0) return null;
 
   return (
     <div className={isEditing ? 'block-fields block-fields--edit' : 'block-fields'}>
       {elements.map((element) => (
         // Text needs the full width: label above instead of beside.
-        <div key={element.id} className={element.kind === 'text' ? 'block-field block-field--wide' : 'block-field'}>
-          <div className="block-field-label">{elementLabel(t, element)}</div>
-          <div className="block-field-value">
-            {element.kind === 'text' ? (
-              // One tree for reading and editing, as with the text block: the editor only switches.
-              <FieldText
-                editorKey={`${block.id}:${element.id}`}
-                initialContent={model.slots[element.id] ?? ''}
-                isEditing={isEditing}
-                // Via the block, not only into the ref like the text block: the
-                // sidebar writes the whole model from the block it
-                // holds; if that were stale, a label change would delete what was typed.
-                onChange={(html) => {
-                  if (isEditing) setSlot(element)(isBlankContent(html) ? null : html);
-                }}
-              />
-            ) : isEditing ? (
-              <FieldEditor element={element} model={model} set={setValue(element)} setSlot={setSlot(element)} />
-            ) : (
-              <FieldReader element={element} model={model} set={canActInRead ? setValue(element) : undefined} />
-            )}
-          </div>
-        </div>
+        <BlockFieldRow key={element.id} label={elementLabel(t, element)} wide={element.kind === 'text'}>
+          {element.kind === 'text' ? (
+            // One tree for reading and editing, as with the text block: the editor only switches.
+            <FieldText
+              editorKey={textEditorKey(block.id, element.id)}
+              initialContent={model.slots[element.id] ?? ''}
+              isEditing={isEditing}
+              // Via the block, not only into the ref like the text block: the
+              // sidebar writes the whole model from the block it
+              // holds; if that were stale, a label change would delete what was typed.
+              onChange={(html) => {
+                if (isEditing) setSlot(element)(isBlankContent(html) ? null : html);
+              }}
+            />
+          ) : isEditing ? (
+            <FieldEditor element={element} model={model} set={setValue(element)} setSlot={setSlot(element)} />
+          ) : (
+            <FieldReader element={element} model={model} set={canActInRead ? setValue(element) : undefined} />
+          )}
+        </BlockFieldRow>
       ))}
     </div>
   );

@@ -132,7 +132,7 @@ Entries, templates and pictures of "Images" link their tags (`entry_tags`, `temp
 The store holds only live tags, and an id that is not among them is shown nowhere:
 
 - **Read side:** `useTagMap()` (live tags by id), `visibleTags(ids, byId)` (what the template dialog and the lists render; `TagInput` builds the same list itself, with its drafts among the real tags) and `liveTagNames(ids)` (what the `.emerald`, Markdown and HTML exports write — files carry names).
-- **Write side:** `lib/tagRefs.ts` (DOM- and store-free, so `scripts/schema-check.mjs` can run it). Tags are rows of `entry_tags`, `template_tags` and `image_tags` (`TAG_LINKS`); the stores write an owner's tags with its row (`tagStatements`) and read them all at once (`readTagLinks`). A tag deleted for good takes its links with it (CASCADE); merging hands them over (`replaceTagId`), reviving a trashed namesake drops them (`unlinkTags`). `tagStore`'s `dropFromStores` applies the same to the entry, template and image stores in memory, and `replaceTagsInDashboards` (`schema.ts`) to the dashboards' filters.
+- **Write side:** `lib/tagRefs.ts` (DOM- and store-free, so `scripts/schema-check.mjs` can run it). Tags are rows of `entry_tags`, `template_tags` and `image_tags` (`TAG_LINKS`); the stores write an owner's tags with its row (`tagStatements`) and read them all at once (`readTagLinks`). A tag deleted for good takes its links with it (CASCADE); merging hands them over (`replaceTagId`), reviving a trashed namesake drops them (`unlinkTags`) — the tags blocks give stay. `tagStore`'s `dropFromStores` applies the same to the entry, template and image stores in memory (`includeBlockTags: false` on a revive), and `replaceTagsInDashboards` (`schema.ts`) to the dashboards' filters.
 
 The actions:
 

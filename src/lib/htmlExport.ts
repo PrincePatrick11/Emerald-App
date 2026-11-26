@@ -1,7 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { save } from '@tauri-apps/plugin-dialog';
 import i18n from '../i18n';
-import { extractInternalLinks } from './internalLinkHtml';
 import { TEXT_COLORS, TEXT_COLOR_SHADES } from './textColors';
 import { useCategoryStore } from '../store/categoryStore';
 import { groupByCategory } from './groupBy';
@@ -59,9 +58,9 @@ function navIcon(data: ExportData): string {
   return icon.image ? `<img src="${icon.image}" class="nav-icon-img" alt="">` : htmlEscape(icon.emoji);
 }
 
-/** IDs of the entries `data` links to. */
+/** The entries and tasks `data` links to (`ExportData.linkedIds`), itself left out; only entries of the file are shown. */
 function outgoingIds(data: ExportData): Set<string> {
-  const ids = new Set(extractInternalLinks(data.content).filter((l) => l.targetKind === 'entry').map((l) => l.id));
+  const ids = new Set(data.linkedIds);
   ids.delete(data.id);
   return ids;
 }

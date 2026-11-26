@@ -54,12 +54,12 @@ import { isBuiltinDashboard, parseDashboardFilter } from './dashboards';
 import { fromRow } from './row';
 import { ICON_FIELDS, IMAGE_FIELDS, STARTER_CATEGORY_IDS, imageColumns, storedImageName, storedImageNamesIn } from './schema';
 import { iconFileNames, plausibleEmoji } from './icons';
-import { isTagId, readTagLinks, tagIdList, tagInsertStatements, tagNameKey, unlinkTags, type TagOwner } from './tagRefs';
+import { readTagLinks, tagIdList, tagInsertStatements, tagNameKey, unlinkTags, type TagOwner } from './tagRefs';
 import { randomTagColor } from '../store/tagStore';
 import { categoryKey } from './categories';
 import i18n from '../i18n';
 import { endOfDay, isValid, parseISO, startOfDay } from 'date-fns';
-import { asString, generateId, isRecord, isValidHexColor, nowIso } from './helpers';
+import { asString, generateId, isRecord, isTagId, isValidHexColor, nowIso } from './helpers';
 import { useVaultStore } from '../store/vaultStore';
 import { VAULT_KEY_CANCELLED } from '../store/vaultKeyStore';
 import { keyErrorOf } from './vaultKeys';
@@ -211,8 +211,15 @@ const TAG_NAME_MAX = 100;
  * otherwise it drops out of the row.
  * Runs in the working copy (`importViaStaging`): if the import fails afterwards,
  * nothing of the tags remains either.
+ *
+ * `blockTag` does the same for the tags the blocks give (`block_refs` kind
+ * `tag`, rebuilt from the blocks): their type names them by ID in their data,
+ * which the import points at the tag here (`remapBlock`); one it cannot place
+ * stays and gives no tag (the write takes only tags that exist).
  */
-async function importTagsAndRemap(db: Awaited<ReturnType<typeof getDb>>, d: VaultData): Promise<VaultData> {
+async function importTagsAndRemap(
+  db: Awaited<ReturnType<typeof getDb>>, d: VaultData,
+): Promise<{ data: VaultData; blockTag: (id: string) => string | undefined }> {
   const local = await db.select<{ id: string; name: string; deleted_at: string | null }[]>('SELECT id, name, deleted_at FROM tags');
   const byId = new Map(local.map((t) => [t.id, t]));
   const byName = new Map(local.map((t) => [tagNameKey(t.name), t]));
@@ -249,12 +256,15 @@ async function importTagsAndRemap(db: Awaited<ReturnType<typeof getDb>>, d: Vaul
     return filter.tags ? { ...row, filter: { ...filter, tags: localIds(filter.tags) } } : row;
   });
   return {
-    ...d,
-    tags: [],
-    entries: remap(d.entries),
-    templates: remap(d.templates),
-    vaultImages: remap(d.vaultImages),
-    dashboards,
+    data: {
+      ...d,
+      tags: [],
+      entries: remap(d.entries),
+      templates: remap(d.templates),
+      vaultImages: remap(d.vaultImages),
+      dashboards,
+    },
+    blockTag: (id) => idMap.get(id),
   };
 }
 
@@ -1079,9 +1089,9 @@ function fileBlockRow(row: Row): StoredBlockRow | null {
  * The blocks of a file, for the owners the import has just inserted:
  * `owners` maps an owner's ID in the file to its ID here (a merge's fresh one), and
  * an owner not in it — filtered out, or a template that already existed here —
- * gets none. Each block goes through `remapBlock` (pictures, and on a merge the
- * IDs) and keeps its position and time (`copyBlockStatements`); `block_refs`
- * is written from it.
+ * gets none. Each block goes through `remapBlock` (pictures, the tags it
+ * gives, and on a merge the IDs) and keeps its position and time
+ * (`copyBlockStatements`); `block_refs` is written from it.
  */
 async function insertImportedBlocks(
   db: Awaited<ReturnType<typeof getDb>>,
@@ -1480,7 +1490,7 @@ export async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: V
   const fileMap = new Map([...pathMap, ...files.icons]);
   // Tags are not replaced but merged: entries that this file does
   // not replace carry the IDs of the existing ones.
-  const d = await importTagsAndRemap(db, remapIconColumns(backup.data, files.icons));
+  const { data: d, blockTag } = await importTagsAndRemap(db, remapIconColumns(backup.data, files.icons));
 
   await assertPayloadReferencesResolve(db, d);
 
@@ -1533,8 +1543,8 @@ export async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: V
   const same = (ids: string[]) => new Map(ids.map((id) => [id, id]));
   const insertedEntries = new Set(entries.map((r) => String(r.id)));
   await insertTagLinks(db, 'entry', d.entries, (id) => (insertedEntries.has(id) ? id : undefined));
-  await insertImportedBlocks(db, d.blocks, 'entry', same(entries.map((r) => String(r.id))), { images: fileMap });
-  await insertImportedBlocks(db, d.blocks, 'template', same(templateIds), { images: fileMap });
+  await insertImportedBlocks(db, d.blocks, 'entry', same(entries.map((r) => String(r.id))), { images: fileMap, tags: blockTag });
+  await insertImportedBlocks(db, d.blocks, 'template', same(templateIds), { images: fileMap, tags: blockTag });
   await insertTasks(db, tasks);
   if (d.taskLinks) await insertRows(db, 'task_links', d.taskLinks);
 
@@ -1551,7 +1561,7 @@ export async function doReplace(db: Awaited<ReturnType<typeof getDb>>, backup: V
 export async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: VaultContent, files: ImportedFiles): Promise<void> {
   const pathMap = new Map(files.images);
   const fileMap = new Map([...pathMap, ...files.icons]);
-  const d = await importTagsAndRemap(db, remapIconColumns(backup.data, files.icons));
+  const { data: d, blockTag } = await importTagsAndRemap(db, remapIconColumns(backup.data, files.icons));
 
   // Merge deletes nothing, but aborts midway through inserting if a
   // category is missing — check beforehand so the message says which.
@@ -1632,8 +1642,8 @@ export async function doMerge(db: Awaited<ReturnType<typeof getDb>>, backup: Vau
   const inserted = new Set(entries.map((r) => String(r.id)));
   const owners = new Map([...newIds].filter(([, to]) => inserted.has(to)));
   await insertTagLinks(db, 'entry', d.entries, (id) => owners.get(id));
-  await insertImportedBlocks(db, d.blocks, 'entry', owners, { images: fileMap, id: nextId });
-  await insertImportedBlocks(db, d.blocks, 'template', new Map(templateIds.map((id) => [id, id])), { images: fileMap, id: nextId });
+  await insertImportedBlocks(db, d.blocks, 'entry', owners, { images: fileMap, id: nextId, tags: blockTag });
+  await insertImportedBlocks(db, d.blocks, 'template', new Map(templateIds.map((id) => [id, id])), { images: fileMap, id: nextId, tags: blockTag });
   await insertTasks(db, tasks);
   await insertRows(db, 'task_links', taskLinks, true);
 

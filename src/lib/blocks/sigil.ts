@@ -3,6 +3,7 @@ import { generateId } from '../helpers';
 import { neutralizeSectionTags } from './blockHtml';
 import { readBlockData, withBlockData } from './blockJson';
 import type { BlockEntryEffect, BlockSettingDef } from './blockType';
+import { parseSigilCalc } from './sigilCalc';
 import { readBlockSettings } from './toolkit';
 import { BLOCK_ATTR, type BlockInstance, type BlockTypeId } from './types';
 
@@ -54,7 +55,7 @@ export function sigilPartId(blockId: string, part: SigilPartName): string {
 /* ---------------- The block's model ---------------- */
 
 interface SigilModel {
-  /** The data JSON is unreadable: such a block is shown as an unknown one and never written. */
+  /** The data JSON is unreadable. */
   broken: boolean;
   data: Record<string, unknown>;
   slots: Partial<Record<SigilPartName, string>>;
@@ -102,9 +103,15 @@ function parseSigil(block: BlockInstance): SigilModel {
   return model;
 }
 
-/** Is the block's stored data unreadable? Then it is shown as a fallback and left as it is. */
+/**
+ * Is the block's stored data unreadable — its own, or that of its calculator
+ * or charge? Then the app cannot read it (`BlockTypeDef.isBroken`): no
+ * interface is asked, it is shown as a notice and saved as it is.
+ */
 export function isSigilBroken(block: BlockInstance): boolean {
-  return parseSigil(block).broken;
+  return parseSigil(block).broken
+    || parseSigilCalc(sigilPartBlock(block, 'calc')).broken
+    || parseSigilCharge(sigilPartBlock(block, 'charge')).broken;
 }
 
 /** One part as a block of its own: its data JSON and its slot's markup. */
@@ -146,7 +153,7 @@ export function shownSigilParts(block: BlockInstance): Record<SigilPartName, boo
   return {
     calc: settings.calc === true,
     drawing: settings.drawing === true,
-    charge: settings.charge === true || (!charge.broken && charge.loaded),
+    charge: settings.charge === true || charge.loaded,
   };
 }
 
@@ -205,11 +212,9 @@ export function chargeConceals(charge: Pick<SigilCharge, 'loaded' | 'revealDate'
   return charge.loaded && (!charge.revealDate || charge.revealDate > today);
 }
 
-/** The block's charge if it shows one and can read it — else `null`. */
+/** The block's charge if it shows one — else `null`. */
 function shownCharge(block: BlockInstance): SigilCharge | null {
-  if (parseSigil(block).broken || !shownSigilParts(block).charge) return null;
-  const charge = parseSigilCharge(sigilPartBlock(block, 'charge'));
-  return charge.broken ? null : charge;
+  return shownSigilParts(block).charge ? parseSigilCharge(sigilPartBlock(block, 'charge')) : null;
 }
 
 /**
@@ -226,16 +231,16 @@ export function sigilTargetDate(block: BlockInstance): { iso: string | null; loa
 /**
  * What the block's charge does to the entry: while loaded it locks the
  * block's calculator and drawing (and, with the lock "whole entry", the
- * entry), and until the target date it conceals them. An unreadable block
- * does nothing — as an unreadable charge never did.
+ * entry), and until the target date it conceals them. Asked only of a
+ * readable block (`isSigilBroken`).
  */
 export function sigilEffect(block: BlockInstance, today: string): BlockEntryEffect {
-  if (parseSigil(block).broken) return {};
   const charge = parseSigilCharge(sigilPartBlock(block, 'charge'));
-  if (charge.broken || !charge.loaded) return {};
+  if (!charge.loaded) return {};
   const tools = [sigilPartId(block.id, 'calc'), sigilPartId(block.id, 'drawing')];
   return {
     lockEntry: charge.lock === 'entry',
+    lockReasonKey: 'blocks.types.sigil.locksEntry',
     locked: tools,
     concealed: chargeConceals(charge, today) ? new Map(tools.map((id) => [id, charge.revealDate])) : undefined,
   };

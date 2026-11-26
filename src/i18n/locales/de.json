@@ -172,6 +172,10 @@
     "jumpTo": "Zum Block springen",
     "remove": "Block entfernen",
     "unknown": "Unbekannter Block ({{type}})",
+    "unreadable": {
+      "newer": "Dieser Block stammt aus einer neueren Version von Emerald. Aktualisiere die App, um ihn zu sehen.",
+      "broken": "Dieser Block kann nicht gelesen werden: Seine Daten sind beschädigt. Er bleibt, wie er ist."
+    },
     "types": {
       "text": {
         "label": "Text",
@@ -186,6 +190,7 @@
         "label": "Sigille",
         "description": "Rechner, Zeichnung und Ladung einer Sigille — jeden Teil im Menü des Blocks ein- oder ausschalten. Geladen verbirgt sie Rechner und Zeichnung und sperrt den Eintrag oder nur diese Sigille.",
         "noParts": "Alle Teile sind ausgeschaltet — schalte sie im Menü des Blocks ein.",
+        "locksEntry": "Eine geladene Sigille sperrt diesen Eintrag — erst entladen",
         "parts": {
           "calc": "Rechner",
           "drawing": "Zeichnung",
@@ -288,7 +293,6 @@
       "loadFailed": "Die Malerei konnte nicht geladen werden – schließ den Eintrag und öffne ihn erneut"
     },
     "canvas": {
-      "broken": "Diese Leinwand ließ sich nicht lesen. Sie bleibt, wie sie ist.",
       "savePicture": "Als Bild speichern …",
       "empty": "Noch nichts auf der Leinwand.",
       "parts": "Verfügbar",
@@ -306,7 +310,7 @@
     "cancel": "Abbrechen",
     "delete": "Löschen",
     "edit": "Bearbeiten",
-    "lockedBySigil": "Eine geladene Sigille sperrt diesen Eintrag — erst entladen",
+    "lockedByBlock": "Ein Block sperrt diesen Eintrag",
     "editing": "wird bearbeitet…",
     "confirm": "Bestätigen",
     "editLink": "Link bearbeiten",

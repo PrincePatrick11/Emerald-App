@@ -3,17 +3,18 @@ import { MOON_PHASE_SYMBOLS } from '../../moonPhase';
 import type { MoonPhase } from '../../../types';
 import { decodeHtmlAttr } from '../../internalLinkHtml';
 import type {
-  BlockExportPart, BlockExportValue, BlockFieldValue, BlockPropertyRow, BlockTypeDef, BlockValue,
+  BlockExportPart, BlockExportValue, BlockFieldValue, BlockGroup, BlockPreset, BlockPropertyRow, BlockTypeDef, BlockValue,
 } from '../blockType';
 import {
-  activeElements, checklistHtml, elementUses, fieldLabel, FIELDS_BLOCK_TYPE, imageFromSlot, isElementEmpty, isHiddenInRead,
-  linkFromSlot, parseFields, withoutElementContent,
+  checklistHtml, createFieldsBlock, ELEMENT_KIND_ICONS, ELEMENT_KINDS, elementKindLabelKey, elementUses, fieldFallbackText, fieldLabel, FIELDS_BLOCK_TYPE, isElementEmpty, isHiddenInRead,
+  parseFields, serializeFields, withoutElementContent,
   type ChecklistItem, type ElementDef, type ElementKind, type FieldUse, type FieldsModel,
 } from '../fields';
+import { extractInternalLinks, withoutInternalLinksTo } from '../../internalLinkHtml';
 import type { ListInfoPart } from '../listInfo';
 import { htmlPlainText } from '../plainText';
-import { blockTypeTextKey, type RefReporter } from '../toolkit';
-import { BLOCK_ATTR, type BlockInstance } from '../types';
+import { blockTypeTextKey, imageFromSlot, linkFromSlot, type RefReporter } from '../toolkit';
+import type { BlockInstance } from '../types';
 
 /**
  * What a kind of field's prefill points at — the fields block's own
@@ -35,11 +36,30 @@ function fieldsRefs(block: BlockInstance, report: RefReporter): void {
   for (const html of Object.values(model.slots)) report.markup(html);
   report.icon(model.icon);
   for (const element of model.elements) ELEMENT_PREFILL_REFS[element.kind]?.(element, report);
-  // A broken block keeps what its markup and JSON name, so nothing it holds goes unseen.
-  if (model.broken) {
-    report.markup(block.html);
-    report.imagesIn(block.attrs[BLOCK_ATTR.config], 'default');
+}
+
+/**
+ * The block without its link to `target`: a link field holding it emptied, a
+ * chip in a text field turned into its word (the text stays). Text fields
+ * with a mounted editor are reached through the editor first (the stack's
+ * link requests); this is for the rest.
+ */
+function fieldsWithoutLink(block: BlockInstance, target: string, t: (key: string) => string): BlockInstance {
+  const model = parseFields(block);
+  const slots = { ...model.slots };
+  let changed = false;
+  for (const element of model.elements) {
+    const slot = slots[element.id];
+    if (!slot) continue;
+    if (element.kind === 'link' && linkFromSlot(slot)?.id === target) {
+      delete slots[element.id];
+      changed = true;
+    } else if (element.kind === 'text' && extractInternalLinks(slot).some((link) => link.id === target)) {
+      slots[element.id] = withoutInternalLinksTo(slot, target);
+      changed = true;
+    }
   }
+  return changed ? serializeFields(block, { ...model, slots }, fieldFallbackText(t)) : block;
 }
 
 const SLOT_RE = /\bdata-block-slot="el:([^"]{1,200})"[^<>]*>([\s\S]*?)<\/dd>/gi;
@@ -76,7 +96,7 @@ function fieldValue(element: ElementDef, model: FieldsModel): BlockValue | null 
     }
     case 'link': {
       const link = linkFromSlot(model.slots[element.id]);
-      return link ? { kind: 'link', id: link.id, label: link.label } : null;
+      return link ? { kind: 'link', id: link.id, targetKind: link.targetKind, label: link.label } : null;
     }
     case 'checklist': {
       const items = value as ChecklistItem[];
@@ -108,8 +128,7 @@ function fieldValue(element: ElementDef, model: FieldsModel): BlockValue | null 
  */
 function usedFields(block: BlockInstance, use: FieldUse) {
   const model = parseFields(block);
-  if (model.broken) return [];
-  return activeElements(model)
+  return model.elements
     .filter((element) => elementUses(element)[use])
     .map((element) => {
       const value = fieldValue(element, model);
@@ -140,17 +159,26 @@ function fieldExportValue(element: ElementDef, model: FieldsModel): BlockExportV
   }
 }
 
-/** What read mode shows: a row per field it shows (archived and — per the display rule — empty ones are missing). */
+/** What read mode shows: a row per field it shows (empty ones missing as the display rule says). */
 function fieldsExport(block: BlockInstance): BlockExportPart[] {
   const model = parseFields(block);
-  // Unreadable: its readable fallback, as read mode shows it.
-  if (model.broken) return block.html ? [{ kind: 'html', html: block.html }] : [];
   return model.elements
     .filter((element) => !isHiddenInRead(element, model))
     .map((element): BlockExportPart => {
       return { kind: 'row', ...fieldLabel(element), value: fieldExportValue(element, model) };
     });
 }
+
+const KIND_GROUPS: Partial<Record<ElementKind, BlockGroup>> = { link: 'reference', image: 'media', moon: 'moon' };
+
+/** "Add block" offers a single field of each kind — but no text field: one inserts the text block. */
+const FIELD_PRESETS: readonly BlockPreset[] = ELEMENT_KINDS.filter((kind) => kind !== 'text').map((kind) => ({
+  id: `field.${kind}`,
+  labelKey: elementKindLabelKey(kind),
+  icon: ELEMENT_KIND_ICONS[kind],
+  group: KIND_GROUPS[kind] ?? 'fields',
+  create: () => createFieldsBlock(kind),
+}));
 
 /** The fields block: user-built blocks and single fields. */
 export const fieldsBlockType: BlockTypeDef = {
@@ -163,6 +191,10 @@ export const fieldsBlockType: BlockTypeDef = {
   dataVersion: 1,
   // A single field carries its label in the row anyway.
   defaultShowTitle: false,
+  presets: FIELD_PRESETS,
+  isBroken: (block) => parseFields(block).broken,
+  // Its text fields are editors of the stack's, under the element's ID.
+  textEditors: (block) => parseFields(block).elements.filter((el) => el.kind === 'text').map((el) => el.id),
   // Each field as its settings say (`FieldUses`): the short info line shows the value alone, the long one and the panel "Field: value".
   listInfo: {
     mayContribute: mayHold,
@@ -173,6 +205,15 @@ export const fieldsBlockType: BlockTypeDef = {
     rows: (block) => usedFields(block, 'panel')
       .flatMap(({ kind: _kind, rank: _rank, value, ...field }): BlockPropertyRow[] => (value ? [{ ...field, value }] : [])),
     overridable: { icon: true, cover: true },
+    // A copy of a custom block carries its name and emoji; a single field is named and iconed after its label or kind.
+    name: (block) => {
+      const model = parseFields(block);
+      const single = model.elements.length === 1 ? model.elements[0] : null;
+      return {
+        name: model.name.trim() ? { label: model.name.trim() } : single ? fieldLabel(single) : undefined,
+        glyph: model.icon || (single ? ELEMENT_KIND_ICONS[single.kind] : undefined),
+      };
+    },
   },
   values: {
     mayContribute: mayHold,
@@ -185,4 +226,5 @@ export const fieldsBlockType: BlockTypeDef = {
   export: fieldsExport,
   refs: fieldsRefs,
   withoutImage: fieldsWithoutImage,
+  withoutLink: fieldsWithoutLink,
 };

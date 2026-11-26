@@ -4,7 +4,8 @@ import type { TFunction } from 'i18next';
 import { Zap } from 'lucide-react';
 import Button from '../ui/Button';
 import Dropdown from '../ui/Dropdown';
-import { linkFromSlot } from '../../lib/blocks/fields';
+import InlineConfirm from '../ui/InlineConfirm';
+import { linkFromSlot } from '../../lib/blocks/toolkit';
 import {
   chargeConceals, parseSigilCharge, serializeSigilCharge, type SigilChargeData, type SigilLockScope,
 } from '../../lib/blocks/sigil';
@@ -12,8 +13,8 @@ import type { BlockInstance } from '../../lib/blocks/types';
 import { formatIsoDateLong } from '../../lib/formatDate';
 import { localIsoDay } from '../../lib/helpers';
 import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
-import UnknownBlock from './UnknownBlock';
 import { LinkEditor, LinkTarget } from './BlockLink';
+import BlockFieldRow from './BlockFieldRow';
 
 /**
  * The sigil's charge: target date, charging technique (a link chip) and what
@@ -31,7 +32,6 @@ export default function SigilCharge({ value, isEditing, onChange, onPersist }: {
   onPersist?: (next: BlockInstance) => void;
 }) {
   const charge = parseSigilCharge(value);
-  if (charge.broken) return <UnknownBlock block={value} />;
   const { broken: _broken, ...data } = charge;
   const write = (next: SigilChargeData) => serializeSigilCharge(value, next);
   if (isEditing) return <ChargeEditor charge={data} onChange={(next) => onChange(write(next))} />;
@@ -42,14 +42,11 @@ function Technique({ html, onChange }: { html: string | null; onChange?: (html: 
   const { t } = useTranslation();
   const target = linkFromSlot(html ?? undefined);
   return (
-    <div className="block-field">
-      <div className="block-field-label">{t('creation.chargingTechnique')}</div>
-      <div className="block-field-value">
-        {onChange
-          ? <LinkEditor slot={html ?? undefined} onChange={onChange} />
-          : target ? <LinkTarget target={target} /> : <span className="block-field-hint">—</span>}
-      </div>
-    </div>
+    <BlockFieldRow label={t('creation.chargingTechnique')}>
+      {onChange
+        ? <LinkEditor slot={html ?? undefined} onChange={onChange} />
+        : target ? <LinkTarget target={target} /> : <span className="block-field-hint">—</span>}
+    </BlockFieldRow>
   );
 }
 
@@ -73,10 +70,9 @@ function ChargeReader({ charge, onPersist }: {
 
   return (
     <div className="block-fields">
-      <div className="block-field">
-        <div className="block-field-label">{t('creation.targetDate')}</div>
-        <div className="block-field-value">{date ?? <span className="block-field-hint">{t('blocks.sigil.noRevealDate')}</span>}</div>
-      </div>
+      <BlockFieldRow label={t('creation.targetDate')}>
+        {date ?? <span className="block-field-hint">{t('blocks.sigil.noRevealDate')}</span>}
+      </BlockFieldRow>
       <Technique html={charge.technique} />
       <p className={`block-sigil-status ${charge.loaded ? 'block-sigil-status--loaded' : ''}`}>
         <Zap size={12} className="flex-shrink-0" />
@@ -122,18 +118,19 @@ function ChargeActions({ charge, date, onPersist }: { charge: SigilChargeData; d
   };
 
   if (confirming) {
+    // Loading and unloading change the sigil, they delete nothing: the jade confirmation.
     return (
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs text-muted">
-          {charge.loaded
-            ? t('blocks.sigil.unloadConfirm')
-            : date ? t('blocks.sigil.loadConfirm', { date }) : t('blocks.sigil.loadConfirmNoDate')}
-        </span>
-        <Button tone={charge.loaded ? 'neutral' : 'jade'} small onClick={confirm}>
-          {charge.loaded ? t('creation.unloadSigil') : t('creation.loadSigille')}
-        </Button>
-        <Button tone="neutral" small onClick={() => setConfirming(false)}>{t('common.cancel')}</Button>
-      </div>
+      <InlineConfirm
+        tone="jade"
+        small
+        wrap
+        message={charge.loaded
+          ? t('blocks.sigil.unloadConfirm')
+          : date ? t('blocks.sigil.loadConfirm', { date }) : t('blocks.sigil.loadConfirmNoDate')}
+        confirmLabel={charge.loaded ? t('creation.unloadSigil') : t('creation.loadSigille')}
+        onConfirm={confirm}
+        onCancel={() => setConfirming(false)}
+      />
     );
   }
   if (charge.loaded) {
@@ -173,37 +170,31 @@ function ChargeEditor({ charge, onChange }: {
   const fixed = charge.loaded;
   return (
     <div className="block-fields block-fields--edit">
-      <div className="block-field">
-        <div className="block-field-label">{t('creation.targetDate')}</div>
-        <div className="block-field-value">
-          <input
-            type="date"
-            className={OP_PROP_SELECT_CLASSES}
-            value={charge.revealDate ?? ''}
-            disabled={fixed}
-            onChange={(e) => onChange({ ...charge, revealDate: e.target.value || null })}
-          />
-        </div>
-      </div>
+      <BlockFieldRow label={t('creation.targetDate')}>
+        <input
+          type="date"
+          className={OP_PROP_SELECT_CLASSES}
+          value={charge.revealDate ?? ''}
+          disabled={fixed}
+          onChange={(e) => onChange({ ...charge, revealDate: e.target.value || null })}
+        />
+      </BlockFieldRow>
       <Technique html={charge.technique} onChange={(technique) => onChange({ ...charge, technique })} />
-      <div className="block-field">
-        <div className="block-field-label">{t('blocks.sigil.lockScope')}</div>
-        <div className="block-field-value">
-          {fixed ? (
-            <span>{charge.lock === 'sigil' ? t('blocks.sigil.lockSigil') : t('blocks.sigil.lockEntry')}</span>
-          ) : (
-            <Dropdown<SigilLockScope>
-              portal
-              value={charge.lock}
-              onChange={(lock) => onChange({ ...charge, lock })}
-              options={[
-                { value: 'entry', label: t('blocks.sigil.lockEntry') },
-                { value: 'sigil', label: t('blocks.sigil.lockSigil') },
-              ]}
-            />
-          )}
-        </div>
-      </div>
+      <BlockFieldRow label={t('blocks.sigil.lockScope')}>
+        {fixed ? (
+          <span>{charge.lock === 'sigil' ? t('blocks.sigil.lockSigil') : t('blocks.sigil.lockEntry')}</span>
+        ) : (
+          <Dropdown<SigilLockScope>
+            portal
+            value={charge.lock}
+            onChange={(lock) => onChange({ ...charge, lock })}
+            options={[
+              { value: 'entry', label: t('blocks.sigil.lockEntry') },
+              { value: 'sigil', label: t('blocks.sigil.lockSigil') },
+            ]}
+          />
+        )}
+      </BlockFieldRow>
       {fixed && (
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted">{t('blocks.sigil.loaded')}</span>

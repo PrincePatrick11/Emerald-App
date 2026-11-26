@@ -21,6 +21,7 @@ import DashboardItem, { CardContent, ItemGlyph, RENAME_INPUT_CLASS, RowContent }
 import RenameField from '../components/ui/RenameField';
 import { useOpenInNewTabAction } from './useOpenInNewTabAction';
 import { useSaveAsTemplateAction } from './useSaveAsTemplateAction';
+import { useLinkTitle } from './useLinkItems';
 import type { ActiveView, Entry } from '../types';
 import { valueLabel } from '../lib/blocks/blockType';
 
@@ -80,6 +81,9 @@ export function useEntryRows({ dashboardId, dateField }: EntryRowOptions): Entry
   const categories = useCategoryStore((s) => s.categories);
   const showMoonPhase = useSettingsStore((s) => s.settings.journal.moonPhase);
 
+  // A link field shows its target's current title, not the one stored with it.
+  const linkTitle = useLinkTitle();
+
   const catById = Object.fromEntries(categories.map((c) => [c.id, c]));
   const view = (e: Entry) => entryView(e.id, dashboardId);
   const date = (e: Entry) => entryDateOf(e, dateField);
@@ -89,7 +93,7 @@ export function useEntryRows({ dashboardId, dateField }: EntryRowOptions): Entry
   const category = (e: Entry) => categoryLabel(t, lookupCategory(catById, e.category_id));
   const meta = (e: Entry) => [category(e), formatEntryDate(date(e))].filter(Boolean).join(' · ');
   // "Label: value" as a key: French puts a space before the colon.
-  const longInfo = (part: ShownListInfoPart) => t('common.labelValue', { label: valueLabel(part, t), value: blockValueText(t, part.value) });
+  const longInfo = (part: ShownListInfoPart) => t('common.labelValue', { label: valueLabel(part, t), value: blockValueText(t, part.value, { titleOf: linkTitle }) });
 
   const duplicate = async (e: Entry) => {
     const copy = await duplicateEntry(e.id);
@@ -109,7 +113,7 @@ export function useEntryRows({ dashboardId, dateField }: EntryRowOptions): Entry
       return form === 'short'
         ? (
           <span key={part.key} className={className} title={longInfo(part)}>
-            <ShortInfo part={part} text={blockValueText(t, part.value, 'short')} />
+            <ShortInfo part={part} text={blockValueText(t, part.value, { form: 'short', titleOf: linkTitle })} />
           </span>
         )
         : <span key={part.key} className={className} title={longInfo(part)}>{longInfo(part)}</span>;

@@ -171,7 +171,7 @@ export default function CanvasBlock({ block, isEditing, onBlockChange, onPersist
   const editorRef = useRef<CanvasEditorHandle>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const editable = isEditing && !parsed.broken;
+  const editable = isEditing;
 
   const elements = useMemo(() => scene.elements.map(toElement), [scene.elements]);
   const background = useMemo(() => parseCanvasBackground(scene.background), [scene.background]);
@@ -200,7 +200,7 @@ export default function CanvasBlock({ block, isEditing, onBlockChange, onPersist
     const { block: current, onPersist: persist } = latest.current;
     const now = parseCanvasBlock(current);
     // Unchanged needs no new picture — unless it has none yet (an altar converted from before).
-    if (now.broken || !persist || (JSON.stringify(now.scene) === from && now.render)) return;
+    if (!persist || (JSON.stringify(now.scene) === from && now.render)) return;
     void renderScene(now.scene, profile.types, parseCanvasBackground(now.scene.background))
       .then(async (render) => {
         const { block: latestBlock, isEditing: editing, onPersist: save } = latest.current;
@@ -221,7 +221,6 @@ export default function CanvasBlock({ block, isEditing, onBlockChange, onPersist
   const commit = useCallback((patch: Partial<CanvasScene>) => {
     const { block: current, onBlockChange: change } = latest.current;
     const now = parseCanvasBlock(current);
-    if (now.broken) return;
     const next = withCanvasScene(current, { ...now.scene, ...patch }, now.render);
     // Seen at once by the next change, before the stack has rendered it (several pictures in a row).
     latest.current = { ...latest.current, block: next };
@@ -366,7 +365,6 @@ export default function CanvasBlock({ block, isEditing, onBlockChange, onPersist
     })();
   });
 
-  if (parsed.broken) return <p className="block-field-error">{t('blocks.canvas.broken')}</p>;
   if (!isEditing && !elements.length && !background) return <p className="block-field-hint">{t('blocks.canvas.empty')}</p>;
 
   return (

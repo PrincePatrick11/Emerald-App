@@ -11,8 +11,7 @@ import type { BlockSidebarEditProps } from './blockSidebarViews';
  */
 export default function CanvasSidebarEdit({ block, update }: BlockSidebarEditProps) {
   const { t } = useTranslation();
-  const { broken, parts } = parseCanvasBlock(block);
-  if (broken) return null;
+  const { parts } = parseCanvasBlock(block);
   return (
     <div className="min-w-0 space-y-2">
       <p className="panel-subheading">{t('blocks.canvas.parts')}</p>

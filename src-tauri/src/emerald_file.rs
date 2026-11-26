@@ -90,7 +90,7 @@ const IMAGES_DIR: &str = "images/";
 const ICONS_DIR: &str = "icons/";
 
 /// The manifest's own version — the frontend's `EMERALD_FORMAT_VERSION`.
-pub(crate) const FORMAT_VERSION: u64 = 7;
+pub(crate) const FORMAT_VERSION: u64 = 8;
 /// The most items a manifest may list — the frontend's `MANIFEST_LIMITS.items`.
 const MAX_ITEMS: usize = 1000;
 
@@ -1244,9 +1244,9 @@ mod tests {
 
     fn manifest(kind: Kind) -> Vec<u8> {
         match kind {
-            Kind::Items => br#"{"format":"emerald","version":7,"kind":"items","items":[{"secret":"GEHEIM-EMERALD"}]}"#.to_vec(),
-            Kind::Vault => br#"{"format":"emerald","version":7,"kind":"vault","data":{"secret":"GEHEIM-EMERALD"}}"#.to_vec(),
-            Kind::Raw => br#"{"format":"emerald","version":7,"kind":"raw"}"#.to_vec(),
+            Kind::Items => br#"{"format":"emerald","version":8,"kind":"items","items":[{"secret":"GEHEIM-EMERALD"}]}"#.to_vec(),
+            Kind::Vault => br#"{"format":"emerald","version":8,"kind":"vault","data":{"secret":"GEHEIM-EMERALD"}}"#.to_vec(),
+            Kind::Raw => br#"{"format":"emerald","version":8,"kind":"raw"}"#.to_vec(),
         }
     }
 
@@ -1327,7 +1327,7 @@ mod tests {
     #[test]
     fn the_manifest_is_deflated() {
         let big = format!(
-            r#"{{"format":"emerald","version":7,"kind":"items","items":[{}]}}"#,
+            r#"{{"format":"emerald","version":8,"kind":"items","items":[{}]}}"#,
             vec![r#"{"text":"the same words again and again"}"#; 500].join(",")
         );
         let contents = Contents { kind: Kind::Items, manifest: big.clone().into_bytes(), images: vec![], icons: vec![] };
@@ -1572,17 +1572,17 @@ mod tests {
 
     #[test]
     fn the_manifest_is_checked_before_pictures_are_stored() {
-        let ok = br#"{"format":"emerald","version":7,"kind":"items","items":[{"kind":"entry"}]}"#;
+        let ok = br#"{"format":"emerald","version":8,"kind":"items","items":[{"kind":"entry"}]}"#;
         assert!(check_manifest(ok, Kind::Items).is_ok());
         assert_eq!(check_manifest(ok, Kind::Vault).unwrap_err(), EMERALD_UNREADABLE);
-        let vault = br#"{"format":"emerald","version":7,"kind":"vault","data":{}}"#;
+        let vault = br#"{"format":"emerald","version":8,"kind":"vault","data":{}}"#;
         assert!(check_manifest(vault, Kind::Vault).is_ok());
-        assert_eq!(check_manifest(br#"{"format":"emerald","version":7,"kind":"vault","data":[]}"#, Kind::Vault).unwrap_err(), EMERALD_UNREADABLE);
-        assert_eq!(check_manifest(br#"{"format":"emerald","version":8,"kind":"items","items":[{}]}"#, Kind::Items).unwrap_err(), EMERALD_NEWER);
+        assert_eq!(check_manifest(br#"{"format":"emerald","version":8,"kind":"vault","data":[]}"#, Kind::Vault).unwrap_err(), EMERALD_UNREADABLE);
+        assert_eq!(check_manifest(br#"{"format":"emerald","version":9,"kind":"items","items":[{}]}"#, Kind::Items).unwrap_err(), EMERALD_NEWER);
         assert_eq!(check_manifest(br#"{"format":"emerald","version":6,"kind":"items","items":[{}]}"#, Kind::Items).unwrap_err(), EMERALD_OLD_FORMAT);
-        assert_eq!(check_manifest(br#"{"format":"other","version":7,"kind":"items","items":[{}]}"#, Kind::Items).unwrap_err(), EMERALD_UNREADABLE);
-        assert_eq!(check_manifest(br#"{"format":"emerald","version":7,"kind":"items","items":[]}"#, Kind::Items).unwrap_err(), EMERALD_UNREADABLE);
-        let many = format!(r#"{{"format":"emerald","version":7,"kind":"items","items":[{}]}}"#, vec!["{}"; MAX_ITEMS + 1].join(","));
+        assert_eq!(check_manifest(br#"{"format":"other","version":8,"kind":"items","items":[{}]}"#, Kind::Items).unwrap_err(), EMERALD_UNREADABLE);
+        assert_eq!(check_manifest(br#"{"format":"emerald","version":8,"kind":"items","items":[]}"#, Kind::Items).unwrap_err(), EMERALD_UNREADABLE);
+        let many = format!(r#"{{"format":"emerald","version":8,"kind":"items","items":[{}]}}"#, vec!["{}"; MAX_ITEMS + 1].join(","));
         assert_eq!(check_manifest(many.as_bytes(), Kind::Items).unwrap_err(), EMERALD_TOO_LARGE);
         assert_eq!(check_manifest(b"not json", Kind::Items).unwrap_err(), EMERALD_UNREADABLE);
     }
@@ -1607,7 +1607,7 @@ mod tests {
         open_zip(body, Kind::Items, limits)
     }
 
-    const ITEMS_MANIFEST: &[u8] = br#"{"format":"emerald","version":7,"kind":"items","items":[{}]}"#;
+    const ITEMS_MANIFEST: &[u8] = br#"{"format":"emerald","version":8,"kind":"items","items":[{}]}"#;
 
     #[test]
     fn too_large_members_and_bombs_are_refused() {
@@ -1701,7 +1701,7 @@ mod tests {
     fn a_manifest_made_to_swell_is_refused() {
         // Twenty megabytes of padding deflate to a few kilobytes.
         let padded = format!(
-            r#"{{"format":"emerald","version":7,"kind":"items","items":[{{}}],"pad":"{}"}}"#,
+            r#"{{"format":"emerald","version":8,"kind":"items","items":[{{}}],"pad":"{}"}}"#,
             " ".repeat(20 * 1024 * 1024)
         );
         let bytes = raw_file(&[(MANIFEST, padded.as_bytes())], true);

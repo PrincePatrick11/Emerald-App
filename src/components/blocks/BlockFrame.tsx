@@ -1,7 +1,7 @@
 import type { PointerEvent, MouseEvent, ReactNode } from 'react';
 import { EyeOff, GripVertical, MoreHorizontal } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import type { GlyphSource } from '../../lib/blocks/presets';
+import type { BlockGlyph as GlyphSource } from '../../lib/blocks/blockType';
 import BlockGlyph from './BlockGlyph';
 
 interface BlockFrameProps {

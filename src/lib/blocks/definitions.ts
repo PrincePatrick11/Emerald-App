@@ -69,11 +69,10 @@ function parseJsonText(raw: unknown): unknown {
 
 /**
  * The elements of a definition from its JSON column — validated like the copy
- * in the content. A field archived by an earlier version stays out: a removed
- * field is simply gone from the definition.
+ * in the content.
  */
 export function parseDefinitionElements(raw: unknown): ElementDef[] {
-  return parseElements(parseJsonText(raw)).filter((element) => !element.archived);
+  return parseElements(parseJsonText(raw));
 }
 
 export function parseDefinitionDisplay(raw: unknown): DefinitionDisplay {

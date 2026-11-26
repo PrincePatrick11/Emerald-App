@@ -3,7 +3,7 @@ import { readImageAsBase64, saveImage } from './images';
 import { isIconFile, plausibleEmoji } from './icons';
 import { storedImageName, storedImageNamesIn } from './schema';
 import { parseBlocks } from './blocks/blockHtml';
-import { blockRefs } from './blocks/blockRefs';
+import { blockRefs, blockTagsOf } from './blocks/blockRefs';
 import { save, message } from '@tauri-apps/plugin-dialog';
 import { exportFilename } from './helpers';
 import { marked } from 'marked';
@@ -34,8 +34,9 @@ import {
   definitionImageRefs, parseDefinitionElements, remapDefinitionDefaults, type LinkDefaultResolver,
 } from './blocks/definitions';
 import { nextDefinitionSortOrder } from './blockDefinitionRows';
+import { retagContent } from './blocks/blockRemap';
 import {
-  blocksToContent, categoryRowsOf, contentToBlocks, EMERALD_FORMAT_VERSION, gentlestImageMode, manifestCategoryOf,
+  blocksToContent, categoryRowsOf, contentToBlocks, EMERALD_FORMAT_VERSION, gentlestImageMode, manifestBlockTags, manifestCategoryOf,
   parseManifest, relinkWithinFile, usedDefinitionIds,
   renameStoredFiles, storedNameStem,
   type EmeraldManifest, type ImageMode, type ManifestBlockDefinition, type ManifestEntry, type ManifestItem,
@@ -286,6 +287,8 @@ export async function writeEmeraldFile(path: string, options: EmeraldExportOptio
     blockDefinitions,
     // Name, note and tags of the pictures the file carries; a left-out one is a placeholder there.
     images: await imageDetailsOf(await getDb(), images.map((image) => image.name)),
+    // The tags the blocks give go by name, as the items' own do.
+    blockTags: manifestBlockTags(contents, (id) => liveTagNames([id])[0]),
   };
   await writeArchive(path, 'items', JSON.stringify(manifest), images, [...icons], options.protection ?? { type: 'none' });
 }
@@ -634,6 +637,15 @@ async function importManifest(
       result.entries.push(entry.id);
     }
 
+    // The tags the blocks of the items imported give, found or made here by
+    // name as the items' own tags are — not those only left-out items give.
+    const given = new Set(items.flatMap((item) => blockTagsOf(parseBlocks(blocksToContent(item.blocks)))));
+    const blockTagIds = new Map<string, string>();
+    for (const tag of manifest.blockTags.filter((t) => given.has(t.id))) {
+      const [id] = await ensureTagIds([tag.name]);
+      if (id) blockTagIds.set(tag.id, id);
+    }
+
     const ownIds = new Set(idMap.values());
     // A link to an item left out as already here points at the one here.
     const relinkMap = new Map([...skip, ...idMap]); // later pairs win: a created item over a skipped one
@@ -641,7 +653,7 @@ async function importManifest(
       const raw = blocksToContent(item.blocks);
       const renamed = renameStoredFiles(renameStoredFiles(raw, iconNames), imageNames);
       const relinked = remapImportedLinks(relinkWithinFile(renamed, relinkMap), manifest.links, linkItems, ownIds);
-      return sanitizeImportedHtml(relinked);
+      return sanitizeImportedHtml(retagContent(relinked, (id) => blockTagIds.get(id)));
     };
     const iconOf = (icon: string): string | undefined => {
       if (!icon) return undefined;

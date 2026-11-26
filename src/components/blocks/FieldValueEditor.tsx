@@ -1,8 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { CheckSquare, Plus, Square, ToggleLeft, ToggleRight, X } from 'lucide-react';
 import Dropdown from '../ui/Dropdown';
-import { elementLabel } from '../../lib/blocks/blockAttrs';
-import type { ChecklistItem, ElementDef, FieldValue } from '../../lib/blocks/fields';
+import { elementLabel, type ChecklistItem, type ElementDef, type FieldValue } from '../../lib/blocks/fields';
 import { generateId } from '../../lib/helpers';
 import { MOON_PHASE_ORDER, MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
 import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';

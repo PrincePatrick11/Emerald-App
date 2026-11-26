@@ -13,13 +13,12 @@ import { useBlockDraftStore, type DefinitionDraft } from '../../store/draftStore
 import { useDraftPage } from '../../hooks/useDraftPage';
 import { useShrunkIcon } from '../../hooks/useShrunkIcon';
 import {
-  canBeEmpty, defaultFromSlot, ELEMENT_KINDS, elementKindLabelKey, initialUses, isSlotKind, slotFromDefault,
+  canBeEmpty, defaultFromSlot, ELEMENT_KIND_ICONS, ELEMENT_KINDS, elementKindLabelKey, initialUses, isSlotKind, slotFromDefault,
   type ElementDef, type ElementKind, type FieldUse, type FieldValue, type LinkCategoryFilter, normalizeLinkCategoryFilter, withFieldUse,
 } from '../../lib/blocks/fields';
 import { categoryLabel } from '../../lib/categories';
 import { useCategoryStore } from '../../store/categoryStore';
 import { SettingsCheckboxGrid, SettingsDescription } from '../layout/settings/SettingsSection';
-import { ELEMENT_KIND_ICONS } from '../../lib/blocks/presets';
 import { definitionLabel } from '../../lib/blocks/blockAttrs';
 import { DEFAULT_DEFINITION_ICON, type BlockDefinition, type DefinitionDisplay } from '../../lib/blocks/definitions';
 import { generateId } from '../../lib/helpers';

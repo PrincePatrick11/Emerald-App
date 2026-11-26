@@ -3,7 +3,7 @@ import { AltarIcon } from '../../altarIcon';
 import { isRecord } from '../../helpers';
 import type { BlockActionDef, BlockExportPart, BlockTypeDef } from '../blockType';
 import {
-  ALTAR_BLOCK_TYPE, CANVAS_BLOCK_TYPE, canvasBackgroundFile, canvasElementFile, parseCanvasBlock, withoutCanvasFile,
+  ALTAR_BLOCK_TYPE, CANVAS_BLOCK_TYPE, canvasBackgroundFile, canvasElementFile, createCanvasBlock, parseCanvasBlock, withoutCanvasFile,
 } from '../canvas';
 import { blockTypeTextKey, type RefReporter } from '../toolkit';
 import type { BlockInstance } from '../types';
@@ -26,8 +26,8 @@ const CANVAS_ACTIONS: readonly BlockActionDef[] = [{
   inRead: true,
   // Nothing on it, nothing to save — read mode does not even show the editor then.
   available: (block) => {
-    const { broken, scene } = parseCanvasBlock(block);
-    return !broken && (scene.elements.length > 0 || drawsBackground(scene.background));
+    const { scene } = parseCanvasBlock(block);
+    return scene.elements.length > 0 || drawsBackground(scene.background);
   },
 }];
 
@@ -44,6 +44,7 @@ const canvasLike = {
   group: 'media',
   dataVersion: 1,
   defaultShowTitle: false,
+  isBroken: (block: BlockInstance) => parseCanvasBlock(block).broken,
   // The rendered picture, named after the block; the pictures behind it are only references.
   export: (block: BlockInstance): BlockExportPart[] => {
     const { render } = parseCanvasBlock(block);
@@ -60,6 +61,7 @@ export const canvasBlockType: BlockTypeDef = {
   icon: Frame,
   labelKey: blockTypeTextKey(CANVAS_BLOCK_TYPE, 'label'),
   descriptionKey: blockTypeTextKey(CANVAS_BLOCK_TYPE, 'description'),
+  presets: [{ id: 'canvas', labelKey: blockTypeTextKey(CANVAS_BLOCK_TYPE, 'label'), descriptionKey: blockTypeTextKey(CANVAS_BLOCK_TYPE, 'description'), icon: Frame, group: 'media', create: () => createCanvasBlock() }],
 };
 
 /**
@@ -73,5 +75,6 @@ export const altarBlockType: BlockTypeDef = {
   icon: AltarIcon,
   labelKey: blockTypeTextKey(ALTAR_BLOCK_TYPE, 'label'),
   descriptionKey: blockTypeTextKey(ALTAR_BLOCK_TYPE, 'description'),
+  presets: [{ id: 'altar', labelKey: blockTypeTextKey(ALTAR_BLOCK_TYPE, 'label'), descriptionKey: blockTypeTextKey(ALTAR_BLOCK_TYPE, 'description'), icon: AltarIcon, group: 'media', create: () => createCanvasBlock(ALTAR_BLOCK_TYPE) }],
   storage: { tag: { id: 'altar-library', name: 'Altar Library' } },
 };

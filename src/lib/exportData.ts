@@ -1,8 +1,11 @@
 import { useEntryStore } from '../store/entryStore';
 import { liveTagNames } from '../store/tagStore';
 import { renderBlocksForExport, type ExportText } from './blocks/exportRender';
+import { linkedIdsOf } from './blocks/blockRefs';
+import { parseBlocks, serializeBlocks } from './blocks/blockHtml';
 import type { BlockExportFormat } from './blocks/blockType';
-import { blockLabel, translatedOr } from './blocks/blockAttrs';
+import { blockLabel, isBlockHidden } from './blocks/blockAttrs';
+import { translatedOr } from './blocks/toolkit';
 import { formatIsoDateLong } from './formatDate';
 import { useCategoryStore } from '../store/categoryStore';
 import { entryMoonPhase, MOON_PHASE_SYMBOLS } from './moonPhase';
@@ -24,7 +27,7 @@ export interface ChipData {
 function exportText(): ExportText {
   const t = i18n.t;
   return {
-    title: (block, meta) => blockLabel(t, block, meta),
+    title: (block) => blockLabel(t, block),
     yes: translatedOr(t, 'blocks.fields.yes', 'Yes'),
     no: translatedOr(t, 'blocks.fields.no', 'No'),
     date: formatIsoDateLong,
@@ -44,6 +47,8 @@ export interface ExportData {
   title: string;
   entryNumber?: number;
   content: string;
+  /** The entries and tasks it links to — what its blocks report (`linkedIdsOf` over the stored blocks, not the rendered `content`). */
+  linkedIds: string[];
   createdAt: string;
   // journal
   moonPhase?: string;         // emoji + label, e.g. "🌕 Full Moon"
@@ -75,6 +80,8 @@ export async function collectExportDataFor(id: string, format: BlockExportFormat
     title: displayTitle(i18n.t, 'entry', entry.title),
     entryNumber: entry.entry_number,
     content: renderBlocksForExport(entry.content, format, exportText()),
+    // Of the blocks the export shows: a hidden one (the eye) is not in the file.
+    linkedIds: [...linkedIdsOf(serializeBlocks(parseBlocks(entry.content).filter((b) => !isBlockHidden(b))))],
     createdAt: entry.created_at,
     moonPhase: phase ? `${MOON_PHASE_SYMBOLS[phase]} ${moonLabel(phase)}` : undefined,
     category: cat ? { id: cat.id, label: categoryLabel(i18n.t, cat), icon: cat.emoji } : undefined,

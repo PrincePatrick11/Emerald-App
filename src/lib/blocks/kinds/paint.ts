@@ -1,6 +1,7 @@
 import { Brush } from 'lucide-react';
 import type { BlockTypeDef } from '../blockType';
-import { drawingImage, PAINT_BLOCK_TYPE, parseDrawing } from '../paint';
+import { readBlockData } from '../blockJson';
+import { createPaintBlock, drawingImage, PAINT_BLOCK_TYPE, parseDrawing } from '../paint';
 import { blockTypeTextKey, type RefReporter } from '../toolkit';
 import type { BlockInstance } from '../types';
 
@@ -25,6 +26,8 @@ export const paintBlockType: BlockTypeDef = {
   group: 'media',
   dataVersion: 1,
   defaultShowTitle: false,
+  presets: [{ id: 'paint', labelKey: blockTypeTextKey(PAINT_BLOCK_TYPE, 'label'), descriptionKey: blockTypeTextKey(PAINT_BLOCK_TYPE, 'description'), icon: Brush, group: 'media', create: createPaintBlock }],
+  isBroken: (block) => readBlockData(block).broken,
   // The rendered picture, named after the block.
   export: (block) => {
     const file = drawingImage(block);

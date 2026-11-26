@@ -4,11 +4,11 @@ import type { ListInfoPart } from '../listInfo';
 import { drawingImage } from '../paint';
 import { htmlPlainText } from '../plainText';
 import {
-  isSigilBroken, parseSigilCharge, shownSigilParts, sigilEffect, sigilPartBlock, sigilPartId, sigilTargetDate,
+  createSigilBlock, isSigilBroken, parseSigilCharge, shownSigilParts, sigilEffect, sigilPartBlock, sigilPartId, sigilTargetDate,
   SIGIL_BLOCK_TYPE, SIGIL_SETTINGS, type SigilPartName,
 } from '../sigil';
 import { blockTypeTextKey, type RefReporter } from '../toolkit';
-import { BLOCK_ATTR, type BlockInstance } from '../types';
+import type { BlockInstance } from '../types';
 import { reportDrawing } from './paint';
 
 /**
@@ -47,7 +47,6 @@ function visibleParts(block: BlockInstance, ctx: ReadContext): Record<SigilPartN
 }
 
 function sigilSearchText(block: BlockInstance, ctx: ReadContext): string {
-  if (isSigilBroken(block)) return htmlPlainText(block.html);
   const visible = visibleParts(block, ctx);
   return (['calc', 'charge'] as const)
     .filter((part) => visible[part])
@@ -60,8 +59,6 @@ function sigilRefs(block: BlockInstance, report: RefReporter): void {
   // Switched off or concealed, a part still holds what it points at.
   reportDrawing(sigilPartBlock(block, 'drawing'), report);
   report.markup(sigilPartBlock(block, 'charge').html);
-  // An unreadable block keeps what its JSON names, so no picture of it goes unseen.
-  if (isSigilBroken(block)) report.imagesIn(block.attrs[BLOCK_ATTR.data], 'default');
 }
 
 const partLabelKey = (part: SigilPartName) => `blocks.types.sigil.parts.${part}`;
@@ -86,8 +83,6 @@ function toolExport(block: BlockInstance, part: 'calc' | 'drawing'): BlockExport
  * discipline, not a lock.
  */
 function sigilExport(block: BlockInstance, ctx: ExportContext): BlockExportPart[] {
-  // Unreadable: its markup, as read mode shows it (an unreadable sigil conceals nothing).
-  if (isSigilBroken(block)) return block.html ? [{ kind: 'html', html: block.html }] : [];
   const shown = shownSigilParts(block);
   const parts: BlockExportPart[] = [];
   for (const part of ['calc', 'drawing'] as const) {
@@ -104,14 +99,12 @@ function sigilExport(block: BlockInstance, ctx: ExportContext): BlockExportPart[
   // A loaded charge is never concealed (it must stay reachable to unload); the check is only a guard.
   if (shown.charge && !ctx.concealed.has(sigilPartId(block.id, 'charge'))) {
     const charge = parseSigilCharge(sigilPartBlock(block, 'charge'));
-    if (!charge.broken) {
-      parts.push(
-        partHeading('charge'),
-        { kind: 'row', labelKey: 'creation.targetDate', value: charge.revealDate ? { kind: 'date', iso: charge.revealDate } : null },
-        { kind: 'row', labelKey: 'creation.chargingTechnique', value: charge.technique ? { kind: 'html', html: charge.technique } : null },
-        { kind: 'note', textKey: charge.loaded ? 'blocks.sigil.loaded' : 'blocks.sigil.notLoaded' },
-      );
-    }
+    parts.push(
+      partHeading('charge'),
+      { kind: 'row', labelKey: 'creation.targetDate', value: charge.revealDate ? { kind: 'date', iso: charge.revealDate } : null },
+      { kind: 'row', labelKey: 'creation.chargingTechnique', value: charge.technique ? { kind: 'html', html: charge.technique } : null },
+      { kind: 'note', textKey: charge.loaded ? 'blocks.sigil.loaded' : 'blocks.sigil.notLoaded' },
+    );
   }
   return parts;
 }
@@ -126,6 +119,11 @@ export const sigilBlockType: BlockTypeDef = {
   dataVersion: 1,
   // Its parts carry their own headings.
   defaultShowTitle: false,
+  presets: [{
+    id: 'sigil', labelKey: blockTypeTextKey(SIGIL_BLOCK_TYPE, 'label'), descriptionKey: blockTypeTextKey(SIGIL_BLOCK_TYPE, 'description'),
+    icon: Sparkles, group: 'sigil', create: createSigilBlock,
+  }],
+  isBroken: isSigilBroken,
   listInfo: {
     mayContribute: mayHold,
     // A hidden sigil keeps showing its target date — the date matters most then.

@@ -13,21 +13,22 @@ import {
   APPEND_ENTRY_LINK_EVENT, REMOVE_ENTRY_LINK_EVENT, REVEAL_ENTRY_LINK_EVENT, subscribeEntryLinkRequest,
   type EntryLinkRequest,
 } from '../../lib/links';
-import { extractInternalLinks, internalLinkBlockHtml, linkTargetKindOf, remapInternalLinks, toInternalLinkChip } from '../../lib/internalLinkHtml';
+import { internalLinkBlockHtml, toInternalLinkChip } from '../../lib/internalLinkHtml';
 import { generateId, localIsoDay } from '../../lib/helpers';
 import { editorSavesSuspended } from '../../lib/editorLock';
-import { activeElements, FIELDS_BLOCK_TYPE, linkFromSlot, parseFields, serializeFields } from '../../lib/blocks/fields';
-import { useFieldFallbackText } from './useFieldFallbackText';
 import { REORDER_SPRING } from '../../lib/motion';
 import { flashReveal, scrollIntoViewCentered } from '../../lib/reveal';
 import { createTextBlock, neutralizeSectionTags, parseBlocks, serializeBlocks } from '../../lib/blocks/blockHtml';
-import { entryEffects, resolveBlockType, upgradeBlock, withDuplicatedBlock, type BlockTypeDef } from '../../lib/blocks/blockTypes';
-import { blockContext } from '../../lib/blocks/toolkit';
+import {
+  blockReadState, blockTextEditors, blockWithoutLink, entryEffects, resolveBlockType, upgradeBlock, withDuplicatedBlock, type BlockTypeDef,
+} from '../../lib/blocks/blockTypes';
+import { blockLinksTo } from '../../lib/blocks/blockRefs';
+import { blockContext, textEditorKey } from '../../lib/blocks/toolkit';
 import { findEntry, useEntryStore } from '../../store/entryStore';
-import { blockIcon, createFromPreset } from '../../lib/blocks/presets';
+import { createFromPreset } from '../../lib/blocks/presets';
 import { useBlockDefinitionStore } from '../../store/blockDefinitionStore';
-import { blockLabel, hiddenAttrValue, isBlockHidden, showsTitleInRead, withBlockAttr } from '../../lib/blocks/blockAttrs';
-import { BLOCK_ATTR, TEXT_BLOCK_TYPE, type BlockAttrName, type BlockInstance } from '../../lib/blocks/types';
+import { blockIcon, blockLabel, hiddenAttrValue, isBlockHidden, showsTitleInRead, withBlockAttr } from '../../lib/blocks/blockAttrs';
+import { BLOCK_ATTR, type BlockAttrName, type BlockInstance } from '../../lib/blocks/types';
 import { useBlockSessionStore, type BlockStackApi } from '../../store/blockSessionStore';
 import { useTemplateNoticeStore } from '../../store/templateStore';
 import { useUIStore } from '../../store/uiStore';
@@ -39,7 +40,7 @@ import { BLOCK_VIEWS } from './blockViews';
 import { BlockStackContext, type BlockActionHandler, type BlockStackContextValue } from './blockStackContext';
 import { addBlockActions, commonBlockActions, typeBlockActions } from './blockActions';
 import BlockFrame from './BlockFrame';
-import UnknownBlock from './UnknownBlock';
+import UnreadableBlock from './UnreadableBlock';
 import BlockErrorBoundary from './BlockErrorBoundary';
 
 interface BlockStackProps {
@@ -169,10 +170,10 @@ export default function BlockStack({
   const runAction = (blockId: string, actionId: string) => actionHandlers.current.get(actionKey(blockId, actionId))?.();
 
   const stackContext = useMemo<BlockStackContextValue>(() => ({
-    // Only the first text block carries the page's placeholder ("Begin your
-    // record…"); further text blocks get a neutral one.
+    // Only the first block that is an editor itself (a text block) carries the
+    // page's placeholder ("Begin your record…"); further ones get a neutral one.
     placeholderFor: (blockId) =>
-      blocksRef.current.find((b) => b.type === TEXT_BLOCK_TYPE)?.id === blockId
+      blocksRef.current.find((b) => blockTextEditors(b).includes(''))?.id === blockId
         ? placeholder
         : t('blocks.types.text.placeholder'),
     registerAction: (blockId, actionId, handler) => {
@@ -204,41 +205,23 @@ export default function BlockStack({
   }, [orderedEditors, targetEditor, commit]);
 
   /**
-   * The field block whose link field points to `target`,
-   * along with the block without that reference. The sidebar's links field
-   * also lists these links (it reads the whole content), so
-   * jumping to and removing must find them too.
+   * Links outside a mounted text editor (a link field) — by the blocks'
+   * references, as "Linked entries" lists them (`blockLinksTo`). Jumping goes
+   * to the first block that links to `target`; removing takes the link out of
+   * the first block whose type can (`withoutLink`) — a block linking without
+   * one (a sigil's charge, a block this app cannot read) is passed over.
    */
-  const fieldText = useFieldFallbackText();
-  const fieldTextRef = useRef(fieldText);
-  fieldTextRef.current = fieldText;
-  const findBlockLink = useCallback((target: { id: string; targetKind: string }) => {
-    const matches = (link: { id: string; targetKind: string } | null) =>
-      link?.id === target.id && linkTargetKindOf(link.targetKind) === linkTargetKindOf(target.targetKind);
+  const findBlockLink = useCallback((target: { id: string }) =>
+    blocksRef.current.find((b) => blockLinksTo(b, target.id)) ?? null, []);
+  const removeBlockLink = useCallback((target: { id: string }) => {
     for (const block of blocksRef.current) {
-      if (resolveBlockType(block)?.id !== FIELDS_BLOCK_TYPE) continue;
-      const model = parseFields(block);
-      if (model.broken) continue;
-      // The raw chip: the sidebar lists every link in the content.
-      const element = model.elements.find((el) =>
-        el.kind === 'link' && matches(linkFromSlot(model.slots[el.id])));
-      // A text element without a mounted editor (removed, but with content): there
-      // only the chip goes away, not the whole text; its word stays.
-      const text = element ? undefined : model.elements.find((el) =>
-        el.kind === 'text' && extractInternalLinks(model.slots[el.id] ?? '').some(matches));
-      if (!element && !text) continue;
-      return {
-        block,
-        withoutLink: () => {
-          const slots = { ...model.slots };
-          if (element) delete slots[element.id];
-          else slots[text!.id] = remapInternalLinks(slots[text!.id], (link) => (matches(link) ? null : { id: link.id }));
-          return serializeFields(block, { ...model, slots }, fieldTextRef.current);
-        },
-      };
+      const next = blockWithoutLink(block, target.id, t);
+      if (next === block) continue;
+      apiRef.current.update(block.id, next);
+      return true;
     }
-    return null;
-  }, []);
+    return false;
+  }, [t]);
 
   // Appending and removing from the links field, edit mode only. If
   // the acknowledgement is missing, the field knows its click went nowhere.
@@ -251,25 +234,22 @@ export default function BlockStack({
       }),
       subscribeEntryLinkRequest(REMOVE_ENTRY_LINK_EVENT, (target) => {
         if (orderedEditors().some((ed) => removeEntryLink(ed, target))) return true;
-        const hit = findBlockLink(target);
-        if (!hit) return false;
-        apiRef.current.update(hit.block.id, hit.withoutLink());
-        return true;
+        return removeBlockLink(target);
       }),
     ];
     return () => off.forEach((fn) => fn());
-  }, [isEditing, orderedEditors, appendLinkOnce, findBlockLink]);
+  }, [isEditing, orderedEditors, appendLinkOnce, removeBlockLink]);
 
   // Click on a chip in the links field → jump to the spot. Also in
-  // read mode, where it is the normal case. The first text block with the link
-  // wins; if it only appears in a link field, it jumps there.
+  // read mode, where it is the normal case. The first text editor with the
+  // link wins; else the first block that links to it.
   useEffect(() => subscribeEntryLinkRequest(
     REVEAL_ENTRY_LINK_EVENT,
     (target) => {
       if (orderedEditors().some((ed) => revealEntryLink(ed, target))) return true;
       const hit = findBlockLink(target);
       if (!hit) return false;
-      apiRef.current.reveal(hit.block.id);
+      apiRef.current.reveal(hit.id);
       return true;
     },
   ), [orderedEditors, findBlockLink]);
@@ -299,9 +279,9 @@ export default function BlockStack({
   }, [blocks]);
 
   const insertAt = (index: number, presetId: string) => {
-    const block = createFromPreset(presetId, definitions, fieldTextRef.current);
+    const block = createFromPreset(presetId, definitions, t);
     if (!block) return;
-    if (block.type === TEXT_BLOCK_TYPE) focusOnMount(block.id);
+    if (blockTextEditors(block).includes('')) focusOnMount(block.id);
     const next = [...blocksRef.current];
     next.splice(index, 0, block);
     commit(next);
@@ -506,10 +486,11 @@ export default function BlockStack({
   };
 
   const renderBody = (block: BlockInstance, meta: BlockTypeDef | undefined) => {
-    const View = meta ? BLOCK_VIEWS.get(meta.id) : undefined;
     // A block another one conceals as a whole is not shown (a block conceals its own parts in its view).
     if (effects.concealed.has(block.id)) return null;
-    if (!View) return <UnknownBlock block={block} />;
+    const state = blockReadState(block);
+    const View = meta ? BLOCK_VIEWS.get(meta.id) : undefined;
+    if (state !== 'readable' || !View) return <UnreadableBlock reason={state === 'broken' ? 'broken' : 'newer'} />;
     return (
       <BlockErrorBoundary block={block}>
         <View
@@ -562,14 +543,14 @@ export default function BlockStack({
       >
         {blocks.map((block, index) => {
           const meta = resolveBlockType(block);
-          const label = blockLabel(t, block, meta);
+          const label = blockLabel(t, block);
           return (
             <StackItem key={`${block.id}:${resetEpoch}`} id={block.id}>
               {(startDrag) => (
                 <>
                   <BlockFrame
                     isEditing={isEditing}
-                    icon={blockIcon(block, meta) ?? Puzzle}
+                    icon={blockIcon(block) ?? Puzzle}
                     label={label}
                     hidden={isBlockHidden(block) || (!isEditing && isEmptyInRead(block.id))}
                     showReadTitle={showsTitleInRead(block, meta)}
@@ -617,17 +598,12 @@ function actionKey(blockId: string, actionId: string): string {
 }
 
 /**
- * The keys of the stack's text editors in block order: a text block under its
- * ID, a custom block's text element under `<block ID>:<element ID>`, at the
- * position of its block.
+ * The keys of the stack's text editors in block order — those each block
+ * holds (`textEditors`): a text block under its ID, a custom block's text
+ * fields under `<block ID>:<key>`.
  */
 function textEditorKeys(blocks: BlockInstance[]): string[] {
-  return blocks.flatMap((block) => [
-    block.id,
-    ...(block.type === FIELDS_BLOCK_TYPE
-      ? activeElements(parseFields(block)).filter((el) => el.kind === 'text').map((el) => `${block.id}:${el.id}`)
-      : []),
-  ]);
+  return blocks.flatMap((block) => blockTextEditors(block).map((key) => textEditorKey(block.id, key)));
 }
 
 /** The blocks of a content, each at its type's data version (`upgradeBlock`); an empty entry gets an empty text block. */

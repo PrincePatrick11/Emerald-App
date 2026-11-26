@@ -1,7 +1,6 @@
 import { useTranslation } from 'react-i18next';
-import { elementLabel } from '../../lib/blocks/blockAttrs';
 import {
-  activeElements, canBeEmpty, elementKindLabelKey, parseFields, serializeFields, withFieldUse, type ElementDef, type FieldsModel,
+  canBeEmpty, elementLabel, elementKindLabelKey, parseFields, serializeFields, withFieldUse, type ElementDef, type FieldsModel,
 } from '../../lib/blocks/fields';
 import { useFieldFallbackText } from './useFieldFallbackText';
 import OptionsEditor from './OptionsEditor';
@@ -22,13 +21,11 @@ export default function FieldsSidebarEdit({ block, update }: BlockSidebarEditPro
   const { t } = useTranslation();
   const text = useFieldFallbackText();
   const model = parseFields(block);
-  // Unreadable data: no settings; any would overwrite it with "empty".
-  if (model.broken) return null;
 
   const write = (next: FieldsModel) => update(serializeFields(block, next, text));
   const patchElement = (id: string, patch: Partial<ElementDef>) =>
     write({ ...model, elements: model.elements.map((el) => (el.id === id ? { ...el, ...patch } : el)) });
-  const elements = activeElements(model);
+  const elements = model.elements;
 
   return (
     <div className="min-w-0 space-y-3">

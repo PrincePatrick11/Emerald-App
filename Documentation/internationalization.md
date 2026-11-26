@@ -84,7 +84,7 @@ Top-level keys of `en.json`, with the conventions worth knowing:
 | `entries`, `tasks` | Entry and task UI strings. Their `untitled` key is what `displayTitle` (`src/lib/entryTitle.ts`) shows for an empty title — display text only, never stored |
 | `creation` | The sigil creation tools (intention, letters, canvas, charge) |
 | `blocks` | Content-block UI and the Blocks view: `types.*` (block types; `types.sigil.*` holds the sigil's name, description and the headings of its parts), `kinds.*` (one per `ElementKind`, shared by the "Add block" menu and the builder's element picker), `fields.*` (field block), `sigil.*` (the texts of the charge and the drawing: states, confirmations, lock), `canvas.*` (the Canvas and Altar blocks), `paint.*` (the Painting block), `library.*` (the Blocks builder and its update/remove-copies notices) |
-| `editor` | Shared editor buttons, link-popup actions, `lockedBySigil`, and `toolbar.*` (every formatting-toolbar tooltip) |
+| `editor` | Shared editor buttons, link-popup actions, `lockedByBlock` (an entry a block locks, when the block gives no reason of its own), and `toolbar.*` (every formatting-toolbar tooltip) |
 | `symbols` | The canvas editor's symbol library: its own labels, `packs.*` the pack names, and `<pack>.<name>` every symbol's name, which the library's search looks in; also `editTitle`, the title of the Symbols view's edit dialog |
 | `moonPhase` | Display names of the eight moon phases |
 | `search` | Dashboard search placeholders (`placeholder`, `placeholderIn` with `{{title}}`) and the title bar's global search (`globalPlaceholder`, `hint`, `clear`, `showMore`). Result module labels reuse `nav.*`; only `categories` has its own |

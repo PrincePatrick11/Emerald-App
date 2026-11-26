@@ -172,6 +172,10 @@
     "jumpTo": "Jump to block",
     "remove": "Remove block",
     "unknown": "Unknown block ({{type}})",
+    "unreadable": {
+      "newer": "This block comes from a newer version of Emerald. Update the app to see it.",
+      "broken": "This block cannot be read: its data is damaged. It stays as it is."
+    },
     "types": {
       "text": {
         "label": "Text",
@@ -186,6 +190,7 @@
         "label": "Sigil",
         "description": "Calculator, drawing and charge of one sigil — switch each part on or off in the block's menu. Once loaded it hides calculator and drawing and locks the entry or only this sigil.",
         "noParts": "All parts are switched off — switch them on in the block's menu.",
+        "locksEntry": "A loaded sigil locks this entry — unload it first",
         "parts": {
           "calc": "Calculator",
           "drawing": "Drawing",
@@ -288,7 +293,6 @@
       "loadFailed": "Couldn't load the painting — close and reopen the entry to try again"
     },
     "canvas": {
-      "broken": "This canvas could not be read. It stays as it is.",
       "savePicture": "Save as picture…",
       "empty": "Nothing on the canvas yet.",
       "parts": "Available",
@@ -306,7 +310,7 @@
     "cancel": "Cancel",
     "delete": "Delete",
     "edit": "Edit",
-    "lockedBySigil": "A loaded sigil locks this entry — unload it first",
+    "lockedByBlock": "A block locks this entry",
     "editing": "editing…",
     "confirm": "Confirm",
     "editLink": "Edit link",

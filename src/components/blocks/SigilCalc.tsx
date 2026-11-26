@@ -6,7 +6,6 @@ import {
 } from '../../lib/blocks/sigilCalc';
 import type { BlockInstance } from '../../lib/blocks/types';
 import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
-import UnknownBlock from './UnknownBlock';
 
 /**
  * The sigil calculator as a building block: from the intention the letter
@@ -24,7 +23,6 @@ export default function SigilCalc({ value, isEditing, locked, onChange }: {
   onChange: (next: BlockInstance) => void;
 }) {
   const calc = parseSigilCalc(value);
-  if (calc.broken) return <UnknownBlock block={value} />;
   if (isEditing && !locked) return <CalcEditor calc={calc} onChange={(next) => onChange(serializeSigilCalc(value, next))} />;
   return <CalcReader calc={calc} locked={isEditing && locked} />;
 }

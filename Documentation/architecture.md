@@ -116,7 +116,7 @@ src/
 │   ├── serialize.ts             per-entity write serialization
 │   ├── modules.ts               module registry
 │   ├── blocks/                  block format, types, fields, sigils, canvas, painting, definitions, templates;
-│   │                            a block as a row (`blockRows.ts`), its references (`blockRefs.ts`, asked of each type: the interfaces in `blockType.ts`, the types in `kinds/`, the registry in `blockTypes.ts`, the toolkit in `toolkit.ts`), positions (`position.ts`), field values by SQL (`blockQuery.ts`), an imported block pointed at this vault (`blockRemap.ts`)
+│   │                            a block as a row (`blockRows.ts`), its references (`blockRefs.ts`, asked of each type: the interfaces in `blockType.ts`, the types in `kinds/`, the registry in `blockTypes.ts`, the toolkit in `toolkit.ts`), positions (`position.ts`), an imported block pointed at this vault (`blockRemap.ts`), the values blocks deliver (`blockValue.ts`)
 │   ├── blockStore.ts            blocks as rows: loading, writing only what changed, replacing a whole stack
 │   ├── entryTitle.ts, dashboards.ts, moonPhase.ts
 │   ├── categories.ts

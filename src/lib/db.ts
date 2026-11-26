@@ -5,7 +5,7 @@ import { BASELINE_VERSION, FRESH_START_VERSION, TABLES, createSchema, purgeCateg
 import { seedAltarTemplate, seedSigilTemplate } from './templateRows';
 import i18n from '../i18n';
 import { useSettingsStore } from '../store/settingsStore';
-import { clearSavedBlocks } from './blockStore';
+import { clearSavedBlocks, dropBlockTagStatements } from './blockStore';
 
 /**
  * A vault from before the fresh start (`FRESH_START_VERSION`): its schema came
@@ -362,18 +362,21 @@ async function runPeriodicCleanup(db: Database, retentionDays: number | null): P
   // Permanently delete trash contents older than the configured period — "never" skips this.
   if (retentionDays !== null) {
     const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString();
-    // A tag takes its links with it (CASCADE); the dashboards' filters
-    // name it without a foreign key.
+    // A tag takes its links with it (CASCADE); the dashboards' filters and
+    // the tags blocks give (`block_refs`) name it without a foreign key.
     const expiredTags = await db.select<{ id: string }[]>(
       'SELECT id FROM tags WHERE deleted_at IS NOT NULL AND deleted_at < $1',
       [cutoff]
     );
     await replaceTagsInDashboards(db, expiredTags.map((t) => t.id));
     // One transaction instead of one commit per table — this runs on every open.
-    await db.batch(CLEANUP_TABLES.map((table) => [
-      `DELETE FROM ${table} WHERE deleted_at IS NOT NULL AND deleted_at < $1`,
-      [cutoff],
-    ] as const));
+    await db.batch([
+      ...CLEANUP_TABLES.map((table) => [
+        `DELETE FROM ${table} WHERE deleted_at IS NOT NULL AND deleted_at < $1`,
+        [cutoff],
+      ] as const),
+      ...dropBlockTagStatements(expiredTags.map((t) => t.id)),
+    ]);
     // Categories last, after their contents are uncategorized. The database
     // is enough here: the stores only load after `getDb()`.
     const expired = await db.select<{ id: string }[]>(

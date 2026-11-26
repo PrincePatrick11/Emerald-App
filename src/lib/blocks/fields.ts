@@ -1,10 +1,14 @@
-import { ListFilter, PanelRight, Rows3, type LucideIcon } from 'lucide-react';
-import { escapeHtml, extractInternalLinks, internalLinkChipHtml, isBlankContent, isValidLinkTarget, linkTargetKindOf, decodeHtmlAttr } from '../internalLinkHtml';
+import {
+  Calendar, ChevronsUpDown, Hash, Image, Link2, ListChecks, ListFilter, Moon, PanelRight, Rows3, TextCursorInput, ToggleLeft, Type,
+  type LucideIcon,
+} from 'lucide-react';
+import { escapeHtml, internalLinkChipHtml, isBlankContent, isValidLinkTarget, linkTargetKindOf, decodeHtmlAttr } from '../internalLinkHtml';
 import { generateId, isRecord } from '../helpers';
 import { storedImageName } from '../schema';
 import { MOON_PHASE_ORDER, MOON_PHASE_SYMBOLS } from '../moonPhase';
 import type { LinkTargetKind, MoonPhase } from '../../types';
 import { neutralizeSectionTags } from './blockHtml';
+import { imageFromSlot, linkFromSlot, translatedOr } from './toolkit';
 import { BLOCK_ATTR, type BlockInstance, type BlockTypeId } from './types';
 
 /**
@@ -50,6 +54,20 @@ export function elementKindLabelKey(kind: ElementKind): string {
   return `blocks.kinds.${kind}`;
 }
 
+/** The icon of an element kind — picker, builder, a single field's block. */
+export const ELEMENT_KIND_ICONS: Record<ElementKind, LucideIcon> = {
+  text: Type,
+  shorttext: TextCursorInput,
+  number: Hash,
+  date: Calendar,
+  select: ChevronsUpDown,
+  toggle: ToggleLeft,
+  checklist: ListChecks,
+  link: Link2,
+  image: Image,
+  moon: Moon,
+};
+
 export interface SelectOption {
   id: string;
   label: string;
@@ -64,11 +82,6 @@ export interface ElementDef {
   options?: SelectOption[];
   /** Overrides `display.readHideEmpty` for this element. */
   hideWhenEmpty?: boolean;
-  /**
-   * Only in copies from earlier versions, which archived a field on update.
-   * Invisible in reading, editing and fallback; the value stays.
-   */
-  archived?: boolean;
   /**
    * Only in a custom block definition: the value with which every new copy
    * prefills the element (checklist with items, yes/no set to "yes", a
@@ -277,7 +290,6 @@ function parseElement(raw: unknown): ElementDef | null {
       .map((o) => ({ id: o.id as string, label: typeof o.label === 'string' ? o.label : '' }));
   }
   if (typeof raw.hideWhenEmpty === 'boolean') element.hideWhenEmpty = raw.hideWhenEmpty;
-  if (raw.archived === true) element.archived = true;
   if (element.kind === 'link' && isRecord(raw.linkCategories)) {
     const ids = Array.isArray(raw.linkCategories.categoryIds)
       ? raw.linkCategories.categoryIds.filter((i): i is string => typeof i === 'string')
@@ -315,11 +327,6 @@ export function parseDisplay(raw: unknown): DisplayRules {
     readHideEmpty: typeof rules.readHideEmpty === 'boolean' ? rules.readHideEmpty : DEFAULT_DISPLAY.readHideEmpty,
     readOnly: typeof rules.readOnly === 'boolean' ? rules.readOnly : DEFAULT_DISPLAY.readOnly,
   };
-}
-
-/** The elements the block shows — without the archived ones. */
-export function activeElements(model: FieldsModel): ElementDef[] {
-  return model.elements.filter((e) => !e.archived);
 }
 
 function parseValue(kind: ElementKind, raw: unknown): FieldValue | undefined {
@@ -400,18 +407,6 @@ export function parseFields(block: BlockInstance): FieldsModel {
   };
   modelCache.set(block, model);
   return model;
-}
-
-/** Target of the link chip in a slot, with its stored label — or `null`. */
-export function linkFromSlot(html: string | undefined): { id: string; targetKind: string; label: string } | null {
-  if (typeof html !== 'string' || !html) return null;
-  return extractInternalLinks(html)[0] ?? null;
-}
-
-/** The stored image file name in a slot — or `null`. */
-export function imageFromSlot(html: string | undefined): string | null {
-  const src = typeof html === 'string' ? /\bsrc="([^"]*)"/i.exec(html)?.[1] : undefined;
-  return src ? decodeHtmlAttr(src) : null;
 }
 
 /* ---------------- Defaults ---------------- */
@@ -508,10 +503,9 @@ export function canBeEmpty(kind: ElementKind): boolean {
   return kind !== 'toggle';
 }
 
-/** Does read mode hide this element? Archived, or empty AND (element or block rule). */
+/** Does read mode hide this element? Empty AND (element or block rule). */
 export function isHiddenInRead(element: ElementDef, model: FieldsModel): boolean {
-  return !!element.archived
-    || (isElementEmpty(element, model) && (element.hideWhenEmpty ?? model.display.readHideEmpty));
+  return isElementEmpty(element, model) && (element.hideWhenEmpty ?? model.display.readHideEmpty);
 }
 
 /* ---------------- Writing ---------------- */
@@ -522,6 +516,22 @@ export interface FallbackText {
   yes: string;
   no: string;
   moonName: (phase: MoonPhase) => string;
+}
+
+/** The label of a field element in the language of `t`: its own, otherwise the name of its kind. */
+export function elementLabel(t: (key: string) => string, element: ElementDef): string {
+  const named = fieldLabel(element);
+  return 'label' in named ? named.label : t(named.labelKey);
+}
+
+/** The texts with which `serializeFields` writes the readable fallback — in the language of `t`. */
+export function fieldFallbackText(t: (key: string) => string): FallbackText {
+  return {
+    label: (element) => elementLabel(t, element),
+    yes: translatedOr(t, 'blocks.fields.yes', 'Yes'),
+    no: translatedOr(t, 'blocks.fields.no', 'No'),
+    moonName: (phase) => translatedOr(t, `moonPhase.${phase}`, phase),
+  };
 }
 
 /** A checklist as readable markup — fallback and export alike. */
@@ -568,11 +578,8 @@ export function serializeFields(block: BlockInstance, model: FieldsModel, text: 
     const dt = `<dt>${escapeHtml(text.label(element))}</dt>`;
     if (isSlotKind(element.kind)) {
       const slot = model.slots[element.id];
-      // Archived: without a label, but the slot stays — and with it link and image.
-      if (!slot) return '';
-      return element.archived ? slotRow(element.id, slot) : `${dt}${slotRow(element.id, slot)}`;
+      return slot ? `${dt}${slotRow(element.id, slot)}` : '';
     }
-    if (element.archived) return '';
     const html = fieldValueHtml(element, model, text);
     return html === null ? '' : `${dt}<dd>${html}</dd>`;
   });

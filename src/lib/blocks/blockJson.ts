@@ -3,8 +3,9 @@ import { isRecord } from '../helpers';
 
 /**
  * Reading a block's JSON attributes (`data-block-data`, `data-block-config`)
- * as objects and writing its data JSON — shared by the sigil, the drawing,
- * the canvas and the converter of the old sigil blocks. A leaf module: `sigil.ts` imports `paint.ts`, so neither can hold it.
+ * as objects and writing its data JSON — part of the toolkit every type
+ * reads its data through. A leaf module: the types' own modules import one
+ * another (`sigil.ts` imports `paint.ts`), so none of them can hold it.
  */
 
 /** A JSON attribute of a block as an object. Unreadable input sets `broken` — such a block is never overwritten. */

@@ -1,14 +1,13 @@
 import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  isSigilBroken, shownSigilParts, sigilPartBlock, sigilPartId, withSigilPart, SIGIL_PARTS, type SigilPartName,
+  shownSigilParts, sigilPartBlock, sigilPartId, withSigilPart, SIGIL_PARTS, type SigilPartName,
 } from '../../lib/blocks/sigil';
 import type { BlockInstance } from '../../lib/blocks/types';
 import DrawingBlock from './DrawingBlock';
 import SigilCalc from './SigilCalc';
 import SigilCharge from './SigilCharge';
 import SigilConcealed from './SigilConcealed';
-import UnknownBlock from './UnknownBlock';
 import type { BlockViewProps } from './blockViews';
 
 /** The palette of the sigil drawing. */
@@ -33,7 +32,6 @@ export default function SigilBlock({ block, isEditing, onBlockChange, onPersist,
   // not both on the block of the last render.
   const latest = useRef(block);
   latest.current = block;
-  if (isSigilBroken(block)) return <UnknownBlock block={block} />;
   const shown = shownSigilParts(block);
   const parts = SIGIL_PARTS.filter((part) => shown[part]);
   if (parts.length === 0) {

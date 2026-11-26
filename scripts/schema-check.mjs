@@ -137,8 +137,8 @@ writeFileSync(
    export { assertPayloadReferencesResolve, collectVaultContent, definitionRows, doMerge, doReplace, FULL_BACKUP_OPTIONS, insertBlockDefinitions, prepareRawDatabase, resolveImportedCategories, vaultContentOf, vaultManifestOf } from '${root}/src/lib/dbBackup';
    export { categoryRowsOf, contentToBlocks, manifestCategoryOf, parseManifest, parseVaultManifest, usedDefinitionIds, EMERALD_FORMAT_VERSION } from '${root}/src/lib/emerald/manifest';
    export { invalidateVaultCache } from '${root}/src/lib/vaultManager';
-   export { clearSavedBlocks, readContents, replaceOwnerBlocks } from '${root}/src/lib/blockStore';
-   export { entriesWithFieldValue } from '${root}/src/lib/blocks/blockQuery';
+   export { clearSavedBlocks, readContents, replaceOwnerBlocks, retagBlocks, dropBlockTagStatements } from '${root}/src/lib/blockStore';
+   export { registerBlockType } from '${root}/src/lib/blocks/blockTypes';
    export { collectImageUses } from '${root}/src/lib/imageUsage';
    export { imageDetailsOf, importImageDetails } from '${root}/src/lib/emerald/imageDetails';`
 );
@@ -180,7 +180,7 @@ const {
   assertPayloadReferencesResolve, collectVaultContent, definitionRows, doMerge, doReplace, insertBlockDefinitions,
   resolveImportedCategories, vaultContentOf, vaultManifestOf, FULL_BACKUP_OPTIONS, prepareRawDatabase,
   categoryRowsOf, contentToBlocks, manifestCategoryOf, parseManifest, parseVaultManifest, usedDefinitionIds, EMERALD_FORMAT_VERSION,
-  invalidateVaultCache, clearSavedBlocks, readContents, replaceOwnerBlocks, entriesWithFieldValue, collectImageUses,
+  invalidateVaultCache, clearSavedBlocks, readContents, replaceOwnerBlocks, retagBlocks, dropBlockTagStatements, registerBlockType, collectImageUses,
   imageDetailsOf, importImageDetails,
 } = await import(pathToFileURL(bundlePath).href);
 
@@ -831,7 +831,7 @@ console.log('\n9. Block rows\n');
   db.close();
 }
 
-console.log('\n10. Readers of the block rows: "Images", image cleanup, field values\n');
+console.log('\n10. Readers of the block rows: "Images", image cleanup\n');
 
 {
   const db = await freshVault('readers.db');
@@ -884,24 +884,6 @@ console.log('\n10. Readers of the block rows: "Images", image cleanup, field val
   check('Images: a cover is a use of its entry, with the role cover',
     ((await collectImageUses(db)).get(name('8')) ?? []).map((u) => `${u.kind}:${u.id}:${u.role}`).join() === 'entry:u1:cover');
   check('image cleanup: a cover is in use', (await collectUsedImageFilenames(db)).has(name('8')));
-
-  // Field values through SQLite's JSON functions (#37).
-  const fields = (id, values) => `<section data-block="core.fields" data-block-id="${id}"`
-    + ` data-block-config="${enc({ elements: [{ id: 'n1', kind: 'number', label: 'N' }, { id: 's1', kind: 'shorttext', label: 'S' }, { id: 'b1', kind: 'toggle', label: 'B' }] })}"`
-    + ` data-block-data="${enc({ values })}"><dl></dl></section>`;
-  await insertWithStack(db, 'entries', { id: 'f1', title: 'F1', created_at: now, updated_at: now }, fields('fa', { n1: 5, s1: 'Hallo Welt', b1: true })); // lang-ok
-  await insertWithStack(db, 'entries', { id: 'f2', title: 'F2', created_at: now, updated_at: now }, fields('fb', { n1: 7, s1: '', b1: false }));
-  await insertWithStack(db, 'entries', { id: 'f3', title: 'F3', created_at: now, updated_at: now, deleted_at: now }, fields('fc', { n1: 5 }));
-  const ids = async (elementId, condition, extra = {}) => (await entriesWithFieldValue(db, { elementId, condition, ...extra })).sort().join();
-  check('field values: equals a number, the trash left out', (await ids('n1', { op: 'equals', value: 5 })) === 'f1');
-  check('field values: the trash on request', (await ids('n1', { op: 'equals', value: 5 }, { includeDeleted: true })) === 'f1,f3');
-  check('field values: contains, regardless of case', (await ids('s1', { op: 'contains', value: 'WELT' })) === 'f1');
-  check('field values: a toggle', (await ids('b1', { op: 'equals', value: false })) === 'f2');
-  check('field values: empty, only in blocks that have the element', (await ids('s1', { op: 'empty' })) === 'f2', await ids('s1', { op: 'empty' }));
-  check('field values: not empty', (await ids('s1', { op: 'notEmpty' })) === 'f1');
-  let refusedId = false;
-  try { await entriesWithFieldValue(db, { elementId: 'x".evil', condition: { op: 'empty' } }); } catch { refusedId = true; }
-  check('field values: an element ID that is no ID is refused', refusedId);
 
   check('readers: schema identical to the fresh vault', JSON.stringify(await readSchema(db)) === JSON.stringify(schemaA));
   db.close();
@@ -1309,6 +1291,59 @@ console.log('\n11. .vault.emerald: the round trip of a vault content, other vers
   const strayEntry = { ...manifestJson, data: { ...manifestJson.data, entries: [{ id: 'x', category_id: 'not-in-file' }] } };
   check('an entry is in a category only if the file carries it',
     vaultContentOf(JSON.stringify(strayEntry)).data.entries[0].category_id === null);
+
+  // ── Tags a block gives (block_refs kind `tag`, #186): written only for a tag that exists, carried through every import, moved by a tag merge ──
+  {
+    // A test type that gives the tags its data names — no built-in block gives any yet.
+    registerBlockType({
+      id: 'test.tagger', origin: 'plugin', icon: () => null, labelKey: 'x', descriptionKey: 'x', group: 'fields', dataVersion: 1, defaultShowTitle: false,
+      properties: {
+        mayContribute: (content) => content.includes('test.tagger'),
+        tags: (block) => { try { return JSON.parse(block.attrs['data-block-data']).tags ?? []; } catch { return []; } },
+        overridable: { icon: true, cover: true },
+      },
+    });
+    const tagger = (id, tags) => `<section data-block="test.tagger" data-block-id="${id}" data-block-data="${attr({ tags })}"></section>`;
+    const tagRefs = async (db, id) => (await refRows(db, 'entry', id)).filter((r) => r.target_kind === 'tag').map((r) => r.target).join();
+    const givenIn = async (db, id) => JSON.parse((await db.select("SELECT data FROM blocks WHERE entry_id = $1 AND type = 'test.tagger'", [id]))[0]?.data ?? '{}').tags?.join();
+    const E = '7d000000-0000-4000-8000-000000000001';
+    const src = await freshVault('block-tags-src.db');
+    clearSavedBlocks();
+    await src.execute("INSERT INTO tags (id, name, color) VALUES ('bt-src', 'Ritual', '#00e699')");
+    await insertWithStack(src, 'entries', { id: E, title: 'Tagged', created_at: now, updated_at: now }, '<p>a</p>' + tagger('tb', ['bt-src', 'bt-ghost']));
+    check('block tags: written as references of kind tag — only for a tag that exists', (await tagRefs(src, E)) === 'bt-src', await tagRefs(src, E));
+    check("block tags: never among the entry's own tags", !(await readTagLinks(src, 'entry', [E])).has(E));
+    const collectedTags = await collectVaultContent(src, FULL);
+
+    const dst = await freshVault('block-tags-replace.db');
+    clearSavedBlocks();
+    const replaced = asFile(collectedTags);
+    await doReplace(dst, replaced.content, replaced.files);
+    check('block tags, replace: the tag keeps its ID, the reference is rebuilt from the block', (await tagRefs(dst, E)) === 'bt-src', await tagRefs(dst, E));
+    dst.close();
+
+    const merge = await freshVault('block-tags-merge.db');
+    await merge.execute("INSERT INTO tags (id, name, color) VALUES ('bt-here', 'ritual', '#3b82f6')");
+    clearSavedBlocks();
+    const merged = asFile(collectedTags);
+    await doMerge(merge, merged.content, merged.files);
+    const [copy] = await merge.select("SELECT id FROM entries WHERE title = 'Tagged'");
+    check('block tags, merge: the block names the tag of the same name here, its reference with it; a tag it cannot place gives nothing',
+      (await givenIn(merge, copy?.id)) === 'bt-here,bt-ghost' && (await tagRefs(merge, copy?.id)) === 'bt-here',
+      [await givenIn(merge, copy?.id), await tagRefs(merge, copy?.id)]);
+    check('block tags, merge: no second tag of the same name', (await merge.select("SELECT COUNT(*) AS n FROM tags WHERE lower(name) = 'ritual'"))[0].n === 1);
+
+    await merge.execute("INSERT INTO tags (id, name, color) VALUES ('bt-other', 'Andere', '#f43f5e')"); // lang-ok
+    const owners = await retagBlocks(merge, 'bt-here', 'bt-other');
+    check('tag merge: the blocks that gave the tag give the other one, data and references alike',
+      (await givenIn(merge, copy?.id)) === 'bt-other,bt-ghost' && (await tagRefs(merge, copy?.id)) === 'bt-other'
+        && owners.length === 1 && owners[0].kind === 'entry' && owners[0].id === copy?.id, owners);
+    await merge.batch([['DELETE FROM tags WHERE id = $1', ['bt-other']], ...dropBlockTagStatements(['bt-other'])]);
+    check('a tag deleted for good: the blocks give it no more', (await tagRefs(merge, copy?.id)) === '');
+    check('block tags: schema identical to the fresh vault', JSON.stringify(await readSchema(merge)) === JSON.stringify(schemaA));
+    merge.close();
+    src.close();
+  }
   delete globalThis.harnessIconFiles;
 }
 

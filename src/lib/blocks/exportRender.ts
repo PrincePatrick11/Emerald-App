@@ -2,7 +2,7 @@ import { escapeHtml } from '../internalLinkHtml';
 import { isBlockHidden, showsTitleInRead } from './blockAttrs';
 import { parseBlocks } from './blockHtml';
 import { phraseText, valueLabel, type BlockExportFormat, type BlockExportPart, type BlockExportValue, type ExportContext } from './blockType';
-import { entryEffects, resolveBlockType, type BlockTypeDef } from './blockTypes';
+import { blockReadState, entryEffects, resolveBlockType, UNREADABLE_NOTICE } from './blockTypes';
 import type { BlockInstance } from './types';
 import { localIsoDay } from '../helpers';
 
@@ -15,8 +15,9 @@ import { localIsoDay } from '../helpers';
  * - a block the entry's effects conceal as a whole is covered in HTML, with a
  *   switch to uncover it, and missing in PDF and Markdown — a concealed part
  *   of a block is the block's own to cover or leave out,
- * - a type without an export of its own shows its readable markup (the text
- *   block, an unknown type, a format too new),
+ * - a type without an export of its own shows its markup (the text block),
+ * - a block this app cannot read (`blockReadState`) shows the notice read
+ *   mode shows, never what it holds,
  * - the block title appears as a heading where read mode shows it,
  * - a block that ends up empty in the process is missing entirely.
  *
@@ -32,7 +33,7 @@ import { localIsoDay } from '../helpers';
 
 export interface ExportText {
   /** What the block is called (`blockLabel` with `t`). */
-  title: (block: BlockInstance, meta: BlockTypeDef | undefined) => string;
+  title: (block: BlockInstance) => string;
   yes: string;
   no: string;
   /** A `YYYY-MM-DD` for humans. */
@@ -117,10 +118,14 @@ function partsHtml(parts: readonly BlockExportPart[], format: BlockExportFormat,
   return html;
 }
 
-function bodyHtml(block: BlockInstance, meta: BlockTypeDef | undefined, ctx: ExportContext, text: ExportText): string {
-  // Without an export of its own (text, an unknown type, a format too new): the readable markup.
+function bodyHtml(block: BlockInstance, ctx: ExportContext, text: ExportText): string {
+  // A block this app cannot read goes out as the notice it shows, never as what it holds.
+  const state = blockReadState(block);
+  if (state !== 'readable') return `<p>${escapeHtml(text.t(UNREADABLE_NOTICE[state]))}</p>`;
+  const meta = resolveBlockType(block);
+  // Without an export of its own (the text block): its markup.
   if (!meta?.export) return block.html;
-  return partsHtml(meta.export(block, ctx), ctx.format, text.title(block, meta), text);
+  return partsHtml(meta.export(block, ctx), ctx.format, text.title(block), text);
 }
 
 export function renderBlocksForExport(
@@ -137,11 +142,10 @@ export function renderBlocksForExport(
     if (isBlockHidden(block)) continue;
     const covered = concealed.has(block.id);
     if (covered && format !== 'html') continue;
-    const meta = resolveBlockType(block);
-    let body = bodyHtml(block, meta, ctx, text);
+    let body = bodyHtml(block, ctx, text);
     if (!body.trim()) continue;
     if (covered) body = coveredHtml(concealed.get(block.id) ?? null, body, text);
-    const title = showsTitleInRead(block, meta) ? `<h3>${escapeHtml(text.title(block, meta))}</h3>` : '';
+    const title = showsTitleInRead(block) ? `<h3>${escapeHtml(text.title(block))}</h3>` : '';
     parts.push(title + body);
   }
   return parts.join('');

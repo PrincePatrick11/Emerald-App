@@ -13,10 +13,9 @@ import { usePointerReorder } from '../../hooks/usePointerReorder';
 import { sidebarRowStateClasses } from '../../lib/styleClasses';
 import { blockActionsOf, resolveBlockType, type BlockTypeDef } from '../../lib/blocks/blockTypes';
 import {
-  blockLabel, blockTypeLabel, customBlockTitle, hiddenAttrValue, isBlockHidden, showsTitleInRead, showTitleAttrValue,
+  blockIcon, blockLabel, blockTypeLabel, customBlockTitle, hiddenAttrValue, isBlockHidden, showsTitleInRead, showTitleAttrValue,
 } from '../../lib/blocks/blockAttrs';
 import { BLOCK_ATTR, type BlockInstance } from '../../lib/blocks/types';
-import { blockIcon } from '../../lib/blocks/presets';
 import { BLOCK_SIDEBAR_VIEWS } from './blockSidebarViews';
 import { addBlockActions, commonBlockActions, typeBlockActions } from './blockActions';
 
@@ -73,7 +72,7 @@ export function BlockReadActions() {
   const session = useBlockSessionStore((s) => s.session);
   if (!session || session.entryId !== activeViewId || session.isEditing) return null;
   const rows = readableBlocks(session).flatMap((block) => blockActionsOf(block, { reading: true }).map((action) => ({
-    block, action, name: blockLabel(t, block, resolveBlockType(block)),
+    block, action, name: blockLabel(t, block),
   })));
   if (rows.length === 0) return null;
   return (
@@ -160,8 +159,8 @@ function BlockOutline({ session }: { session: BlockSession }) {
         return (
           <div key={block.id}>
             <SidebarItemRow
-              icon={<BlockGlyph icon={blockIcon(block, meta) ?? Puzzle} size={14} />}
-              label={blockLabel(t, block, meta)}
+              icon={<BlockGlyph icon={blockIcon(block) ?? Puzzle} size={14} />}
+              label={blockLabel(t, block)}
               title={t('blocks.jumpTo')}
               active={selected}
               onClick={() => {
@@ -245,9 +244,8 @@ function BlockManager({ session }: { session: BlockSession }) {
               <ManagerRow
                 key={block.id}
                 block={block}
-                meta={meta}
-                label={blockLabel(t, block, meta)}
-                typeLabel={blockTypeLabel(t, block, meta)}
+                label={blockLabel(t, block)}
+                typeLabel={blockTypeLabel(t, block)}
                 renaming={renamingId === block.id}
                 onRenamed={(title) => {
                   setRenamingId(null);
@@ -276,7 +274,6 @@ function BlockManager({ session }: { session: BlockSession }) {
 
 interface ManagerRowProps {
   block: BlockInstance;
-  meta: BlockTypeDef | undefined;
   label: string;
   typeLabel: string;
   renaming: boolean;
@@ -299,12 +296,12 @@ interface ManagerRowProps {
  * sidebar's handle rows (`sidebarRowStateClasses`).
  */
 function ManagerRow({
-  block, meta, label, typeLabel, renaming, onRenamed, selected, isDragging, onGripPointerDown, onActivate, onToggleHidden, onOpenMenu, settings,
+  block, label, typeLabel, renaming, onRenamed, selected, isDragging, onGripPointerDown, onActivate, onToggleHidden, onOpenMenu, settings,
 }: ManagerRowProps) {
   const { t } = useTranslation();
   const cancelledRef = useRef(false);
   const hidden = isBlockHidden(block);
-  const glyph = blockIcon(block, meta) ?? Puzzle;
+  const glyph = blockIcon(block) ?? Puzzle;
 
   return (
     <div data-block-row={block.id}>

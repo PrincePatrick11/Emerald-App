@@ -1,7 +1,6 @@
-import { isImageIcon, localIsoDay } from '../helpers';
+import { isImageIcon, isTagId, localIsoDay } from '../helpers';
 import { decodeHtmlAttr, extractInternalLinks } from '../internalLinkHtml';
 import { storedImageName, storedImageNamesIn } from '../schema';
-import { isTagId } from '../tagRefs';
 import { readBlockJson } from './blockJson';
 import type { BlockContext, BlockSettingDef, BlockSettingValue } from './blockType';
 import { BLOCK_ATTR, type BlockInstance } from './types';
@@ -98,6 +97,31 @@ export class RefReporter {
   }
 }
 
+/* ---------------- Slots: one value as markup ---------------- */
+
+/**
+ * Target of the link chip in a slot (the markup a block keeps a link in), with
+ * the label stored in it — or `null`. Every type that holds a link as a chip
+ * reads it so.
+ */
+export function linkFromSlot(html: string | undefined): { id: string; targetKind: string; label: string } | null {
+  if (typeof html !== 'string' || !html) return null;
+  return extractInternalLinks(html)[0] ?? null;
+}
+
+/** The stored picture in a slot (`<img src>`) — or `null`. */
+export function imageFromSlot(html: string | undefined): string | null {
+  const src = typeof html === 'string' ? /\bsrc="([^"]*)"/i.exec(html)?.[1] : undefined;
+  return src ? decodeHtmlAttr(src) : null;
+}
+
+/* ---------------- Text editors (15) ---------------- */
+
+/** The key under which the stack hosts a text editor of a block (`textEditors`): the block's ID for `''`, else `<block ID>:<key>`. */
+export function textEditorKey(blockId: string, key: string): string {
+  return key ? `${blockId}:${key}` : blockId;
+}
+
 /* ---------------- Pictures in markup ---------------- */
 
 // Bounded: it runs over foreign markup.
@@ -176,6 +200,16 @@ export function withBlockSetting(block: BlockInstance, def: BlockSettingDef, val
  */
 export function blockTypeTextKey(typeId: string, key: string): string {
   return `blocks.types.${typeId.replace(/^core\./, '')}.${key}`;
+}
+
+/**
+ * `t(key)` — unless i18n is not ready yet and returns the key itself;
+ * then `fallback`. For texts that end up permanently in content or a
+ * definition: otherwise "blocks.fields.no" would stay there forever.
+ */
+export function translatedOr(t: (key: string) => string, key: string, fallback: string): string {
+  const value = t(key);
+  return typeof value === 'string' && value && value !== key ? value : fallback;
 }
 
 /* ---------------- Data version (13) ---------------- */

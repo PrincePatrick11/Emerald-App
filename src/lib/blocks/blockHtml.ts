@@ -161,7 +161,8 @@ export function blockSectionHtml(block: BlockInstance): string {
   return `<section ${attrs.map(([k, v]) => `${k}="${escapeHtml(v)}"`).join(' ')}>${block.html}</section>`;
 }
 
-function isPlainTextBlock(block: BlockInstance): boolean {
+/** A text block without attributes — written without a wrapper (rule 2). */
+export function isPlainTextBlock(block: BlockInstance): boolean {
   return block.type === TEXT_BLOCK_TYPE && Object.keys(block.attrs).length === 0;
 }
 

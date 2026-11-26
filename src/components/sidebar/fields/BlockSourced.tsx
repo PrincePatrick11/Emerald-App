@@ -6,6 +6,7 @@ import { resolveBlockType } from '../../../lib/blocks/blockTypes';
 import { entryBlockSummary } from '../../../lib/blocks/entrySummary';
 import type { BlockSuggestions } from '../../../lib/blocks/entryProperties';
 import { blockValueText } from '../../../lib/blockValueText';
+import { useLinkTitle } from '../../../hooks/useLinkItems';
 import { valueLabel } from '../../../lib/blocks/blockType';
 import { SidebarPropertyRow } from './SidebarSection';
 import FromBlockMark, { FROM_BLOCK_ICON } from '../../ui/FromBlockMark';
@@ -36,11 +37,11 @@ export function useEntryBlockSources(entry: Entry): EntryBlockSources {
   const blocks = useMemo(() => (needsBlocks ? parseBlocks(content) : []), [needsBlocks, content]);
   const blockName = (blockId: string) => {
     const block = blocks.find((b) => b.id === blockId);
-    return block ? blockLabel(t, block, resolveBlockType(block)) : '';
+    return block ? blockLabel(t, block) : '';
   };
   const blockTags = (blockTagIds ?? []).filter((id) => !tags.includes(id)).map((id) => {
     const givers = blocks.filter((b) => resolveBlockType(b)?.properties?.tags?.(b).includes(id));
-    return { id, blockName: givers.map((b) => blockLabel(t, b, resolveBlockType(b))).join(', ') };
+    return { id, blockName: givers.map((b) => blockLabel(t, b)).join(', ') };
   });
   return { suggestions, blockName, blockTags };
 }
@@ -48,11 +49,12 @@ export function useEntryBlockSources(entry: Entry): EntryBlockSources {
 /** The rows the entry's visible blocks add, in stack order — the same rows in reading and editing. */
 export function BlockPropertyRows({ sources }: { sources: EntryBlockSources }) {
   const { t } = useTranslation();
+  const linkTitle = useLinkTitle();
   return (
     <>
       {sources.suggestions.rows.map((row) => {
         const Icon = row.icon ?? FROM_BLOCK_ICON;
-        const value = blockValueText(t, row.value);
+        const value = blockValueText(t, row.value, { titleOf: linkTitle });
         return (
           <SidebarPropertyRow
             key={`${row.blockId}:${row.key}`}

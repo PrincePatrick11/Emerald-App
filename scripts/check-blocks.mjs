@@ -25,7 +25,7 @@ writeFileSync(
   entry,
   `export { parseBlocks, serializeBlocks, createTextBlock, blockSectionHtml, neutralizeSectionTags } from '${root}/src/lib/blocks/blockHtml';
    export { TEXT_BLOCK_TYPE, BLOCK_ATTR } from '${root}/src/lib/blocks/types';
-   export { parseFields, serializeFields, createFieldsBlock, isElementEmpty, isHiddenInRead, linkFromSlot, imageFromSlot } from '${root}/src/lib/blocks/fields';
+   export { parseFields, serializeFields, createFieldsBlock, isElementEmpty, isHiddenInRead } from '${root}/src/lib/blocks/fields';
    export { instantiateDefinition, parseDefinitionElements, parseDefinitionDisplay, remapDefinitionDefaults, definitionImageRefs } from '${root}/src/lib/blocks/definitions';
    export { entryBlockSummary, entryBlockValue } from '${root}/src/lib/blocks/entrySummary';
    export { createSigilBlock, parseSigilCharge, serializeSigilCharge, sigilPartBlock, sigilPartId, withSigilPart, shownSigilParts, isSigilBroken, SIGIL_SETTINGS } from '${root}/src/lib/blocks/sigil';
@@ -37,8 +37,9 @@ writeFileSync(
    export { group, ungroup, withGroups, moveInStack, copiesOf, align } from '${root}/src/components/editors/canvas/canvasActions';
    export { renderBlocksForExport } from '${root}/src/lib/blocks/exportRender';
    export { createPaintBlock, PAINT_BLOCK_TYPE, parseDrawing, withDrawing, withDrawingImage, drawingImage } from '${root}/src/lib/blocks/paint';
-   export { resolveBlockType, registerBlockType, upgradeBlock, blockSearchText, blockStorageTag, blockActionsOf, withDuplicatedBlock, copiedBlock, entryEffects } from '${root}/src/lib/blocks/blockTypes';
-   export { readBlockSettings, withBlockSetting, RefReporter } from '${root}/src/lib/blocks/toolkit';
+   export { resolveBlockType, blockReadState, registeredBlockType, blockWithoutLink, blockTextEditors, registerBlockType, upgradeBlock, blockSearchText, blockStorageTag, blockActionsOf, withDuplicatedBlock, copiedBlock, entryEffects } from '${root}/src/lib/blocks/blockTypes';
+   export { readBlockSettings, withBlockSetting, RefReporter, linkFromSlot, imageFromSlot } from '${root}/src/lib/blocks/toolkit';
+   export { linkValueTitle, compareBlockValues } from '${root}/src/lib/blocks/blockValue';
    export { blockSuggestions, resolveProperty } from '${root}/src/lib/blocks/entryProperties';
    export { createCanvasBlock, parseCanvasBlock, withCanvasScene, withCanvasParts, withCanvasStripTag, withoutCanvasFile, CANVAS_BLOCK_TYPE, ALTAR_BLOCK_TYPE } from '${root}/src/lib/blocks/canvas';
    export { resolveStartTemplate, instantiateTemplateBlocks, templateStart, mergeTemplateTags, areBlocksEmpty, fieldsWithTemplate, fieldsWithoutTemplate } from '${root}/src/lib/blocks/templates';
@@ -50,7 +51,8 @@ writeFileSync(
    export { withoutImage } from '${root}/src/lib/imageUsage';
    export { keyBetween, evenKeys, positionsFor, isPositionKey } from '${root}/src/lib/blocks/position';
    export { blocksOfContent, planBlockWrite, clearSavedBlocks, contentOf } from '${root}/src/lib/blockStore';
-   export { contentToBlocks, blocksToContent, parseManifest, renameStoredFiles, relinkWithinFile, gentlestImageMode, storedNameStem, EMERALD_FORMAT_VERSION } from '${root}/src/lib/emerald/manifest';`
+   export { contentToBlocks, blocksToContent, parseManifest, renameStoredFiles, relinkWithinFile, gentlestImageMode, storedNameStem, manifestBlockTags, EMERALD_FORMAT_VERSION } from '${root}/src/lib/emerald/manifest';
+   export { remapBlock, retagContent } from '${root}/src/lib/blocks/blockRemap';`
 );
 
 const bundlePath = join(workDir, 'bundle.mjs');
@@ -86,12 +88,12 @@ const {
   fieldsWithTemplate, fieldsWithoutTemplate,
   createCanvasBlock, parseCanvasBlock, withCanvasScene, withCanvasParts, withCanvasStripTag, withoutCanvasFile, CANVAS_BLOCK_TYPE, ALTAR_BLOCK_TYPE,
   createPaintBlock, PAINT_BLOCK_TYPE, resolveBlockType,
-  registerBlockType, upgradeBlock, blockSearchText, blockStorageTag, blockActionsOf, withDuplicatedBlock, copiedBlock, entryEffects,
-  readBlockSettings, withBlockSetting, RefReporter, blockSuggestions, resolveProperty, blockTagsOf, linkedIdsOf, blockWithoutImage,
+  registerBlockType, blockReadState, registeredBlockType, blockWithoutLink, blockTextEditors, upgradeBlock, blockSearchText, blockStorageTag, blockActionsOf, withDuplicatedBlock, copiedBlock, entryEffects,
+  readBlockSettings, withBlockSetting, RefReporter, linkValueTitle, compareBlockValues, blockSuggestions, resolveProperty, blockTagsOf, linkedIdsOf, blockWithoutImage,
   toBlockRow, fromBlockRow, htmlPlainText, blockRefs, withoutImage, keyBetween, evenKeys, positionsFor, isPositionKey,
   blocksOfContent, planBlockWrite, clearSavedBlocks, contentOf,
   contentToBlocks, blocksToContent, parseManifest, renameStoredFiles, relinkWithinFile, gentlestImageMode, storedNameStem,
-  EMERALD_FORMAT_VERSION,
+  EMERALD_FORMAT_VERSION, manifestBlockTags, remapBlock, retagContent,
 } = bundle;
 
 const failures = [];
@@ -381,8 +383,8 @@ console.log('\n4d. Custom blocks: copies\n');
   check('a note of a foreign shape is not read',
     parseFields({ ...copy, attrs: { ...copy.attrs, 'data-block-config': JSON.stringify({ elements: [], definition: '../x y' }) } }).definition === undefined);
   const content = serializeBlocks([createTextBlock('<p>a</p>'), filled, createFieldsBlock('number')]);
-  check('a field archived by an earlier version is gone from the definition',
-    parseDefinitionElements(JSON.stringify([{ id: 'a', kind: 'date', label: 'A', archived: true }, { id: 'b', kind: 'date', label: 'B' }])).map((e) => e.id).join() === 'b');
+  check('an "archived" mark of an earlier 0.2.0 build is no longer read: the field is an ordinary one',
+    parseDefinitionElements(JSON.stringify([{ id: 'a', kind: 'date', label: 'A', archived: true }, { id: 'b', kind: 'date', label: 'B' }])).map((e) => e.id).join() === 'a,b');
   check('a copy from before keeps working with its old markers',
     parseFields({ ...filled, attrs: { ...filled.attrs, 'data-block-origin': 'def-1', 'data-block-rev': '1' } }).values['e-result'] === 'gut');
 
@@ -752,8 +754,11 @@ console.log('\n4f. Sigils\n');
     !renderBlocksForExport(serializeBlocks([withBlockSetting(sigil, calcSetting, false)]), 'html', exportText, '2029-12-31').includes('Ich'));
   check('export: a part switched off is not exported',
     !renderBlocksForExport(serializeBlocks([withBlockSetting(unloaded, calcSetting, false)]), 'pdf', exportText, '2029-12-31').includes('Ich'));
-  check('export: an unreadable sigil shows its markup, as read mode does',
-    renderBlocksForExport(serializeBlocks([broken]), 'pdf', exportText, '2029-12-31').includes('Ich &lt;b&gt;bin'));
+  const brokenOut = renderBlocksForExport(serializeBlocks([broken]), 'html', exportText, '2029-12-31');
+  check('export: an unreadable sigil goes out as the notice, never with what it holds',
+    brokenOut === '<p>K:blocks.unreadable.broken</p>', brokenOut);
+  const brokenCharge = withSigilPart(sigil, 'charge', { ...sigilPartBlock(sigil, 'charge'), attrs: { [BLOCK_ATTR.data]: '"kaputt"' } }); // lang-ok
+  check('a sigil whose charge cannot be read is unreadable as a whole', isSigilBroken(brokenCharge) && blockReadState(brokenCharge) === 'broken');
   check('the stored row text holds a concealed calculator too: the row outlives the day',
     toBlockRow(sigil).text.includes('Ich <b>bin</b>'), toBlockRow(sigil).text);
 
@@ -804,22 +809,21 @@ console.log('\n4f. Sigils\n');
         elements: [
           { id: 'e1', kind: 'date', label: 'Datum' },
           { id: 'e2', kind: 'number', label: 'Leer' },
-          { id: 'e3', kind: 'shorttext', label: 'Alt', archived: true },
           { id: 'e4', kind: 'number', label: 'Menge' },
           { id: 'e5', kind: 'moon', label: '' },
           { id: 'e6', kind: 'image', label: 'Foto' },
         ],
         display: { readHideEmpty: true },
       }),
-      'data-block-data': JSON.stringify({ values: { e1: '2030-05-01', e3: 'weg', e4: 3, e5: 'full' } }),
+      'data-block-data': JSON.stringify({ values: { e1: '2030-05-01', e4: 3, e5: 'full' } }),
     },
     html: `<dl><dt>Foto</dt><dd data-block-slot="el:e6"><img src="${'ef'.repeat(32)}.png"></dd></dl>`,
   };
   const titled = { ...createTextBlock('<p>mit Titel</p>'), attrs: { 'data-block-show-title': '1' } };
   const fieldsOut = renderBlocksForExport(serializeBlocks([fieldsBlock, titled]), 'pdf', exportText, '2030-01-01');
-  check('export: fields as in read mode — formatted, without empty and archived ones',
+  check('export: fields as in read mode — formatted, without empty ones',
     fieldsOut.includes('<dt>Datum</dt><dd>D:2030-05-01</dd>') && fieldsOut.includes('<dt>Menge</dt><dd>N:3</dd>')
-      && !fieldsOut.includes('Leer') && !fieldsOut.includes('weg'), fieldsOut);
+      && !fieldsOut.includes('Leer'), fieldsOut);
   check('export: an unnamed field is labelled by its kind, the moon phase worded with its symbol',
     fieldsOut.includes('<dt>K:blocks.kinds.moon</dt><dd>🌕 K:moonPhase.full</dd>'), fieldsOut);
   check('export: a picture of an image field is named after its row',
@@ -1099,11 +1103,13 @@ console.log('\n7. Blocks as rows (blocks, block_refs)\n');
   check('a row\'s attrs keep only data-* strings, never the type or the ID', JSON.stringify(foreignRow.attrs) === '{"data-ok":"1"}', foreignRow.attrs);
   check('unreadable attrs JSON loses only itself', Object.keys(fromBlockRow({ id: 'f', type: 'core.text', html: '', attrs: '{nope' }).attrs).length === 0);
 
+  const titledCurrent = { ...titled, attrs: {} };
   check('search text: tags gone, words kept apart by block elements, chips their own word, entities decoded',
-    blockSearchText(titled) === 'Kopf einszwei & Ziel', blockSearchText(titled)); // lang-ok
+    blockSearchText(titledCurrent) === 'Kopf einszwei & Ziel', blockSearchText(titledCurrent)); // lang-ok
+  check('search text: a block in a newer format finds nothing', blockSearchText(titled) === '');
   check('search text: a fields block reads as its fallback', blockSearchText(withLink).includes('Ziel'), blockSearchText(withLink)); // lang-ok
   check('search text: a canvas and a drawing have none', blockSearchText(canvas) === '' && blockSearchText(paint) === '');
-  check('search text: an unknown type is read as its markup', blockSearchText({ id: 'u', type: 'x.y', html: '<p>Fremd</p>', attrs: {} }) === 'Fremd'); // lang-ok
+  check('search text: an unknown type finds nothing — its markup may hold what it conceals', blockSearchText({ id: 'u', type: 'x.y', html: '<p>Fremd</p>', attrs: {} }) === ''); // lang-ok
   check('the row text is the block search text', toBlockRow(titled).text === blockSearchText(titled));
 
   const withoutVersion = (b) => ({ ...b, attrs: Object.fromEntries(Object.entries(b.attrs).filter(([k]) => k !== 'data-block-v')) });
@@ -1345,8 +1351,115 @@ console.log('\n7b. Block interfaces: registry, toolkit, copies, actions, setting
   const roles = blockRefs(tooNew).map((r) => `${r.kind}:${r.role}`).sort().join(' ');
   check('a known type in a newer format keeps its pictures as its own, not as shown ones', roles === 'image:default image:default', roles);
   check('"Images" does not take a picture out of a block in a newer format', blockWithoutImage(tooNew, pic) === tooNew);
-  check('an unknown type still lets "Images" take a picture out of its markup',
-    !blockWithoutImage({ id: 'u', type: 'x.y', html: `<img src="${pic}" alt="">`, attrs: {} }, pic).html.includes(pic));
+  const unknownPic = { id: 'u', type: 'x.y', html: `<img src="${pic}" alt="">`, attrs: {} };
+  check('an unknown type is saved as it is: "Images" leaves its pictures in, and they count as its own',
+    blockWithoutImage(unknownPic, pic) === unknownPic && blockRefs(unknownPic).every((r) => r.role === 'default'));
+
+  // One rule for every block this app cannot read (`blockReadState`), with no knowledge of any type.
+  const fresh = createCanvasBlock();
+  const brokenCanvas = { ...fresh, attrs: { ...fresh.attrs, [BLOCK_ATTR.data]: '{nope' } };
+  const states = [fresh, { ...fresh, attrs: { ...fresh.attrs, 'data-block-v': '9' } }, unknownPic, brokenCanvas,
+    { ...createFieldsBlock('number'), attrs: { [BLOCK_ATTR.config]: '{kaputt' } }, { ...createPaintBlock(), attrs: { [BLOCK_ATTR.data]: '[' } }].map(blockReadState); // lang-ok
+  check('readable, newer (a newer format, an unknown type) and broken (damaged data of canvas, fields, paint)',
+    states.join() === 'readable,newer,newer,broken,broken,broken', states);
+  check('an unreadable block is asked nothing of its type: no actions, no settings, no effect, no search text',
+    resolveBlockType(brokenCanvas) === undefined && blockActionsOf(brokenCanvas, { reading: true }).length === 0
+      && blockSearchText(brokenCanvas) === '' && entryEffects([brokenCanvas], { today: '2030-01-01' }).lockEntry === false);
+  check('its registered type still names it', registeredBlockType(brokenCanvas)?.id === CANVAS_BLOCK_TYPE);
+  const unreadableOut = renderBlocksForExport(serializeBlocks([unknownPic, brokenCanvas]), 'pdf', exportText);
+  check('the export shows the notice of each, never its content',
+    unreadableOut === '<p>K:blocks.unreadable.newer</p><p>K:blocks.unreadable.broken</p>', unreadableOut);
+}
+
+console.log('\n7c. Interfaces that keep the app free of any one type\n');
+{
+  const T = (key) => `K:${key}`;
+  const target = '44444444-4444-4444-8444-444444444444';
+  const otherId = '55555555-5555-4555-8555-555555555555';
+  const chipTo = (id) => internalLinkChipHtml({ id, targetKind: 'entry', label: 'Z' });
+  const custom = {
+    id: 'cf', type: 'core.fields', html: '',
+    attrs: { [BLOCK_ATTR.config]: JSON.stringify({ name: 'Buch', icon: '📚', elements: [ // lang-ok
+      { id: 'l1', kind: 'link', label: 'Quelle' }, { id: 't1', kind: 'text', label: 'Notiz' }, { id: 'l2', kind: 'link', label: 'Andere' }, // lang-ok
+    ] }) },
+  };
+  const model = parseFields(custom);
+  const filled = serializeFields(custom, { ...model, slots: { l1: chipTo(target), t1: `<p>siehe ${chipTo(target)} und ${chipTo(otherId)}</p>`, l2: chipTo(otherId) } }, { label: (e) => e.label, yes: 'J', no: 'N', moonName: (p) => p }); // lang-ok
+  const without = parseFields(blockWithoutLink(filled, target, T));
+  check('removing a link (11): the link field holding it is emptied, a chip in a text field becomes its word, other links stay',
+    !without.slots.l1 && without.slots.l2 === chipTo(otherId) && !without.slots.t1.includes(target) && without.slots.t1.includes(otherId) && without.slots.t1.includes('Z'),
+    without.slots);
+  check('removing a link a block does not hold gives the same block', blockWithoutLink(filled, '66666666-6666-4666-8666-666666666666', T) === filled);
+  check('removing a link from a type without the interface gives the same block', blockWithoutLink(createTextBlock(`<p>${chipTo(target)}</p>`), target, T).html.includes(target));
+  check('text editors (15): a text block is one itself, a custom block holds its text fields, a canvas none',
+    blockTextEditors(createTextBlock('<p>a</p>')).join() === '' && blockTextEditors(createTextBlock('<p>a</p>')).length === 1
+      && blockTextEditors(filled).join() === 't1' && blockTextEditors(createCanvasBlock()).length === 0);
+}
+
+console.log('\n7d. A link field names its target by its current title (#192)\n');
+{
+  const a = '77777777-7777-4777-8777-777777777777';
+  const b = '88888888-8888-4888-8888-888888888888';
+  const linkCopy = (id, target, label) => ({
+    id, type: 'core.fields',
+    html: `<dl><dt>Quelle</dt><dd data-block-slot="el:src">${internalLinkChipHtml({ id: target, targetKind: 'entry', label })}</dd></dl>`, // lang-ok
+    attrs: { 'data-block-config': JSON.stringify({ elements: [{ id: 'src', kind: 'link', label: 'Quelle', uses: { info: true, panel: true, values: true } }] }) }, // lang-ok
+  });
+  const entryWith = (id, block) => ({ id, content: serializeBlocks([block]), created_at: '2026-01-01T12:00:00Z' });
+  const one = entryBlockSummary(entryWith('l1', linkCopy('k1', a, 'Altname'))); // lang-ok
+  const value = one.values.find((v) => v.key === 'field:src')?.value;
+  check('the link value carries the target and its kind, not only the stored name',
+    value?.kind === 'link' && value.id === a && value.targetKind === 'entry' && value.label === 'Altname', value); // lang-ok
+  // The live titles after a rename: `a` is now "Zebra", `b` (stored as "Anton") is gone.
+  const titles = new Map([[`entry:${a}`, 'Zebra']]);
+  const titleOf = (link) => titles.get(`${link.targetKind}:${link.id}`);
+  const panelRow = one.properties.rows[0]?.value;
+  const infoPart = one.info.long[0]?.value;
+  check('after a rename the info line, the panel and the values show the current title',
+    linkValueTitle(value, titleOf) === 'Zebra' && linkValueTitle(panelRow, titleOf) === 'Zebra' && linkValueTitle(infoPart, titleOf) === 'Zebra', { panelRow, infoPart });
+  const gone = entryBlockSummary(entryWith('l2', linkCopy('k2', b, 'Anton'))).values[0].value;
+  check('a target that is gone shows the name stored with the link', linkValueTitle(gone, titleOf) === 'Anton');
+  // Stored "Altname" < "Anton" — by the current titles "Anton" (gone, stored) < "Zebra".
+  const sorted = [value, gone].sort((x, y) => compareBlockValues(x, y, titleOf)).map((v) => linkValueTitle(v, titleOf));
+  check('sorting by the field goes by the current titles', sorted.join() === 'Anton,Zebra', sorted);
+  check('a missing value sorts last', compareBlockValues(null, value, titleOf) > 0 && compareBlockValues(value, null, titleOf) < 0);
+}
+
+console.log('\n7e. Tags a block gives travel by name (#186)\n');
+{
+  // A test type that gives the tags its data names — no built-in block gives any yet.
+  registerBlockType({
+    id: 'test.datatags', origin: 'plugin', icon: () => null, labelKey: 'x', descriptionKey: 'x', group: 'fields', dataVersion: 1, defaultShowTitle: false,
+    properties: {
+      mayContribute: (content) => content.includes('test.datatags'),
+      tags: (block) => { try { return JSON.parse(block.attrs['data-block-data']).tags ?? []; } catch { return []; } },
+      overridable: { icon: true, cover: true },
+    },
+  });
+  const tagger = { id: 'tg', type: 'test.datatags', html: '', attrs: { [BLOCK_ATTR.data]: JSON.stringify({ tags: ['t-file'], note: 't-other' }) } };
+  const content = serializeBlocks([createTextBlock('<p>t-file</p>'), tagger]);
+  check('a block gives its tags (blockTagsOf)', blockTagsOf(parseBlocks(content)).join() === 't-file');
+
+  // Export: the file names the tags the blocks give, by name; one without a name (gone) stays out.
+  const names = new Map([['t-file', 'Ritual']]);
+  const carried = manifestBlockTags([content, serializeBlocks([{ ...tagger, id: 'tg2', attrs: { [BLOCK_ATTR.data]: JSON.stringify({ tags: ['t-gone'] }) } }])], (id) => names.get(id));
+  check('export: the block tags go along by ID and name, a tag without a name stays out', JSON.stringify(carried) === JSON.stringify([{ id: 't-file', name: 'Ritual' }]), carried);
+  const file = {
+    format: 'emerald', version: EMERALD_FORMAT_VERSION, kind: 'items', exportedAt: '', links: [], omittedImages: [], blockDefinitions: [], images: [],
+    items: [{ kind: 'template', id: 'tp', name: 'T', title: '', createdAt: '', updatedAt: '', icon: '', tags: [], blocks: contentToBlocks(content) }],
+    blockTags: [...carried, { id: 'bad id', name: 'x' }, { id: 't-empty', name: '  ' }, { id: 't-file', name: 'twice' }, 'nope'],
+  };
+  const read = parseManifest(JSON.stringify(file));
+  check('the manifest reads the block tags, foreign values dropped, each ID once', JSON.stringify(read.blockTags) === JSON.stringify(carried), read.blockTags);
+
+  // Import: the tag of that name here (`ensureTag` in the app) — the blocks are pointed at it, nothing else that looks like an ID.
+  const here = new Map([['t-file', 't-here'], ['t-other', 't-wrong']]);
+  const imported = retagContent(blocksToContent(read.items[0].blocks), (id) => here.get(id));
+  const back = parseBlocks(imported);
+  check('import: the block gives the tag here; another value of the same shape and the text stay',
+    blockTagsOf(back).join() === 't-here' && JSON.parse(back[1].attrs[BLOCK_ATTR.data]).note === 't-other' && back[0].html.includes('t-file'), imported);
+  check('import: a content whose blocks give no mapped tag stays the same string', retagContent(content, () => undefined) === content);
+  check('remapBlock leaves a type without tags alone', remapBlock(createTextBlock('<p>t-file</p>'), { tags: () => 'x' }).html === '<p>t-file</p>');
 }
 
 console.log('\n8. .emerald manifest (lib/emerald/manifest.ts)\n');

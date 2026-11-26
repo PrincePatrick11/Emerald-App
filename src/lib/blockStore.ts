@@ -1,9 +1,10 @@
 import type Database from './sqlite';
-import { blockSectionHtml, parseBlocks, serializeBlocks } from './blocks/blockHtml';
+import { blockSectionHtml, isPlainTextBlock, parseBlocks, serializeBlocks } from './blocks/blockHtml';
 import { blockRefs, blockTagsOf } from './blocks/blockRefs';
 import { fromBlockRow, toBlockRow, type StoredBlockRow } from './blocks/blockRows';
+import { remapBlock } from './blocks/blockRemap';
 import { isPositionKey, positionsFor } from './blocks/position';
-import { TEXT_BLOCK_TYPE, type BlockInstance } from './blocks/types';
+import type { BlockInstance } from './blocks/types';
 
 /**
  * The blocks of entries and templates as rows (`blocks`, `block_refs`) —
@@ -157,10 +158,6 @@ export async function readContents(db: Database, kind: BlockOwnerKind, ids: read
 
 /* ---------------- From content to blocks ---------------- */
 
-function isPlainText(block: BlockInstance): boolean {
-  return block.type === TEXT_BLOCK_TYPE && Object.keys(block.attrs).length === 0;
-}
-
 /**
  * The blocks of a content string. A single plain text block is written
  * without its section, so without its ID (`serializeBlocks`, rule 2); it keeps
@@ -168,7 +165,7 @@ function isPlainText(block: BlockInstance): boolean {
  */
 export function blocksOfContent(content: string, previousIds: readonly string[] | null): BlockInstance[] {
   const blocks = parseBlocks(content);
-  if (blocks.length === 1 && isPlainText(blocks[0]) && previousIds?.length === 1) {
+  if (blocks.length === 1 && isPlainTextBlock(blocks[0]) && previousIds?.length === 1) {
     blocks[0] = { ...blocks[0], id: previousIds[0] };
   }
   return blocks;
@@ -223,9 +220,12 @@ function blockStatements(owner: BlockOwner, block: BlockInstance, position: stri
     const values = chunk.map((_, j) => `($${3 * j + 1}, $${3 * j + 2}, $${3 * j + 3})`).join(', ');
     const n = 3 * chunk.length;
     statements.push([
+      // A tag the block gives only while the tag exists (in the trash too, like
+      // the entry's own): an ID from another vault or of a tag deleted for good is no tag.
       `INSERT OR IGNORE INTO block_refs (block_row, target_kind, target, role)
        SELECT b.row_id, v.column1, v.column2, v.column3 FROM (VALUES ${values}) AS v, blocks b
-        WHERE b.${column} = $${n + 1} AND b.id = $${n + 2}`,
+        WHERE b.${column} = $${n + 1} AND b.id = $${n + 2}
+          AND (v.column1 <> 'tag' OR EXISTS (SELECT 1 FROM tags t WHERE t.id = v.column2))`,
       [...chunk.flatMap((r) => [r.kind, r.target, r.role]), owner.id, block.id],
     ]);
   }
@@ -355,4 +355,47 @@ export function copyBlockStatements(owner: BlockOwner, copies: readonly CopiedBl
   if (keyed) ordered = ordered.sort((a, b) => (a.position! < b.position! ? -1 : 1));
   const positions = keyed ? ordered.map((c) => c.position!) : positionsFor(new Map(), ordered.map((c) => c.block.id));
   return ordered.flatMap((c, i) => blockStatements(owner, c.block, positions[i], c.updatedAt ?? now));
+}
+
+/* ---------------- Tags the blocks give ---------------- */
+
+/**
+ * One tag merging into another (`replaceTagId`): every block that gives
+ * `from` gives `to` instead — its data rewritten by its type's own account of
+ * its tags (`remapBlock`'s `tags`) and its references with it, keeping its
+ * position and time. The owners' saved state is forgotten, so their next save
+ * reads the rows again. Returns the owners whose blocks changed.
+ */
+export async function retagBlocks(db: Database, from: string, to: string): Promise<BlockOwner[]> {
+  const rows = await db.select<(ReadRow & { entry_id: string | null; template_id: string | null; updated_at: string })[]>(
+    `SELECT ${ROW_COLUMNS}, entry_id, template_id, updated_at, '' AS owner FROM blocks
+      WHERE row_id IN (SELECT block_row FROM block_refs WHERE target_kind = 'tag' AND target = $1)`,
+    [from],
+  );
+  const owners = new Map<string, BlockOwner>();
+  const statements: Statement[] = [];
+  for (const row of rows) {
+    const owner: BlockOwner = row.entry_id ? { kind: 'entry', id: row.entry_id } : { kind: 'template', id: row.template_id! };
+    const block = remapBlock(fromBlockRow(row), { tags: (id) => (id === from ? to : undefined) });
+    statements.push(...blockStatements(owner, block, row.position, row.updated_at));
+    owners.set(ownerKey(owner), owner);
+  }
+  if (statements.length) await db.batch(statements);
+  // A write outside the stores' save queue: a save planned before it must not
+  // be remembered as what the rows hold (`committer`).
+  for (const key of owners.keys()) {
+    savedByOwner.delete(key);
+    generations.set(key, (generations.get(key) ?? 0) + 1);
+  }
+  return [...owners.values()];
+}
+
+/** Tags deleted for good: the blocks that give them give them no more — their references go (the blocks keep the IDs, which name no tag now). */
+export function dropBlockTagStatements(ids: readonly string[]): Statement[] {
+  const out: Statement[] = [];
+  for (let i = 0; i < ids.length; i += ID_CHUNK) {
+    const chunk = ids.slice(i, i + ID_CHUNK);
+    out.push([`DELETE FROM block_refs WHERE target_kind = 'tag' AND target IN (${placeholders(chunk.length)})`, chunk]);
+  }
+  return out;
 }

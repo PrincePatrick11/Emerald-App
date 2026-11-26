@@ -109,3 +109,8 @@ export function oneOf<T>(raw: unknown, options: readonly T[], fallback: T): T {
 export function listOf(items: readonly string[], language: string): string {
   return new Intl.ListFormat(language, { style: 'long', type: 'conjunction' }).format(items);
 }
+
+/** A tag ID from a foreign source (backup): only harmless characters, like `isDefinitionId`. */
+export function isTagId(id: unknown): id is string {
+  return typeof id === 'string' && /^[\w-]{1,100}$/.test(id);
+}
