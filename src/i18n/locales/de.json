@@ -940,6 +940,8 @@
     "deleteConfirmFiles": "Vault samt Dateien löschen?",
     "outdated": "Dieser Vault stammt aus einer älteren Emerald-Version und lässt sich in dieser nicht öffnen. Er bleibt, wie er ist; ein Konverter folgt.",
     "keyMissing": "In diesem Vault fehlt die Schlüsseldatei (vault.key), seine Daten sind aber verschlüsselt. Lege die Datei aus einer Sicherung oder einer Kopie des Ordners zurück; ohne sie lässt er sich nicht öffnen.",
+    "tampered": "Dieser Vault war verschlüsselt, liegt jetzt aber unverschlüsselt vor, und die Schlüsseldatei (vault.key) fehlt. Er wurde möglicherweise manipuliert und deshalb nicht geöffnet; verändert oder gelöscht wurde nichts. Lege Schlüsseldatei und Datenbank aus einer Sicherung zurück.",
+    "marksUnreadable": "Emerald kann die Liste der verschlüsselten Vaults (encrypted-vaults.json im App-Datenordner) nicht lesen. Solange sie fehlerhaft ist, öffnet kein Vault ohne Schlüsseldatei, und es lässt sich kein neuer anlegen, denn ein ausgetauschter Vault ließe sich davon nicht unterscheiden. Lege die Datei aus einer Sicherung zurück oder lösche sie; dann gilt der Schutz erst wieder ab dem nächsten Öffnen jedes verschlüsselten Vaults.",
     "tooNew": "Dieser Vault stammt aus einer neueren Emerald-Version. Aktualisiere diese App, um ihn zu öffnen. Er bleibt, wie er ist.",
     "stateLocal": "nur hier"
   },
@@ -1188,6 +1190,8 @@
     "errorVaultMissing": "Der Vault-Ordner ist nicht erreichbar.",
     "errorInterrupted": "Das Neuverschlüsseln dieses Vaults (Passwortwechsel oder Verschlüsseln) wurde unterbrochen. Öffne den Vault einmal, dann geht die Sicherung weiter.",
     "errorKeyMissing": "In diesem Vault fehlt die Schlüsseldatei (vault.key). Ohne sie wäre die Sicherung unbrauchbar, deshalb wurde keine geschrieben.",
+    "errorTampered": "Dieser Vault war verschlüsselt, liegt jetzt aber unverschlüsselt vor und wurde möglicherweise manipuliert. Deshalb wurde keine Sicherung geschrieben.",
+    "errorMarksUnreadable": "Emerald kann die Liste der verschlüsselten Vaults nicht lesen. Für diesen Vault wurde deshalb keine Sicherung geschrieben.",
     "errorSave": "Die Einstellung konnte nicht gespeichert werden."
   },
   "contextMenu": {

@@ -158,6 +158,7 @@ src-tauri/src/
 ├── db.rs               SQLCipher pools, `db_*` commands, SQL authorizer
 ├── crypto.rs           sealed-file format, subkeys, keyed hash
 ├── keys.rs             vault.key, unlocking, OS keychain, `VaultKeys`
+├── vault_marks.rs      `encrypted-vaults.json`: the vault ids known as encrypted, `VAULT_TAMPERED` check
 ├── reencrypt.rs        changing the password, recovery, crash recovery
 ├── emerald_file.rs     .emerald and .vault.emerald files (content and raw backups): header, archive, limits, their commands
 ├── emerald_seal.rs     the sealed body of a .emerald file: chunked XChaCha20-Poly1305, streamed

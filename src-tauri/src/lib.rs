@@ -30,6 +30,9 @@ mod db;
 mod crypto;
 /// `vault.key`, unlocking, and the keys of unlocked vaults.
 mod keys;
+/// Which vaults were ever encrypted, kept outside every vault folder, so a
+/// swapped-in plain vault does not open without a password.
+mod vault_marks;
 /// Putting a vault under a new key — encrypting an old one, changing the
 /// password —, resumable after a crash.
 mod reencrypt;
@@ -999,6 +1002,10 @@ mod app_data_write_tests {
             "auto-backup.json",
             "auto-backup.json.tmp",
             "update.json",
+            // Which vaults were encrypted (`vault_marks.rs`): the webview must
+            // not be able to take a vault off that list.
+            "encrypted-vaults.json",
+            "encrypted-vaults.json.tmp",
             // Spellings that a file system maps to the same name.
             "AUTO-BACKUP.JSON",
             "auto-bac\u{212A}up.json",

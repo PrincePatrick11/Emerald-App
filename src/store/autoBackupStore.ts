@@ -25,7 +25,7 @@ export interface AutoBackupSettings {
 }
 
 /** What the last run of a vault came to — kept as a code and translated on render. */
-export type AutoBackupError = 'dirMissing' | 'vaultMissing' | 'interrupted' | 'keyMissing' | 'failed';
+export type AutoBackupError = 'dirMissing' | 'vaultMissing' | 'interrupted' | 'keyMissing' | 'tampered' | 'marksUnreadable' | 'failed';
 
 /** Mirrors `VaultBackupStatus` in `auto_backup.rs`. */
 export interface VaultBackupStatus {

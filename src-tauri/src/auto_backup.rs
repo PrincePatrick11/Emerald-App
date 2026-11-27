@@ -357,13 +357,18 @@ async fn back_up(app: &tauri::AppHandle, vault_id: &str, vault_dir: &Path, state
     // One file per day: a second run replaces it.
     let file = target.dir.join(file_name(&tag, &iso(today)));
     let key = crate::raw_backup::key_in_memory(app, vault_id);
+    // A vault backed up with `vault.key` is marked here too, even if it is
+    // never opened on this installation.
+    let mark = crate::vault_marks::mark_if_encrypted(app, vault_id, vault_dir);
     let (closed_app, closed_id) = (app.clone(), vault_id.to_string());
     let still_closed = move || !crate::db::is_open_blocking(&closed_app, &closed_id);
-    match crate::raw_backup::write(vault_dir, vault_id, key.as_ref(), &file, still_closed).await {
+    match crate::raw_backup::write(vault_dir, vault_id, key.as_ref(), mark, &file, still_closed).await {
         Ok(()) => {}
         Err(e) if e == crate::raw_backup::BUSY => return Outcome::Busy,
         Err(e) if e == crate::raw_backup::INTERRUPTED => return Outcome::Failed("interrupted"),
         Err(e) if e == crate::keys::VAULT_KEY_MISSING => return Outcome::Failed("keyMissing"),
+        Err(e) if e == crate::keys::VAULT_TAMPERED => return Outcome::Failed("tampered"),
+        Err(e) if e == crate::keys::VAULT_MARKS_UNREADABLE => return Outcome::Failed("marksUnreadable"),
         Err(e) => {
             eprintln!("[auto-backup] {vault_id} failed: {e}");
             return Outcome::Failed("failed");

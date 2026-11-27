@@ -940,6 +940,8 @@
     "deleteConfirmFiles": "Delete the vault and its files?",
     "outdated": "This vault comes from an older version of Emerald and cannot be opened in this one. It stays as it is; a converter will follow.",
     "keyMissing": "This vault is missing its key file (vault.key), but its data is encrypted. Put the file back from a backup or a copy of the folder; without it the vault cannot be opened.",
+    "tampered": "This vault was encrypted, but it is now unencrypted and its key file (vault.key) is missing. It may have been tampered with, so it was not opened; nothing was changed or deleted. Put the key file and the database back from a backup.",
+    "marksUnreadable": "Emerald cannot read the list of encrypted vaults (encrypted-vaults.json in the app data folder). While it is damaged, no vault without a key file opens and no new vault can be created, because a swapped vault could not be told apart. Put the file back from a backup or delete it; the protection then starts again the next time each encrypted vault is opened.",
     "tooNew": "This vault comes from a newer version of Emerald. Update this app to open it. It stays as it is.",
     "stateLocal": "only here"
   },
@@ -1188,6 +1190,8 @@
     "errorVaultMissing": "The vault folder cannot be reached.",
     "errorInterrupted": "Re-encrypting this vault (a password change or encrypting it) was interrupted. Open the vault once and the backup carries on.",
     "errorKeyMissing": "This vault is missing its key file (vault.key). A backup without it could not be restored, so none was written.",
+    "errorTampered": "This vault was encrypted, but it is now unencrypted and may have been tampered with. No backup was written.",
+    "errorMarksUnreadable": "Emerald cannot read the list of encrypted vaults. No backup was written for this vault.",
     "errorSave": "The setting could not be saved."
   },
   "contextMenu": {

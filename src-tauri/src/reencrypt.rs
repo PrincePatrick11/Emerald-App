@@ -851,8 +851,15 @@ pub async fn vault_encrypt(
     keys::check_password(&password)?;
     let _running = Reencrypting::begin().await;
     let dir = vault_dir_checked(&app, &vault_id)?;
+    // A vault known as encrypted that turns up plain is not taken as the
+    // user's own and encrypted as it lies: it may have been swapped.
+    crate::vault_marks::refuse_if_swapped(crate::vault_marks::mark_of(&app, &vault_id), &dir)?;
     crate::db::close_vault(&app, &vault_id).await;
     let done = encrypt_dir(&dir, &password, keys::DEFAULT_KDF, &progress_events(&app, &vault_id)).await?;
+    // Only now: a run that failed before its swap leaves the vault plain, and
+    // marked it would no longer open. One cut short after the swap is marked
+    // when it is next opened and found with `vault.key`.
+    crate::vault_marks::mark(&app, &vault_id);
     Ok(adopt(&app, &vault_id, done, remember_key).await)
 }
 
@@ -899,7 +906,10 @@ pub async fn dev_seed(app: &tauri::AppHandle, vault_id: &str) {
     if !keys::is_encrypted_dir(&dir) {
         if is_regular_file(&dir.join(vault::DB_FILE)) {
             match encrypt_dir(&dir, &password, keys::DEFAULT_KDF, &quiet).await {
-                Ok(done) => vault_keys.insert(vault_id, done.vault_key),
+                Ok(done) => {
+                    crate::vault_marks::mark(app, vault_id);
+                    vault_keys.insert(vault_id, done.vault_key);
+                }
                 Err(e) => eprintln!("[dev-seed] could not encrypt the seed vault: {e}"),
             }
         }

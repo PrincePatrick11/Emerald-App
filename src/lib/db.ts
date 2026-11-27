@@ -17,6 +17,10 @@ export const VAULT_OUTDATED = 'VAULT_OUTDATED';
 export const VAULT_TOO_NEW = 'VAULT_TOO_NEW';
 /** An encrypted vault whose `vault.key` is gone (`keys::VAULT_KEY_MISSING`). */
 export const VAULT_KEY_MISSING = 'VAULT_KEY_MISSING';
+/** A vault known as encrypted that turned up plain or empty (`keys::VAULT_TAMPERED`). */
+export const VAULT_TAMPERED = 'VAULT_TAMPERED';
+/** A vault without `vault.key` while the list of encrypted vaults (`encrypted-vaults.json`) cannot be read (`keys::VAULT_MARKS_UNREADABLE`). */
+export const VAULT_MARKS_UNREADABLE = 'VAULT_MARKS_UNREADABLE';
 
 /** Whether an error says the vault's schema is from another version of the app. */
 export function vaultVersionErrorOf(err: unknown): typeof VAULT_OUTDATED | typeof VAULT_TOO_NEW | null {
@@ -31,6 +35,8 @@ export function vaultOpenErrorKey(err: unknown, fallback: string): string {
   const version = vaultVersionErrorOf(err);
   if (version) return version === VAULT_OUTDATED ? 'vault.outdated' : 'vault.tooNew';
   const message = err instanceof Error ? err.message : String(err);
+  if (message.includes(VAULT_TAMPERED)) return 'vault.tampered';
+  if (message.includes(VAULT_MARKS_UNREADABLE)) return 'vault.marksUnreadable';
   return message.includes(VAULT_KEY_MISSING) ? 'vault.keyMissing' : fallback;
 }
 

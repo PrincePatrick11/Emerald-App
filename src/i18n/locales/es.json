@@ -940,6 +940,8 @@
     "deleteConfirmFiles": "¿Eliminar el vault y sus archivos?",
     "outdated": "Este vault procede de una versión anterior de Emerald y no se puede abrir en esta. Se queda como está; llegará un conversor.",
     "keyMissing": "A este vault le falta su archivo de clave (vault.key), pero sus datos están cifrados. Restaura el archivo desde una copia de seguridad o una copia de la carpeta; sin él no se puede abrir.",
+    "tampered": "Este vault estaba cifrado, pero ahora está sin cifrar y le falta su archivo de clave (vault.key). Puede que lo hayan manipulado, así que no se ha abierto; no se ha cambiado ni borrado nada. Restaura el archivo de clave y la base de datos desde una copia de seguridad.",
+    "marksUnreadable": "Emerald no puede leer la lista de vaults cifrados (encrypted-vaults.json en la carpeta de datos de la app). Mientras esté dañada, no se abre ningún vault sin archivo de clave ni se puede crear uno nuevo, porque un vault sustituido no se podría distinguir. Restaura el archivo desde una copia de seguridad o bórralo; la protección vuelve a empezar la próxima vez que se abra cada vault cifrado.",
     "tooNew": "Este vault procede de una versión más reciente de Emerald. Actualiza esta aplicación para abrirlo. Se queda como está.",
     "stateLocal": "solo aquí"
   },
@@ -1188,6 +1190,8 @@
     "errorVaultMissing": "No se puede acceder a la carpeta del vault.",
     "errorInterrupted": "Se interrumpió el recifrado de este vault (un cambio de contraseña o su cifrado). Abre el vault una vez y la copia continuará.",
     "errorKeyMissing": "A este vault le falta su archivo de clave (vault.key). Sin él la copia no se podría restaurar, así que no se ha hecho ninguna.",
+    "errorTampered": "Este vault estaba cifrado, pero ahora está sin cifrar y puede que lo hayan manipulado. No se ha hecho ninguna copia.",
+    "errorMarksUnreadable": "Emerald no puede leer la lista de vaults cifrados. No se ha hecho ninguna copia de este vault.",
     "errorSave": "No se pudo guardar el ajuste."
   },
   "contextMenu": {

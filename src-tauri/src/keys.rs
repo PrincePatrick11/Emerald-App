@@ -62,6 +62,12 @@ pub const VAULT_REENCRYPTING: &str = "VAULT_REENCRYPTING";
 /// A vault without `vault.key` whose database is not plain SQLite: an
 /// encrypted vault that lost its key file.
 pub const VAULT_KEY_MISSING: &str = "VAULT_KEY_MISSING";
+/// A vault without `vault.key` that this installation knew as encrypted, and
+/// whose database is plain or gone: it may have been swapped (`vault_marks.rs`).
+pub const VAULT_TAMPERED: &str = "VAULT_TAMPERED";
+/// A vault without `vault.key` while the list of encrypted vaults cannot be
+/// read: it cannot be told from a swapped one (`vault_marks.rs`).
+pub const VAULT_MARKS_UNREADABLE: &str = "VAULT_MARKS_UNREADABLE";
 
 /// For a vault without `vault.key`: whether its database is really plain —
 /// empty (a new plain vault) or starting with SQLite's header. An encrypted
@@ -366,6 +372,9 @@ pub fn key_for(app: &tauri::AppHandle, vault_id: &str) -> Result<Option<Key>, St
         if crate::reencrypt::is_reencrypting() {
             return Err(VAULT_REENCRYPTING.to_string());
         }
+        // Once encrypted, never plain: whatever is written now would lie in
+        // the clear in a folder that may have been swapped.
+        crate::vault_marks::refuse_if_swapped(crate::vault_marks::mark_of(app, vault_id), &dir)?;
         return Ok(None);
     }
     app.state::<VaultKeys>()
@@ -453,6 +462,10 @@ pub async fn vault_key_status(app: tauri::AppHandle, vault_id: String) -> Result
         vault::directory_state(&dir)?;
         crate::reencrypt::recover_if_idle(&dir)?;
         let encrypted = is_encrypted_dir(&dir);
+        // Refused before the frontend could open it as a plain vault — or
+        // offer to create one in its place.
+        let mark = crate::vault_marks::mark_if_encrypted(&app, &vault_id, &dir);
+        crate::vault_marks::refuse_if_swapped(mark, &dir)?;
         // A key in memory that does not fit this folder — the vault was
         // relocated, or a swap only just finished — is no key: drop it, and
         // the frontend asks again.
@@ -527,6 +540,7 @@ pub async fn vault_create_key(
         check_new(&dir)?;
         let (file, vault_key, recovery_key) = KeyFile::create(&password, DEFAULT_KDF)?;
         write_key_file(&dir, &file)?;
+        crate::vault_marks::mark(&app, &vault_id);
         let remembered = apply_remember(&vault_id, &vault_key, remember_key);
         app.state::<VaultKeys>().insert(&vault_id, vault_key);
         Ok(CreatedKey { recovery_key, remembered })
@@ -544,14 +558,17 @@ pub async fn vault_create_plain(app: tauri::AppHandle, vault_id: String) -> Resu
         let dir = vault::vault_dir(&app, &vault_id)?;
         vault::directory_state(&dir)?;
         let _guard = CREATE_LOCK.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-        create_plain(&dir)
+        create_plain(&dir, crate::vault_marks::mark_of(&app, &vault_id))
     })
     .await
     .map_err(|e| e.to_string())?
 }
 
-fn create_plain(dir: &Path) -> Result<(), String> {
+/// `mark`: a vault that was encrypted once — its key file and database gone —
+/// must not come back as a plain one.
+fn create_plain(dir: &Path, mark: crate::vault_marks::Mark) -> Result<(), String> {
     check_new(dir)?;
+    crate::vault_marks::refuse_if_swapped(mark, dir)?;
     // An empty file is an empty SQLite database; the schema follows on open.
     std::fs::OpenOptions::new()
         .write(true)
@@ -682,10 +699,20 @@ mod tests {
     fn a_plain_vault_is_made_only_where_nothing_is() {
         let dir = std::env::temp_dir().join(format!("emerald-keys-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
-        create_plain(&dir).unwrap();
+        create_plain(&dir, crate::vault_marks::Mark::No).unwrap();
         assert!(dir.join(vault::DB_FILE).is_file());
         assert!(!is_encrypted_dir(&dir));
-        assert_eq!(create_plain(&dir).unwrap_err(), VAULT_NOT_NEW);
+        assert_eq!(create_plain(&dir, crate::vault_marks::Mark::No).unwrap_err(), VAULT_NOT_NEW);
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn a_vault_known_as_encrypted_is_not_made_plain() {
+        // `vault.key` and database both removed: the empty folder looks new.
+        let dir = std::env::temp_dir().join(format!("emerald-keys-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        assert_eq!(create_plain(&dir, crate::vault_marks::Mark::Yes).unwrap_err(), VAULT_TAMPERED);
+        assert!(!dir.join(vault::DB_FILE).exists());
         std::fs::remove_dir_all(&dir).ok();
     }
 
@@ -694,7 +721,7 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("emerald-keys-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
         assert!(plain_database_or_none(&dir), "no database");
-        create_plain(&dir).unwrap();
+        create_plain(&dir, crate::vault_marks::Mark::No).unwrap();
         assert!(plain_database_or_none(&dir), "empty");
         std::fs::write(dir.join(vault::DB_FILE), b"SQLite format 3\0and pages").unwrap();
         assert!(plain_database_or_none(&dir), "plain");

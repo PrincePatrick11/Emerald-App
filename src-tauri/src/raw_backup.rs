@@ -171,6 +171,7 @@ pub(crate) async fn write(
     dir: &Path,
     vault_id: &str,
     vault_key: Option<&Key>,
+    mark: crate::vault_marks::Mark,
     target: &Path,
     still_closed: impl Fn() -> bool + Send + Sync + 'static,
 ) -> Result<(), String> {
@@ -178,7 +179,7 @@ pub(crate) async fn write(
     let Ok(_running) = crate::reencrypt::RUNNING.try_lock() else {
         return Err(BUSY.into());
     };
-    write_unguarded(dir, vault_id, vault_key, target, still_closed).await
+    write_unguarded(dir, vault_id, vault_key, mark, target, still_closed).await
 }
 
 /// [`write`] without the wait for re-encryptions — for the tests, which run
@@ -187,6 +188,7 @@ async fn write_unguarded(
     dir: &Path,
     vault_id: &str,
     vault_key: Option<&Key>,
+    mark: crate::vault_marks::Mark,
     target: &Path,
     still_closed: impl Fn() -> bool + Send + Sync + 'static,
 ) -> Result<(), String> {
@@ -205,6 +207,9 @@ async fn write_unguarded(
     if !encrypted && !keys::plain_database_or_none(dir) {
         return Err(keys::VAULT_KEY_MISSING.into());
     }
+    // Known as encrypted, found plain: a backup of what may have been swapped
+    // in would push the good ones out (`vault_marks.rs`).
+    crate::vault_marks::refuse_if_swapped(mark, dir)?;
     let manifest = manifest(vault_id);
     let target = target.to_path_buf();
 
@@ -272,6 +277,9 @@ mod tests {
     use sqlx::sqlite::SqliteConnection;
     use sqlx::Row;
     use std::sync::atomic::{AtomicUsize, Ordering};
+
+    /// A vault the list of encrypted vaults does not name.
+    const NOT_MARKED: crate::vault_marks::Mark = crate::vault_marks::Mark::No;
 
     const TEST_KDF: KdfParams = KdfParams { memory_kib: 64, iterations: 1, parallelism: 1 };
     static NEXT: AtomicUsize = AtomicUsize::new(0);
@@ -341,7 +349,7 @@ mod tests {
     async fn a_closed_vault_is_packed_as_it_lies() {
         let (dir, key) = vault(25).await;
         let target = scratch().join("closed.vault.emerald");
-        write_unguarded(&dir, "v1", None, &target, || true).await.unwrap();
+        write_unguarded(&dir, "v1", None, NOT_MARKED, &target, || true).await.unwrap();
         let (names, count) = unpack(&target, &key).await;
         assert_eq!(count, 25);
         for name in ["manifest.json", "emerald.db", "vault.key", "settings.json"] {
@@ -367,7 +375,7 @@ mod tests {
             db.close().await.unwrap();
         });
         let target = scratch().join("open.vault.emerald");
-        write_unguarded(&dir, "v1", Some(&key), &target, || false).await.unwrap();
+        write_unguarded(&dir, "v1", Some(&key), NOT_MARKED, &target, || false).await.unwrap();
         writer.await.unwrap();
         let (names, count) = unpack(&target, &key).await;
         // One state of the database: never fewer than at the start, never more than at the end.
@@ -380,7 +388,7 @@ mod tests {
     async fn a_closed_vault_changed_during_the_copy_is_not_placed() {
         let (dir, _) = vault(3).await;
         let target = scratch().join("changed.vault.emerald");
-        let err = write_unguarded(&dir, "v1", None, &target, || false).await.unwrap_err();
+        let err = write_unguarded(&dir, "v1", None, NOT_MARKED, &target, || false).await.unwrap_err();
         assert_eq!(err, BUSY);
         assert!(!target.exists());
     }
@@ -390,7 +398,7 @@ mod tests {
         let (dir, _) = vault(1).await;
         std::fs::write(dir.join("vault.reencrypting"), b"{}").unwrap();
         let target = scratch().join("interrupted.vault.emerald");
-        assert_eq!(write_unguarded(&dir, "v1", None, &target, || true).await.unwrap_err(), INTERRUPTED);
+        assert_eq!(write_unguarded(&dir, "v1", None, NOT_MARKED, &target, || true).await.unwrap_err(), INTERRUPTED);
         assert!(!target.exists());
     }
 
@@ -409,7 +417,7 @@ mod tests {
         // Closed (packed as it lies) and open (snapshotted).
         for (name, closed) in [("closed", true), ("open", false)] {
             let target = scratch().join(format!("{name}.vault.emerald"));
-            write_unguarded(&dir, "v1", None, &target, move || closed).await.unwrap();
+            write_unguarded(&dir, "v1", None, NOT_MARKED, &target, move || closed).await.unwrap();
             let bytes = std::fs::read(&target).unwrap();
             let start = 4 + 1 + 4 + u32::from_le_bytes(bytes[5..9].try_into().unwrap()) as usize;
             let header: serde_json::Value = serde_json::from_slice(&bytes[9..start]).unwrap();
@@ -427,10 +435,22 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_swapped_vault_is_not_backed_up() {
+        // An encrypted vault whose `vault.key` was removed and whose database
+        // was replaced by a plain one.
+        let (dir, _) = vault(1).await;
+        std::fs::remove_file(dir.join(keys::KEY_FILE)).unwrap();
+        std::fs::write(dir.join(vault::DB_FILE), b"SQLite format 3\0and pages").unwrap();
+        let target = scratch().join("swapped.vault.emerald");
+        assert_eq!(write_unguarded(&dir, "v1", None, crate::vault_marks::Mark::Yes, &target, || true).await.unwrap_err(), keys::VAULT_TAMPERED);
+        assert!(!target.exists());
+    }
+
+    #[tokio::test]
     async fn a_running_reencryption_is_waited_for() {
         let (dir, _) = vault(1).await;
         let target = scratch().join("busy.vault.emerald");
         let _running = crate::reencrypt::RUNNING.lock().await;
-        assert_eq!(write(&dir, "v1", None, &target, || true).await.unwrap_err(), BUSY);
+        assert_eq!(write(&dir, "v1", None, NOT_MARKED, &target, || true).await.unwrap_err(), BUSY);
     }
 }

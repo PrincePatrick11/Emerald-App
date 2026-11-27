@@ -218,6 +218,7 @@ fn previous_dir(current: &Path) -> Option<PathBuf> {
 /// here. If another artefact of our own is added, it belongs here.
 fn is_own_data(name: &str) -> bool {
     name == VAULTS_FILE
+        || name == crate::vault_marks::MARKS_FILE
         || name == IMAGES_SUBDIR
         || name == VAULTS_SUBDIR
         // `emerald.db`, the flat `emerald-{uuid}.db` of the old layout, their

@@ -388,6 +388,8 @@ An encrypted vault's entries, images, drafts and backups are unreadable without 
 
 **Encrypting later.** An unencrypted vault can be encrypted at any time in Settings → Security (see below). The other way is closed: an encrypted vault stays encrypted, there is no way to decrypt it.
 
+**A vault that was encrypted and is not any more.** Emerald remembers, outside the vault folder, which vaults in its list it has known as encrypted. If one of them turns up without its key file and with an unencrypted database — or none —, someone may have swapped it: Emerald does not open it, asks no password, does not offer to create a new vault there and makes no automatic backup of it, and says the vault may have been tampered with. Nothing in the folder is changed or deleted. The protection starts the first time Emerald sees the vault encrypted; a folder that is newly added to the list — or removed and added again, which resets it — is unprotected until then. Should Emerald be unable to read its own list, it says so and opens no vault without a key file — and creates no new one — until the list is repaired or removed.
+
 **Unlocking.** Opening or switching to an encrypted vault asks for its password. Leaving a vault locks it. If you forgot the password, **Forgot your password?** takes the recovery key and a new password, and gives you a new recovery key; the old one stops working.
 
 **Remember on this device** (a switch in the password dialog and in Settings → Security) keeps the vault's key in the operating system's keychain, so the vault opens without a password on this computer. The files in the vault folder stay encrypted either way. The switch is missing where the system has no keychain.

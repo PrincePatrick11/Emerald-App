@@ -77,6 +77,7 @@ Version 0.2.0 is a fresh start: the database, backups and `.emerald` files have 
 ### Security and vaults
 - **Vaults are encrypted unless chosen otherwise when created** (SQLCipher; pictures and drafts sealed too); an unencrypted vault can be encrypted later, never decrypted. A password of any length but empty and a recovery key, "Remember on this device" via the system keychain, Lock now, Change password with progress and a check for free space.
 - **Automatic backups stay as encrypted as the vault** lies on disk; an encrypted vault's open with its password or its recovery key.
+- **A swapped vault is not opened.** Emerald remembers which vaults it has known as encrypted. If one turns up without its key file and with an unencrypted database or none, it is not opened, no password or new vault is offered, no automatic backup is made, and the vault picker warns that it may have been tampered with; nothing in the folder is changed. The protection starts when a vault is first seen encrypted; removing a vault from the list and adding it again resets it.
 - **Fonts ship with the app;** no request leaves the device on start. `.emerald` entry imports and Markdown go through the same HTML filter; a crafted file can no longer freeze the app.
 
 ### Import, export and backup

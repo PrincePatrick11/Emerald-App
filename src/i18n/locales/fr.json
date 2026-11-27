@@ -940,6 +940,8 @@
     "deleteConfirmFiles": "Supprimer le vault et ses fichiers ?",
     "outdated": "Ce vault provient d'une version antérieure d'Emerald et ne peut pas être ouvert dans celle-ci. Il reste tel quel ; un convertisseur suivra.",
     "keyMissing": "Il manque à ce vault son fichier de clé (vault.key), mais ses données sont chiffrées. Remets le fichier depuis une sauvegarde ou une copie du dossier ; sans lui, il ne peut pas être ouvert.",
+    "tampered": "Ce vault était chiffré, mais il ne l’est plus et son fichier de clé (vault.key) manque. Il a peut-être été manipulé, il n’a donc pas été ouvert ; rien n’a été modifié ni supprimé. Remets le fichier de clé et la base de données depuis une sauvegarde.",
+    "marksUnreadable": "Emerald ne peut pas lire la liste des vaults chiffrés (encrypted-vaults.json dans le dossier de données de l’app). Tant qu’elle est endommagée, aucun vault sans fichier de clé ne s’ouvre et aucun nouveau ne peut être créé, car un vault remplacé ne pourrait pas être distingué. Remets le fichier depuis une sauvegarde ou supprime-le ; la protection reprend alors à la prochaine ouverture de chaque vault chiffré.",
     "tooNew": "Ce vault provient d'une version plus récente d'Emerald. Mettez à jour cette application pour l'ouvrir. Il reste tel quel.",
     "stateLocal": "ici seulement"
   },
@@ -1188,6 +1190,8 @@
     "errorVaultMissing": "Le dossier du vault est inaccessible.",
     "errorInterrupted": "Le rechiffrement de ce vault (changement de mot de passe ou chiffrement) a été interrompu. Ouvre le vault une fois et la sauvegarde reprend.",
     "errorKeyMissing": "Il manque à ce vault son fichier de clé (vault.key). Sans lui, la sauvegarde serait inutilisable ; aucune n’a donc été écrite.",
+    "errorTampered": "Ce vault était chiffré, mais il ne l’est plus et a peut-être été manipulé. Aucune sauvegarde n’a été écrite.",
+    "errorMarksUnreadable": "Emerald ne peut pas lire la liste des vaults chiffrés. Aucune sauvegarde n’a été écrite pour ce vault.",
     "errorSave": "Le réglage n'a pas pu être enregistré."
   },
   "contextMenu": {

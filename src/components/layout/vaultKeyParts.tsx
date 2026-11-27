@@ -7,6 +7,7 @@ import ProgressBar from '../ui/ProgressBar';
 import {
   KEY_ERRORS, keyErrorOf, onReencryptProgress, spaceShortfall, type ReencryptProgress,
 } from '../../lib/vaultKeys';
+import { vaultOpenErrorKey } from '../../lib/db';
 
 /**
  * What `VaultKeyDialog` and the settings' security page share: the
@@ -84,6 +85,10 @@ export function keyErrorText(t: TFunction, err: unknown, fallbackKey: string): s
   if (code === KEY_ERRORS.passwordEmpty) return t('vaultKey.empty');
   const space = spaceShortfall(err);
   if (space) return t('vaultKey.notEnoughSpace', { needed: diskSize(space.needed), free: diskSize(space.free) });
+  // A vault that was encrypted and turned up without its key file: creating
+  // a plain database or encrypting it refuses it, as opening does.
+  const refused = vaultOpenErrorKey(err, '');
+  if (refused) return t(refused);
   console.error('[vault-key]', err);
   return t(fallbackKey);
 }
