@@ -218,7 +218,7 @@ export default function BlockStack({
    * references, as "Linked entries" lists them (`blockLinksTo`). Jumping goes
    * to the first block that links to `target`; removing takes the link out of
    * the first block whose type can (`withoutLink`) — a block linking without
-   * one (a sigil's charge, a block this app cannot read) is passed over.
+   * one (a block this app cannot read) is passed over.
    */
   const findBlockLink = useCallback((target: { id: string }) =>
     blocksRef.current.find((b) => blockCountsLinks(b) && blockLinksTo(b, target.id)) ?? null, []);

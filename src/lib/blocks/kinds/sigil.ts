@@ -4,9 +4,10 @@ import type { ListInfoPart } from '../listInfo';
 import { drawingImage } from '../paint';
 import { htmlPlainText } from '../plainText';
 import {
-  createSigilBlock, isSigilBroken, parseSigilCharge, shownSigilParts, sigilEffect, sigilPartBlock, sigilPartId, sigilTargetDate,
-  SIGIL_BLOCK_TYPE, SIGIL_SETTINGS, type SigilPartName,
+  createSigilBlock, isSigilBroken, parseSigilCharge, serializeSigilCharge, shownSigilParts, sigilEffect, sigilPartBlock, sigilPartId, sigilTargetDate,
+  SIGIL_BLOCK_TYPE, SIGIL_SETTINGS, withSigilPart, type SigilPartName,
 } from '../sigil';
+import { extractInternalLinks } from '../../internalLinkHtml';
 import { blockTypeTextKey, type RefReporter } from '../toolkit';
 import type { BlockInstance } from '../types';
 import { reportDrawing } from './paint';
@@ -59,6 +60,15 @@ function sigilRefs(block: BlockInstance, report: RefReporter): void {
   // Switched off or concealed, a part still holds what it points at.
   reportDrawing(sigilPartBlock(block, 'drawing'), report);
   report.markup(sigilPartBlock(block, 'charge').html);
+}
+
+/** The sigil without its charging technique if that links to `target`; charged state, date and lock stay as they are. */
+function sigilWithoutLink(block: BlockInstance, target: string): BlockInstance {
+  const part = sigilPartBlock(block, 'charge');
+  const charge = parseSigilCharge(part);
+  if (!extractInternalLinks(part.html).some((link) => link.id === target)) return block;
+  const { broken: _broken, ...data } = charge;
+  return withSigilPart(block, 'charge', serializeSigilCharge(part, { ...data, technique: null }));
 }
 
 const partLabelKey = (part: SigilPartName) => `blocks.types.sigil.parts.${part}`;
@@ -155,5 +165,6 @@ export const sigilBlockType: BlockTypeDef = {
   export: sigilExport,
   searchText: sigilSearchText,
   refs: sigilRefs,
+  withoutLink: sigilWithoutLink,
   settings: SIGIL_SETTINGS,
 };
