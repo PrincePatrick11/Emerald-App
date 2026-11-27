@@ -138,11 +138,18 @@ export function renderBlocksForExport(
   content: string,
   format: BlockExportFormat,
   text: ExportText,
-  today = localIsoDay(),
+  {
+    today = localIsoDay(),
+    entryDate = null,
+  }: {
+    today?: string;
+    /** The entry's day (toolkit, `entryDate`) — what a block shown by its entry's date needs. */
+    entryDate?: string | null;
+  } = {},
 ): string {
   const blocks = parseBlocks(content);
   const { concealed } = entryEffects(blocks, { today });
-  const ctx: ExportContext = { format, today, concealed };
+  const ctx: ExportContext = { format, entryDate, today, concealed };
   const parts: string[] = [];
   for (const block of blocks) {
     if (isBlockHidden(block)) continue;

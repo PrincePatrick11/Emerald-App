@@ -33,7 +33,7 @@ const EMPTY: EntryBlockSummary = { effects: NO_EFFECTS, info: NO_INFO, propertie
 /** What the summary needs of an entry. */
 type SummaryEntry = { id: string; content: string; created_at: string };
 
-const cache = new Map<string, { content: string; day: string; summary: EntryBlockSummary }>();
+const cache = new Map<string, { content: string; created: string; day: string; summary: EntryBlockSummary }>();
 
 function collectInfo(blocks: readonly BlockInstance[], ctx: BlockContext): EntryBlockSummary['info'] {
   const parts: ListInfoPart[] = blocks.flatMap((block) => {
@@ -63,12 +63,16 @@ function summarize(entry: SummaryEntry, today: string): EntryBlockSummary {
   };
 }
 
-/** The summary of an entry; the same content is not parsed twice on the same day. */
+/**
+ * The summary of an entry; the same content is not parsed twice on the same
+ * day. The creation date is part of the key: what a block shows may follow
+ * the entry's day (the moon phase).
+ */
 export function entryBlockSummary(entry: SummaryEntry, today = localIsoDay()): EntryBlockSummary {
   const hit = cache.get(entry.id);
-  if (hit?.content === entry.content && hit.day === today) return hit.summary;
+  if (hit?.content === entry.content && hit.created === entry.created_at && hit.day === today) return hit.summary;
   const summary = summarize(entry, today);
-  cache.set(entry.id, { content: entry.content, day: today, summary });
+  cache.set(entry.id, { content: entry.content, created: entry.created_at, day: today, summary });
   return summary;
 }
 

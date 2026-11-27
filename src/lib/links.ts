@@ -14,7 +14,7 @@ export interface EntryLinkRequest {
   /**
    * Removing a link to a gone target, whose category is no longer known: the
    * headings an appended link block could have been given (every category's
-   * label and the moon phases). Only consulted where `categoryLabel` would be.
+   * label). Only consulted where `categoryLabel` would be.
    */
   headingLabels?: readonly string[];
   entry_number?: number | null;

@@ -16,7 +16,7 @@ Links name their target by kind `entry` or `task` only (`LinkTargetKind`, `linkT
 **Titles and icons.** Two small rules live beside the registry so that no list decides them for itself:
 
 - `src/lib/entryTitle.ts`: new entries and tasks are stored with an **empty** title, and `displayTitle(t, 'entry' | 'task', title)` shows the translated "Untitled entry" or "Untitled task" wherever a title is displayed. `hasOwnTitle(title)` is the one test for "has a title of its own". Only a `.emerald` or Markdown import reads the app-language "Untitled …" an export wrote for an empty title as no title; anything typed is a title, whatever it says. Renaming starts from the *stored* title (`EntryListTab`'s `getEditTitle`), so Enter on an untitled row cannot save the placeholder.
-- `entryIcon(entry, category, showMoonPhase)` in `src/lib/entryIcon.ts` is the one icon rule for an entry, in every list, tab, link chip and the export: its own icon (emoji or image), else the one a block suggests (before the own one if the block's type does not let it be overridden — see [Blocks](blocks.md#registry-and-interfaces)), else its moon phase (category Journal with the vault setting on, see [Moon Phase](#moon-phase)), else its category's emoji, else `DEFAULT_ENTRY_ICON` (📄). A task without a category shows `DEFAULT_TASK_ICON` (✅).
+- `entryIcon(entry, category)` in `src/lib/entryIcon.ts` is the one icon rule for an entry, in every list, tab, link chip and the export: its own icon (emoji or image), else the one a block suggests (before the own one if the block's type does not let it be overridden — see [Blocks](blocks.md#registry-and-interfaces)), else its category's emoji, else `DEFAULT_ENTRY_ICON` (📄). A task without a category shows `DEFAULT_TASK_ICON` (✅).
 
 A second, smaller registry sits in `src/components/editors/text/SuggestionList.tsx` — `TARGET_KIND_ICONS` and `TARGET_KIND_LABEL_KEYS`, keyed by `LinkTargetKind`: the link picker's tabs and the badge of a target without a category.
 
@@ -77,7 +77,7 @@ An entry has no type and belongs to no dashboard; the same category may stand in
 
 ## Moon Phase
 
-The moon phase of an entry of the category Journal is not stored: `entryMoonPhase(entry, shown)` in `src/lib/moonPhase.ts` derives it from `created_at`; an entry of any other category has none, whatever dashboard shows it. The vault setting `journal.moonPhase` means "show it on journal entries" and works retroactively: with it on, such an entry shows its phase as its icon (unless it has one of its own, `entryIcon`), in the entry page's header and in the properties panel. The setting's locale keys are `moonPhaseShow`/`moonPhaseShowHint`.
+The moon phase is a block, not a property of a category: an entry that holds a moon phase block (`core.moon`, see [Blocks](blocks.md#moon-phase-block)) shows the phase of its creation day — as its icon unless it has one of its own, beside the date in the header, as a row of the properties panel, in the detailed info line and in exports — whatever its category. Nothing is stored; `src/lib/moonPhase.ts` only calculates. Journal and Dream Journal get the block through their built-in start templates.
 
 ## Store Selectors
 
@@ -104,7 +104,7 @@ All `useState`, `useEffect`, `useRef`, `useMemo`, and `useCallback` calls must a
 
 ## Categories
 
-Entries and tasks share one category list — `useCategoryStore` (`src/store/categoryStore.ts`), backed by the single `categories` table (see [`database.md`](../database.md#categories)). The journal is a built-in category of it; its entries show the moon phase of their creation day (when the vault setting is on).
+Entries and tasks share one category list — `useCategoryStore` (`src/store/categoryStore.ts`), backed by the single `categories` table (see [`database.md`](../database.md#categories)). The journal is a built-in category of it; its new entries start with the built-in template `core-journal` (moon phase and text).
 
 An entry's `category_id` may be `NULL`. A new entry from a dashboard starts in the first live category of its filter (`startCategoryOf`); one without a category is in no dashboard that filters by category, only in "All entries" and those that filter by tags only. The "Uncategorized" bucket shows it, and also collects entries whose category is in the Trash — for the reader the two are the same thing. `lookupCategory(byId, id)` in `lib/categories.ts` resolves a possibly-null id; `categoryLabel` accepts `null`.
 

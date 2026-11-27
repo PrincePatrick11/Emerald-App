@@ -43,6 +43,19 @@ export const SIGIL_TEMPLATE_ID = 'core-sigil';
 /** The built-in altar template: the start template of the category Altars, editable and deletable like the sigil's. */
 export const ALTAR_TEMPLATE_ID = 'core-altar';
 
+/** The built-in journal template (moon phase and text): the start template of the category Journal, editable and deletable like the sigil's. */
+export const JOURNAL_TEMPLATE_ID = 'core-journal';
+
+/** The built-in dream journal template (moon phase and text): the start template of the starter category Dream Journal. */
+export const DREAMS_TEMPLATE_ID = 'core-dreams';
+
+/**
+ * The IDs of every built-in template — what a restore into a new vault lets the
+ * file's own version replace. Must name exactly the templates `seedBuiltinTemplates`
+ * seeds (`BUILTIN_TEMPLATES` in `templateRows.ts`); `check:schema` compares them.
+ */
+export const BUILTIN_TEMPLATE_IDS: readonly string[] = [SIGIL_TEMPLATE_ID, ALTAR_TEMPLATE_ID, JOURNAL_TEMPLATE_ID, DREAMS_TEMPLATE_ID];
+
 /** A template ID from a foreign source. The same rule as for definitions. */
 export function isTemplateId(id: unknown): id is string {
   return isDefinitionId(id);

@@ -52,7 +52,9 @@ writeFileSync(
    export { keyBetween, evenKeys, positionsFor, isPositionKey } from '${root}/src/lib/blocks/position';
    export { blocksOfContent, planBlockWrite, clearSavedBlocks, contentOf } from '${root}/src/lib/blockStore';
    export { contentToBlocks, blocksToContent, parseManifest, renameStoredFiles, relinkWithinFile, gentlestImageMode, storedNameStem, manifestBlockTags, EMERALD_FORMAT_VERSION } from '${root}/src/lib/emerald/manifest';
-   export { remapBlock, retagContent } from '${root}/src/lib/blocks/blockRemap';`
+   export { remapBlock, retagContent } from '${root}/src/lib/blocks/blockRemap';
+   export { createMoonBlock, moonBlockSet, MOON_BLOCK_TYPE } from '${root}/src/lib/blocks/moon';
+   export { moonPhaseOfDay } from '${root}/src/lib/moonPhase';`
 );
 
 const bundlePath = join(workDir, 'bundle.mjs');
@@ -87,6 +89,7 @@ const {
   templateStart, mergeTemplateTags, areBlocksEmpty,
   fieldsWithTemplate, fieldsWithoutTemplate,
   createCanvasBlock, parseCanvasBlock, withCanvasScene, withCanvasParts, withCanvasStripTag, withoutCanvasFile, CANVAS_BLOCK_TYPE, ALTAR_BLOCK_TYPE,
+  createMoonBlock, moonBlockSet, MOON_BLOCK_TYPE, moonPhaseOfDay,
   createPaintBlock, PAINT_BLOCK_TYPE, resolveBlockType,
   registerBlockType, blockReadState, registeredBlockType, blockWithoutLink, blockTextEditors, upgradeBlock, blockSearchText, blockStorageTag, blockActionsOf, withDuplicatedBlock, copiedBlock, entryEffects, typesLinkingWhenHidden,
   readBlockSettings, withBlockSetting, RefReporter, linkValueTitle, compareBlockValues, blockSuggestions, resolveProperty, blockTagsOf, linkedIdsOf, blockWithoutImage,
@@ -246,7 +249,7 @@ console.log('\n4b. Deception attempts\n');
 
 console.log('\n4c. Field block\n');
 {
-  const text = { label: (el) => el.label || el.kind, yes: 'Ja', no: 'Nein', moonName: (p) => p }; // lang-ok
+  const text = { label: (el) => el.label || el.kind, yes: 'Ja', no: 'Nein' }; // lang-ok
 
   const fresh = parseFields(createFieldsBlock('shorttext'));
   check(
@@ -365,7 +368,7 @@ console.log('\n4c. Field block\n');
 
 console.log('\n4d. Custom blocks: copies\n');
 {
-  const text = { label: (el) => el.label || el.kind, yes: 'Ja', no: 'Nein', moonName: (p) => p };
+  const text = { label: (el) => el.label || el.kind, yes: 'Ja', no: 'Nein' };
   const def = {
     id: 'def-1', name: 'Ritual', icon: '🕯️', sort_order: 0,
     created_at: '', updated_at: '', deleted_at: null,
@@ -730,22 +733,22 @@ console.log('\n4f. Sigils\n');
 
   const secret = { ...createTextBlock('<p>geheim</p>'), attrs: { 'data-block-hidden': '1' } };
   const exportedContent = serializeBlocks([createTextBlock('<p>sichtbar</p>'), secret, sigil]);
-  const exported = renderBlocksForExport(exportedContent, 'pdf', exportText, '2029-12-31');
+  const exported = renderBlocksForExport(exportedContent, 'pdf', exportText, { today: '2029-12-31' });
   check('export: hidden blocks and the concealed parts are missing, the charge stays',
     exported.includes('sichtbar') && !exported.includes('geheim') && !exported.includes('Ich') && !exported.includes('<img')
       && exported.includes('<dt>K:creation.targetDate</dt><dd>D:2030-01-01</dd>') && exported.includes('<p>K:blocks.sigil.loaded</p>'), exported);
   check('export: no sections, the parts under their headings, no title of its own',
     !exported.includes('<section') && exported.includes('<h4>K:blocks.types.sigil.parts.charge</h4><dl>')
       && !exported.includes('<h4>K:blocks.types.sigil.parts.calc</h4>') && !exported.includes('T:core.sigil') && !exported.includes('T:core.text'), exported);
-  const revealed = renderBlocksForExport(exportedContent, 'pdf', exportText, '2030-02-01');
+  const revealed = renderBlocksForExport(exportedContent, 'pdf', exportText, { today: '2030-02-01' });
   check('export after the target date: calculator and drawing (with alt text) are included',
     revealed.includes('<h4>K:blocks.types.sigil.parts.calc</h4><p>Ich &lt;b&gt;bin')
       && revealed.includes(`<img src="${drawnFile}" alt="K:blocks.types.sigil.parts.drawing" data-export-placeholder="1">`), revealed);
   for (const format of ['pdf', 'markdown']) {
-    const out = renderBlocksForExport(exportedContent, format, exportText, '2029-12-31');
+    const out = renderBlocksForExport(exportedContent, format, exportText, { today: '2029-12-31' });
     check(`export (${format}): a concealed part is missing, with no cover`, out === exported && !out.includes('export-concealed'), out);
   }
-  const html = renderBlocksForExport(exportedContent, 'html', exportText, '2029-12-31');
+  const html = renderBlocksForExport(exportedContent, 'html', exportText, { today: '2029-12-31' });
   check('export (HTML): the concealed parts are there, covered under their headings, with a switch',
     html.includes('<h4>K:blocks.types.sigil.parts.calc</h4><div class="export-concealed"><p class="export-concealed-cover"><span>C:2030-01-01</span><button type="button" class="export-concealed-toggle" data-reveal="R" data-conceal="Z">R</button></p><div class="export-concealed-body"><p>Ich &lt;b&gt;bin')
       && html.includes(`<div class="export-concealed-body"><img src="${drawnFile}"`)
@@ -753,12 +756,12 @@ console.log('\n4f. Sigils\n');
   check('export (HTML): hidden blocks stay missing, the charge stays open',
     !html.includes('geheim') && html.includes('<p>K:blocks.sigil.loaded</p>') && !/export-concealed-body"><h4>K:blocks\.types\.sigil\.parts\.charge/.test(html), html);
   check('export (HTML): after the target date nothing is covered',
-    renderBlocksForExport(exportedContent, 'html', exportText, '2030-02-01') === revealed, renderBlocksForExport(exportedContent, 'html', exportText, '2030-02-01'));
+    renderBlocksForExport(exportedContent, 'html', exportText, { today: '2030-02-01' }) === revealed, renderBlocksForExport(exportedContent, 'html', exportText, { today: '2030-02-01' }));
   check('export (HTML): a part switched off stays missing even concealed',
-    !renderBlocksForExport(serializeBlocks([withBlockSetting(sigil, calcSetting, false)]), 'html', exportText, '2029-12-31').includes('Ich'));
+    !renderBlocksForExport(serializeBlocks([withBlockSetting(sigil, calcSetting, false)]), 'html', exportText, { today: '2029-12-31' }).includes('Ich'));
   check('export: a part switched off is not exported',
-    !renderBlocksForExport(serializeBlocks([withBlockSetting(unloaded, calcSetting, false)]), 'pdf', exportText, '2029-12-31').includes('Ich'));
-  const brokenOut = renderBlocksForExport(serializeBlocks([broken]), 'html', exportText, '2029-12-31');
+    !renderBlocksForExport(serializeBlocks([withBlockSetting(unloaded, calcSetting, false)]), 'pdf', exportText, { today: '2029-12-31' }).includes('Ich'));
+  const brokenOut = renderBlocksForExport(serializeBlocks([broken]), 'html', exportText, { today: '2029-12-31' });
   check('export: an unreadable sigil goes out as the notice, never with what it holds',
     brokenOut === '<p>K:blocks.unreadable.broken</p>', brokenOut);
   const brokenCharge = withSigilPart(sigil, 'charge', { ...sigilPartBlock(sigil, 'charge'), attrs: { [BLOCK_ATTR.data]: '"kaputt"' } }); // lang-ok
@@ -814,22 +817,19 @@ console.log('\n4f. Sigils\n');
           { id: 'e1', kind: 'date', label: 'Datum' },
           { id: 'e2', kind: 'number', label: 'Leer' },
           { id: 'e4', kind: 'number', label: 'Menge' },
-          { id: 'e5', kind: 'moon', label: '' },
           { id: 'e6', kind: 'image', label: 'Foto' },
         ],
         display: { readHideEmpty: true },
       }),
-      'data-block-data': JSON.stringify({ values: { e1: '2030-05-01', e4: 3, e5: 'full' } }),
+      'data-block-data': JSON.stringify({ values: { e1: '2030-05-01', e4: 3 } }),
     },
     html: `<dl><dt>Foto</dt><dd data-block-slot="el:e6"><img src="${'ef'.repeat(32)}.png"></dd></dl>`,
   };
   const titled = { ...createTextBlock('<p>mit Titel</p>'), attrs: { 'data-block-show-title': '1' } };
-  const fieldsOut = renderBlocksForExport(serializeBlocks([fieldsBlock, titled]), 'pdf', exportText, '2030-01-01');
+  const fieldsOut = renderBlocksForExport(serializeBlocks([fieldsBlock, titled]), 'pdf', exportText, { today: '2030-01-01' });
   check('export: fields as in read mode — formatted, without empty ones',
     fieldsOut.includes('<dt>Datum</dt><dd>D:2030-05-01</dd>') && fieldsOut.includes('<dt>Menge</dt><dd>N:3</dd>')
       && !fieldsOut.includes('Leer'), fieldsOut);
-  check('export: an unnamed field is labelled by its kind, the moon phase worded with its symbol',
-    fieldsOut.includes('<dt>K:blocks.kinds.moon</dt><dd>🌕 K:moonPhase.full</dd>'), fieldsOut);
   check('export: a picture of an image field is named after its row',
     fieldsOut.includes(`<dt>Foto</dt><dd><img src="${'ef'.repeat(32)}.png" alt="Foto" data-export-placeholder="1"></dd>`), fieldsOut);
   check('export: a text block with the title switched on carries it', fieldsOut.includes('<h3>T:core.text</h3><p>mit Titel</p>'), fieldsOut);
@@ -856,7 +856,7 @@ console.log('\n4g. Link and image defaults with markup\n');
     title: (b) => `T:${b.type}`, date: (iso) => iso, number: String, t: (key) => key,
     yes: 'Ja', no: 'Nein', concealed: (until) => `C:${until}`, reveal: 'R', conceal: 'Z',
   };
-  const fallbackText = { label: (e) => e.label, yes: 'Ja', no: 'Nein', moonName: (p) => p };
+  const fallbackText = { label: (e) => e.label, yes: 'Ja', no: 'Nein' };
 
   const elements = parseDefinitionElements(JSON.stringify([
     { id: 'lnk', kind: 'link', label: 'Quelle', defaultValue: { id: linkTargetId, targetKind: 'entry', label: 'Artikel' } },
@@ -1052,7 +1052,7 @@ console.log('\n7. Blocks as rows (blocks, block_refs)\n');
   const def = `${'5'.repeat(64)}.webp`;
   const linked = '33333333-3333-3333-3333-333333333333';
   const chip = internalLinkChipHtml({ id: linked, targetKind: 'entry', label: 'Ziel' }); // lang-ok
-  const fallback = { label: (e) => e.label, yes: 'Yes', no: 'No', moonName: (p) => p };
+  const fallback = { label: (e) => e.label, yes: 'Yes', no: 'No' };
 
   const linkBlock = createFieldsBlock('link');
   const linkModel = parseFields(linkBlock);
@@ -1266,8 +1266,8 @@ console.log('\n7b. Block interfaces: registry, toolkit, copies, actions, setting
   });
   const veiled = { ...createTextBlock('<p>darunter</p>'), id: 'veiled', attrs: { 'data-block-show-title': '1' } };
   const veilContent = serializeBlocks([{ id: 'vl', type: 'test.veil', html: '', attrs: {} }, veiled, createTextBlock('<p>offen</p>')]);
-  const veilPdf = renderBlocksForExport(veilContent, 'pdf', exportText, '2030-01-01');
-  const veilHtml = renderBlocksForExport(veilContent, 'html', exportText, '2030-01-01');
+  const veilPdf = renderBlocksForExport(veilContent, 'pdf', exportText, { today: '2030-01-01' });
+  const veilHtml = renderBlocksForExport(veilContent, 'html', exportText, { today: '2030-01-01' });
   check('export: a block concealed as a whole is missing in PDF, the rest stays',
     !veilPdf.includes('darunter') && !veilPdf.includes('T:core.text') && veilPdf.includes('offen'), veilPdf);
   check('export: a block concealed as a whole is covered in HTML, its title above the cover',
@@ -1359,7 +1359,7 @@ console.log('\n7b. Block interfaces: registry, toolkit, copies, actions, setting
 
   // The export names a link field's target by its current title, as lists and the panel do.
   {
-    const fieldText = { label: (el) => el.label || el.kind, yes: 'Ja', no: 'Nein', moonName: (p) => p }; // lang-ok
+    const fieldText = { label: (el) => el.label || el.kind, yes: 'Ja', no: 'Nein' }; // lang-ok
     const linkBlock = createFieldsBlock('link');
     const model = parseFields(linkBlock);
     const linkChip = internalLinkChipHtml({ id: target, targetKind: 'entry', label: 'Alter Titel' }); // lang-ok
@@ -1439,7 +1439,7 @@ console.log('\n7c. Interfaces that keep the app free of any one type\n');
     ] }) },
   };
   const model = parseFields(custom);
-  const filled = serializeFields(custom, { ...model, slots: { l1: chipTo(target), t1: `<p>siehe ${chipTo(target)} und ${chipTo(otherId)}</p>`, l2: chipTo(otherId) } }, { label: (e) => e.label, yes: 'J', no: 'N', moonName: (p) => p }); // lang-ok
+  const filled = serializeFields(custom, { ...model, slots: { l1: chipTo(target), t1: `<p>siehe ${chipTo(target)} und ${chipTo(otherId)}</p>`, l2: chipTo(otherId) } }, { label: (e) => e.label, yes: 'J', no: 'N' }); // lang-ok
   const without = parseFields(blockWithoutLink(filled, target, T));
   check('removing a link (11): the link field holding it is emptied, a chip in a text field becomes its word, other links stay',
     !without.slots.l1 && without.slots.l2 === chipTo(otherId) && !without.slots.t1.includes(target) && without.slots.t1.includes(otherId) && without.slots.t1.includes('Z'),
@@ -1641,6 +1641,39 @@ console.log('\n8. .emerald manifest (lib/emerald/manifest.ts)\n');
       && hostile.items[0].tags.join() === 'ok' && hostile.items[0].category === null
       && hostile.items[0].blocks.length === 1 && hostile.items[0].blocks[0].hidden === 0 && hostile.items[0].blocks[0].version === null,
     hostile);
+}
+
+console.log('\n9. Moon phase block (lib/blocks/moon.ts, kinds/moon.ts)\n');
+{
+  check('the phase of a day, taken at its noon',
+    moonPhaseOfDay('2025-01-15') === 'full' && moonPhaseOfDay('2025-01-29') === 'new',
+    [moonPhaseOfDay('2025-01-15'), moonPhaseOfDay('2025-01-29')]);
+  check('no phase outside an entry or for a malformed day', moonPhaseOfDay(null) === null && moonPhaseOfDay('2025-1-3') === null);
+  const [moon, text] = moonBlockSet();
+  check('the template set: a moon phase, then text', moon.type === MOON_BLOCK_TYPE && text.type === 'core.text');
+  check('the block stores nothing', moon.html === '' && Object.keys(moon.attrs).length === 0);
+  const content = serializeBlocks([moon, createTextBlock('<p>Traum</p>')]);
+  check('it survives the content and a row', parseBlocks(content)[0]?.type === MOON_BLOCK_TYPE
+    && fromBlockRow(toBlockRow(moon)).type === MOON_BLOCK_TYPE);
+  const entry = { id: 'moon-e', content, created_at: new Date(2025, 0, 15, 22, 30).toISOString() };
+  const summary = entryBlockSummary(entry, '2026-11-25');
+  check('it suggests the symbol of the entry\'s day as an overridable icon',
+    summary.properties.icon?.value === '🌕' && summary.properties.icon.overridable === true, summary.properties.icon);
+  check('the user\'s own icon comes first', resolveProperty('🔥', summary.properties.icon, '📓')?.value === '🔥');
+  check('one row for the panel, worded as symbol and name',
+    summary.properties.rows.length === 1 && summary.properties.rows[0].value.key === 'moonPhase.full'
+      && summary.properties.rows[0].value.symbol === '🌕', summary.properties.rows);
+  check('the long info line carries it, the short one not (the icon shows it)',
+    summary.info.long.length === 1 && summary.info.short.length === 0, summary.info);
+  check('a value to filter by', entryBlockValue(entry, 'moon.phase')?.key === 'moonPhase.full');
+  const later = entryBlockSummary({ ...entry, created_at: new Date(2025, 0, 29, 9).toISOString() }, '2026-11-25');
+  check('another creation day, another phase — the summary follows the date', later.properties.icon?.value === '🌑', later.properties.icon);
+  const hidden = { ...moon, attrs: { 'data-block-hidden': '1' } };
+  check('hidden, it suggests no icon', entryBlockSummary({ ...entry, id: 'moon-h', content: serializeBlocks([hidden]) }, '2026-11-25').properties.icon === null);
+  const out = renderBlocksForExport(content, 'pdf', exportText, { today: '2026-11-25', entryDate: '2025-01-15' });
+  check('the export shows it as a row', out.includes('🌕 K:moonPhase.full'), out);
+  check('the export outside an entry leaves it out', !renderBlocksForExport(content, 'pdf', exportText, { today: '2026-11-25' }).includes('moonPhase'));
+  check('a template\'s block shows no phase', resolveBlockType(moon)?.properties?.icon?.(moon, { entryId: null, entryDate: null, today: '2026-11-25' }) === null);
 }
 
 console.log('');

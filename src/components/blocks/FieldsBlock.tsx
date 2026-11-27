@@ -12,8 +12,6 @@ import { LinkTarget } from './BlockLink';
 import FieldSlotEditor from './FieldSlotEditor';
 import BlockFieldRow from './BlockFieldRow';
 import { imageSrc } from '../../lib/images';
-import { MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
-import type { MoonPhase } from '../../types';
 import { useFieldFallbackText } from './useFieldFallbackText';
 import FieldValueEditor, { CheckButton, ToggleSwitch } from './FieldValueEditor';
 import type { BlockViewProps } from './blockViews';
@@ -134,9 +132,9 @@ function FieldEditor({ element, model, set, setSlot }: {
 /* ---------------- Reading ---------------- */
 
 function FieldReader({ element, model, set }: { element: ElementDef; model: FieldsModel; set?: Setter }) {
-  const { t, i18n } = useTranslation();
+  const { i18n } = useTranslation();
   const value = model.values[element.id];
-  // Invalid values (deleted option, unknown moon phase, only whitespace) show
+  // Invalid values (deleted option, only whitespace) show
   // nothing; the same rule by which the element counts as empty.
   if (isElementEmpty(element, model)) return null;
 
@@ -167,8 +165,6 @@ function FieldReader({ element, model, set }: { element: ElementDef; model: Fiel
         </div>
       );
     }
-    case 'moon':
-      return <span>{MOON_PHASE_SYMBOLS[value as MoonPhase]} {t(`moonPhase.${value}`)}</span>;
     case 'link': {
       const target = linkFromSlot(model.slots[element.id]);
       return target ? <LinkTarget target={target} /> : null;

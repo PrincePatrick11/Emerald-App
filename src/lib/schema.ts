@@ -159,8 +159,8 @@ export const TABLE_DDL: Record<TableName, string> = {
   // - `category_id`: at most one category, NULL for none.
   // - `entry_number` runs over all entries (`nextEntryNumber`), unique
   //   (`idx_entries_number`).
-  // - The moon phase of an entry of the category Journal follows from
-  //   `created_at` (`entryMoonPhase`), it is not a column.
+  // - The moon phase is a block (`core.moon`) that follows from
+  //   `created_at`; it is not a column.
   // - `icon`: an emoji, or the stored name of a file in `icons/` (`ICON_FIELDS`).
   // - `cover_image`: the stored name of a picture in `images/` (`IMAGE_FIELDS`).
   // - Tags in `entry_tags`.
@@ -389,8 +389,8 @@ const INDEX_DDL: readonly string[] = [
 
 
 /**
- * Built in: the journal. A dashboard of the same name shows it, and the moon
- * phase belongs to its entries (`entryMoonPhase`).
+ * Built in: the journal. A dashboard of the same name shows it; a new entry
+ * in it starts with the built-in template `core-journal` (moon phase and text).
  */
 export const JOURNAL_CATEGORY_ID = 'journal';
 
@@ -408,6 +408,13 @@ export const SIGIL_CATEGORY_ID = 'sigils';
  */
 export const ALTAR_CATEGORY_ID = 'altars';
 
+/**
+ * The dream journal of the starter set: an ordinary category, renamable and
+ * deletable, whose new entries start with the built-in template `core-dreams`
+ * (moon phase and text) while it is there.
+ */
+export const DREAMS_CATEGORY_ID = 'dreams';
+
 /** [id, name (database only — `categories.builtin.<id>` is displayed), emoji]. */
 const BUILTIN_CATEGORIES: readonly [string, string, string][] = [
   [JOURNAL_CATEGORY_ID, 'Journal', '📓'],
@@ -421,7 +428,7 @@ const BUILTIN_CATEGORIES: readonly [string, string, string][] = [
  * The keys are at the same time the IDs.
  */
 const STARTER_CATEGORIES: readonly [string, string][] = [
-  ['dreams', '💭'],
+  [DREAMS_CATEGORY_ID, '💭'],
   ['paradigm', '🌀'],
   ['ritual', '🪄'],
   ['meditation', '🧘'],
@@ -452,7 +459,7 @@ const BUILTIN_DASHBOARDS: readonly {
   display: { view: 'list' | 'cards'; grouping: 'grouped' | 'flat' };
 }[] = [
   { key: 'all', categories: null, sort: { by: 'updated', dir: 'desc' }, display: { view: 'list', grouping: 'flat' } },
-  { key: 'journal', categories: [JOURNAL_CATEGORY_ID, 'dreams'], sort: { by: 'created', dir: 'desc' }, display: { view: 'list', grouping: 'flat' } },
+  { key: 'journal', categories: [JOURNAL_CATEGORY_ID, DREAMS_CATEGORY_ID], sort: { by: 'created', dir: 'desc' }, display: { view: 'list', grouping: 'flat' } },
   { key: 'practice', categories: [SIGIL_CATEGORY_ID, ALTAR_CATEGORY_ID, 'ritual', 'meditation'], sort: { by: 'updated', dir: 'desc' }, display: { view: 'list', grouping: 'grouped' } },
   { key: 'knowledge', categories: ['paradigm', 'herbs', 'crystals', 'candles', 'deities', 'tools'], sort: { by: 'title', dir: 'asc' }, display: { view: 'cards', grouping: 'grouped' } },
 ];
@@ -484,12 +491,12 @@ export async function seedBuiltins(
   const builtins = BUILTIN_CATEGORIES.map(([id, name, emoji]) => ({ id, name, emoji, is_builtin: 1 }));
   const starters = STARTER_CATEGORIES.map(([key, emoji]) => ({ id: key, name: starterName(key), emoji, is_builtin: 0 }));
   // The dream journal comes right after the journal, ahead of sigils and altars.
-  const afterJournal = starters.filter((c) => c.id === 'dreams');
+  const afterJournal = starters.filter((c) => c.id === DREAMS_CATEGORY_ID);
   const rows = [
     ...builtins.filter((c) => c.id === JOURNAL_CATEGORY_ID),
     ...afterJournal,
     ...builtins.filter((c) => c.id !== JOURNAL_CATEGORY_ID),
-    ...starters.filter((c) => c.id !== 'dreams'),
+    ...starters.filter((c) => c.id !== DREAMS_CATEGORY_ID),
   ];
   for (const [i, row] of rows.entries()) {
     await db.execute(

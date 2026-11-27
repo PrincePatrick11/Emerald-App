@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { useEntryStore } from '../store/entryStore';
 import { useTaskStore } from '../store/taskStore';
 import { useCategoryStore } from '../store/categoryStore';
-import { useSettingsStore } from '../store/settingsStore';
 import { buildLinkItems, linkItemsByKey, linkTitleIn, resolveLink, type ResolvedLink } from '../lib/linkItems';
 import type { LinkTitleOf } from '../lib/blocks/blockValue';
 import type { SuggestionItem } from '../components/editors/text/SuggestionList';
@@ -32,14 +31,13 @@ export function useLinkItems(): SuggestionItem[] {
   const entries = useEntryStore((s) => s.entries);
   const categories = useCategoryStore((s) => s.categories);
   const tasks = useTaskStore((s) => s.tasks);
-  const showMoonPhase = useSettingsStore((s) => s.settings.journal.moonPhase);
 
   return useMemo(
     () => sharedLinkItems(
-      [t, entries, tasks, categories, showMoonPhase],
-      () => buildLinkItems({ entries, tasks, categories, showMoonPhase }, t),
+      [t, entries, tasks, categories],
+      () => buildLinkItems({ entries, tasks, categories }, t),
     ),
-    [t, entries, tasks, categories, showMoonPhase],
+    [t, entries, tasks, categories],
   );
 }
 

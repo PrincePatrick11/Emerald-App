@@ -6,11 +6,13 @@ import type { BlockContext } from '../../lib/blocks/blockType';
 import type { EntryEffects } from '../../lib/blocks/blockTypes';
 import { ALTAR_BLOCK_TYPE, CANVAS_BLOCK_TYPE } from '../../lib/blocks/canvas';
 import { PAINT_BLOCK_TYPE } from '../../lib/blocks/paint';
+import { MOON_BLOCK_TYPE } from '../../lib/blocks/moon';
 import TextBlock from './TextBlock';
 import CanvasBlock from './CanvasBlock';
 import PaintBlock from './PaintBlock';
 import FieldsBlock from './FieldsBlock';
 import SigilBlock from './SigilBlock';
+import MoonBlock from './MoonBlock';
 
 /**
  * Which component renders a block type: the component part of the
@@ -51,4 +53,5 @@ export const BLOCK_VIEWS: ReadonlyMap<string, ComponentType<BlockViewProps>> = n
   [ALTAR_BLOCK_TYPE, CanvasBlock],
   [PAINT_BLOCK_TYPE, PaintBlock],
   [SIGIL_BLOCK_TYPE, SigilBlock],
+  [MOON_BLOCK_TYPE, MoonBlock],
 ]);

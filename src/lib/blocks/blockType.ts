@@ -108,9 +108,11 @@ export type BlockExportValue =
   | { kind: 'html'; html: string }
   | { kind: 'image'; file: string; alt?: string };
 
-/** Where a block is exported: the format asked for, and what the entry's blocks conceal today. */
+/** Where a block is exported: the format asked for, the entry's day, and what the entry's blocks conceal today. */
 export interface ExportContext {
   format: BlockExportFormat;
+  /** The entry's day, local `yyyy-MM-dd`, as `BlockContext.entryDate`; `null` outside an entry. */
+  entryDate: string | null;
   today: string;
   /** Block or part IDs concealed by the entry's effects (`entryEffects`), until a day or (`null`) until lifted. */
   concealed: ReadonlyMap<string, string | null>;

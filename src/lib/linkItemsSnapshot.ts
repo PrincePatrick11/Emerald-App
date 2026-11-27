@@ -1,7 +1,6 @@
 import i18n from '../i18n';
 import { useCategoryStore } from '../store/categoryStore';
 import { useEntryStore } from '../store/entryStore';
-import { useSettingsStore } from '../store/settingsStore';
 import { useTaskStore } from '../store/taskStore';
 import type { LinkTitleOf } from './blocks/blockValue';
 import { buildLinkItems, linkTitleIn, type SuggestionItem } from './linkItems';
@@ -17,10 +16,9 @@ export function linkItemsSnapshot(): SuggestionItem[] {
   const entries = useEntryStore.getState().entries;
   const tasks = useTaskStore.getState().tasks;
   const categories = useCategoryStore.getState().categories;
-  const showMoonPhase = useSettingsStore.getState().settings.journal.moonPhase;
-  const deps = [i18n.language, entries, tasks, categories, showMoonPhase];
+  const deps = [i18n.language, entries, tasks, categories];
   if (last && last.deps.every((d, i) => d === deps[i])) return last.items;
-  last = { deps, items: buildLinkItems({ entries, tasks, categories, showMoonPhase }, i18n.t) };
+  last = { deps, items: buildLinkItems({ entries, tasks, categories }, i18n.t) };
   return last.items;
 }
 

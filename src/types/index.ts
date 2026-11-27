@@ -9,9 +9,6 @@ export type LinkTargetKind = 'entry' | 'task';
 /**
  * An entry from `entries`. It has no type: what it is follows from its
  * category, which dashboards show it and with which template it started.
- *
- * The moon phase of an entry of the category Journal follows from
- * `created_at` (`entryMoonPhase`).
  */
 export interface Entry {
   id: string;

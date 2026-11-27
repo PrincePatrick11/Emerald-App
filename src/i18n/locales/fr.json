@@ -184,7 +184,7 @@
       },
       "fields": {
         "label": "Champs",
-        "description": "Valeurs avec libellé : texte, nombre, date, choix, oui/non, liste de contrôle, lien, image, phase lunaire."
+        "description": "Valeurs avec libellé : texte, nombre, date, choix, oui/non, liste de contrôle, lien, image."
       },
       "sigil": {
         "label": "Sigil",
@@ -208,6 +208,11 @@
       "altar": {
         "label": "Autel",
         "description": "Une toile avec « Images » en dessous, d’où glisser les images."
+      },
+      "moon": {
+        "label": "Phase lunaire",
+        "description": "La phase lunaire du jour où l’entrée a été créée — symbole et nom, rien à choisir.",
+        "outsideEntry": "Affiche dans l’entrée la phase lunaire de son jour de création."
       }
     },
     "kinds": {
@@ -219,8 +224,7 @@
       "toggle": "Oui/Non",
       "checklist": "Liste de contrôle",
       "link": "Lien",
-      "image": "Image",
-      "moon": "Phase lunaire"
+      "image": "Image"
     },
     "fields": {
       "yes": "Oui",
@@ -865,7 +869,6 @@
     "title": "Propriétés",
     "category": "Catégorie",
     "noCategory": "Aucune",
-    "moonPhase": "Phase lunaire",
     "tags": "Étiquettes",
     "noTags": "Aucun tag",
     "linkedEntries": "Entrées liées",
@@ -1108,7 +1111,6 @@
     "tagCreateDashboardOnly": "Uniquement dans Étiquettes",
     "groupTags": "Étiquettes",
     "groupEditor": "Mise en forme",
-    "groupJournal": "Journal",
     "uiScaleHint": "Met à l'échelle toute l'interface — texte, icônes et espacements.",
     "editorFontSizeHint": "Taille du texte dans les entrées et les valeurs de champ, indépendante de la taille de l'interface.",
     "sidebarListHint": "Les entrées qu'affiche la barre latérale gauche : toutes, ou celles d'un tableau de bord.",
@@ -1132,10 +1134,6 @@
     "typographyHint": "Les guillemets droits deviennent typographiques, -- un tiret cadratin, -> une flèche, 1/2 devient ½.",
     "autoLinks": "Liens automatiques",
     "autoLinksHint": "Une adresse saisie ou collée devient un lien.",
-    "moonPhase": "Phase lunaire",
-    "moonPhaseHint": "La phase lunaire du jour où une entrée du journal a été créée.",
-    "moonPhaseShow": "Afficher sur les entrées du journal",
-    "moonPhaseShowHint": "S'applique à toutes les entrées du journal, anciennes comprises. Désactivé : pas de phase lunaire comme icône, dans la barre latérale ni à l'export.",
     "trashRetentionHint": "Durée pendant laquelle les éléments supprimés restent dans la corbeille. Ensuite, ils sont effacés définitivement à l'ouverture du vault.",
     "customThemeImport": "Importer un thème…",
     "customThemeRemove": "Retirer « {{name}} »",
@@ -1291,7 +1289,9 @@
     "untitled": "Modèle sans titre",
     "builtin": {
       "sigil": "Sigil",
-      "altar": "Autel"
+      "altar": "Autel",
+      "journal": "Journal",
+      "dreams": "Journal de rêves"
     },
     "newTemplate": "Nouveau modèle",
     "defaultName": "Nouveau modèle",

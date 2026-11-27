@@ -284,7 +284,7 @@ A `.emerald` file comes from anywhere. `read_emerald_file` (`src-tauri/src/emera
 User-provided text interpolated into the PDF and HTML export goes through `htmlEscape()` (in `src/lib/export.ts`), which replaces `&`, `<`, `>`, `"` and `'` with HTML entities. It is applied to:
 
 - the entry title (in `<title>` and the `<h1>`),
-- the top bar's emoji icon and its label (moon phase name or category name),
+- the top bar's emoji icon and its label (the category name),
 - tag names.
 
 An image icon is passed through `sanitizeDataImageUrl` instead. The content HTML itself (TipTap output) is not re-escaped — it is sanitised (see below). Stored image references are resolved to base64 data-URLs by `embedImages()` before the HTML goes to the export backend.

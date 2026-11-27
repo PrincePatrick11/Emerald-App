@@ -28,7 +28,6 @@ const SETTINGS_GROUP_LABEL_KEYS: Record<SettingsGroup, string> = {
   images: 'settings.groupImages',
   tags: 'settings.groupTags',
   editor: 'settings.groupEditor',
-  journal: 'settings.groupJournal',
   templates: 'settings.groupTemplates',
 };
 

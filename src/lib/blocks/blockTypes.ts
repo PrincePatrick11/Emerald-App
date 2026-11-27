@@ -8,6 +8,7 @@ import { fieldsBlockType } from './kinds/fields';
 import { altarBlockType, canvasBlockType } from './kinds/canvas';
 import { paintBlockType } from './kinds/paint';
 import { sigilBlockType } from './kinds/sigil';
+import { moonBlockType } from './kinds/moon';
 
 export type { BlockGroup, BlockTypeDef } from './blockType';
 
@@ -42,7 +43,7 @@ export function registerBlockType(def: BlockTypeDef): void {
   effectChecks = null;
 }
 
-for (const def of [textBlockType, fieldsBlockType, canvasBlockType, paintBlockType, altarBlockType, sigilBlockType]) registerBlockType(def);
+for (const def of [textBlockType, fieldsBlockType, canvasBlockType, paintBlockType, altarBlockType, sigilBlockType, moonBlockType]) registerBlockType(def);
 
 /** What "Add block" offers of all types, in the order they were registered (`BlockTypeDef.presets`). */
 export function blockTypePresets(): BlockPreset[] {

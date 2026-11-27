@@ -2,7 +2,7 @@ import Database from './sqlite';
 import { invoke } from '@tauri-apps/api/core';
 import { getActiveVaultId } from './vaultManager';
 import { BASELINE_VERSION, FRESH_START_VERSION, TABLES, createSchema, purgeCategory, replaceTagsInDashboards, seedBuiltins } from './schema';
-import { seedAltarTemplate, seedSigilTemplate } from './templateRows';
+import { seedBuiltinTemplates } from './templateRows';
 import i18n from '../i18n';
 import { useSettingsStore } from '../store/settingsStore';
 import { clearSavedBlocks, dropBlockTagStatements } from './blockStore';
@@ -283,8 +283,7 @@ export async function runMigrations(
     // opens the database.
     await seedBuiltins(db, (key) => i18n.t(`categories.starter.${key}`));
     // Not in seedBuiltins: schema.ts imports no block logic.
-    await seedSigilTemplate(db, i18n.t);
-    await seedAltarTemplate(db, i18n.t);
+    await seedBuiltinTemplates(db, i18n.t);
     await db.execute(
       'INSERT INTO schema_version (version, name, applied_at) VALUES ($1, $2, $3)',
       [baseline, 'baseline', new Date().toISOString()]

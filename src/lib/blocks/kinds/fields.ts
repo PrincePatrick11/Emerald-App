@@ -1,6 +1,4 @@
 import { SlidersHorizontal } from 'lucide-react';
-import { MOON_PHASE_SYMBOLS } from '../../moonPhase';
-import type { MoonPhase } from '../../../types';
 import { decodeHtmlAttr } from '../../internalLinkHtml';
 import type {
   BlockExportPart, BlockExportValue, BlockFieldValue, BlockGroup, BlockPreset, BlockPropertyRow, BlockTypeDef, BlockValue,
@@ -114,8 +112,6 @@ function fieldValue(element: ElementDef, model: FieldsModel): BlockValue | null 
       return { kind: 'text', text: element.options!.find((o) => o.id === value)!.label };
     case 'toggle':
       return { kind: 'bool', value: value === true };
-    case 'moon':
-      return { kind: 'phrase', key: `moonPhase.${value as MoonPhase}`, symbol: MOON_PHASE_SYMBOLS[value as MoonPhase] };
   }
 }
 
@@ -169,7 +165,7 @@ function fieldsExport(block: BlockInstance): BlockExportPart[] {
     });
 }
 
-const KIND_GROUPS: Partial<Record<ElementKind, BlockGroup>> = { link: 'reference', image: 'media', moon: 'moon' };
+const KIND_GROUPS: Partial<Record<ElementKind, BlockGroup>> = { link: 'reference', image: 'media' };
 
 /** "Add block" offers a single field of each kind — but no text field: one inserts the text block. */
 const FIELD_PRESETS: readonly BlockPreset[] = ELEMENT_KINDS.filter((kind) => kind !== 'text').map((kind) => ({

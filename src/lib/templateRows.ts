@@ -3,13 +3,17 @@ import type { TFunction } from 'i18next';
 import { nowIso } from './helpers';
 import { fromRow, type DbRow } from './row';
 import { readContents, replaceOwnerBlocks } from './blockStore';
-import { ALTAR_CATEGORY_ID, SIGIL_CATEGORY_ID } from './schema';
+import { ALTAR_CATEGORY_ID, DREAMS_CATEGORY_ID, JOURNAL_CATEGORY_ID, SIGIL_CATEGORY_ID } from './schema';
 import { serializeBlocks } from './blocks/blockHtml';
 import { translatedOr } from './blocks/toolkit';
 import { createSigilBlock } from './blocks/sigil';
 import { altarBlockSet } from './blocks/canvas';
-import { ALTAR_TEMPLATE_ID, SIGIL_TEMPLATE_ID, templateToRow, type Template } from './blocks/templates';
+import { moonBlockSet } from './blocks/moon';
+import {
+  ALTAR_TEMPLATE_ID, DREAMS_TEMPLATE_ID, JOURNAL_TEMPLATE_ID, SIGIL_TEMPLATE_ID, templateToRow, type Template,
+} from './blocks/templates';
 import { readTags, tagStatements } from './tagRefs';
+import type { BlockInstance } from './blocks/types';
 
 /**
  * The accesses to `templates` that store, fresh vaults and imports share.
@@ -57,60 +61,58 @@ async function templateById(db: Database, id: string): Promise<Template | undefi
   return { ...template, content: (await readContents(db, 'template', [id])).get(id) ?? '' };
 }
 
-/**
- * The built-in "Sigil" template: one sigil block with all its parts, the
- * start template of the "Sigils" category.
- * The name ends up permanently in the row; if i18n is not ready yet, English.
- */
-function sigilTemplate(t: TFunction, now: string, sortOrder: number): Template {
-  return {
-    id: SIGIL_TEMPLATE_ID,
-    name: translatedOr(t, 'templates.builtin.sigil', 'Sigil'),
-    icon: '🔯',
-    title: '',
-    content: serializeBlocks([createSigilBlock()]),
-    tags: [],
-    sort_order: sortOrder,
-    created_at: now,
-    updated_at: now,
-    deleted_at: null,
-  };
-}
-
 /** Makes the template the start template of the category — if the category exists and has none yet. */
 async function startCategoryWith(db: Database, categoryId: string, templateId: string): Promise<void> {
   await db.execute('UPDATE categories SET template_id=$1 WHERE id=$2 AND template_id IS NULL', [templateId, categoryId]);
 }
 
-/**
- * Creates the sigil template if it does not yet exist (including in the trash)
- * — for fresh vaults — and makes it the start template of "Sigils".
- */
-export async function seedSigilTemplate(db: Database, t: TFunction): Promise<void> {
-  if (await templateById(db, SIGIL_TEMPLATE_ID)) return;
-  await insertTemplateRow(db, sigilTemplate(t, nowIso(), await nextTemplateSortOrder(db)));
-  await startCategoryWith(db, SIGIL_CATEGORY_ID, SIGIL_TEMPLATE_ID);
+/** A built-in template: what it is called and starts with, and the category it starts. */
+interface BuiltinTemplate {
+  id: string;
+  /** Text key of its name; the name ends up permanently in the row — if i18n is not ready yet, `fallback`. */
+  nameKey: string;
+  fallback: string;
+  icon: string;
+  blocks: () => BlockInstance[];
+  categoryId: string;
 }
 
 /**
- * Creates the built-in "Altar" template if it does not yet exist (including
- * in the trash) — for fresh vaults: an altar and a text for
- * notes, the start template of the "Altars" category.
+ * The built-in templates, each the start template of its category and
+ * otherwise an ordinary row — editable, deletable. Their IDs are
+ * `BUILTIN_TEMPLATE_IDS`, which a restore into a new vault lets the file's
+ * own version replace.
  */
-export async function seedAltarTemplate(db: Database, t: TFunction): Promise<void> {
-  if (await templateById(db, ALTAR_TEMPLATE_ID)) return;
-  const now = nowIso();
-  await insertTemplateRow(db, {
-    id: ALTAR_TEMPLATE_ID,
-    name: translatedOr(t, 'templates.builtin.altar', 'Altar'),
-    icon: '🪔',
-    title: '',
-    content: serializeBlocks(altarBlockSet()),
-    tags: [],
-    sort_order: await nextTemplateSortOrder(db),
-    created_at: now,
-    updated_at: now,
-    deleted_at: null,
-  });
-  await startCategoryWith(db, ALTAR_CATEGORY_ID, ALTAR_TEMPLATE_ID);
+const BUILTIN_TEMPLATES: readonly BuiltinTemplate[] = [
+  // Moon phase and text.
+  { id: JOURNAL_TEMPLATE_ID, nameKey: 'templates.builtin.journal', fallback: 'Journal', icon: '📓', blocks: moonBlockSet, categoryId: JOURNAL_CATEGORY_ID },
+  { id: DREAMS_TEMPLATE_ID, nameKey: 'templates.builtin.dreams', fallback: 'Dream Journal', icon: '💭', blocks: moonBlockSet, categoryId: DREAMS_CATEGORY_ID },
+  // One sigil block with all its parts.
+  { id: SIGIL_TEMPLATE_ID, nameKey: 'templates.builtin.sigil', fallback: 'Sigil', icon: '🔯', blocks: () => [createSigilBlock()], categoryId: SIGIL_CATEGORY_ID },
+  // An altar and a text for notes.
+  { id: ALTAR_TEMPLATE_ID, nameKey: 'templates.builtin.altar', fallback: 'Altar', icon: '🪔', blocks: altarBlockSet, categoryId: ALTAR_CATEGORY_ID },
+];
+
+/**
+ * Creates every built-in template that does not yet exist (including in the
+ * trash) — for fresh vaults — and makes it the start template of its category.
+ */
+export async function seedBuiltinTemplates(db: Database, t: TFunction): Promise<void> {
+  for (const builtin of BUILTIN_TEMPLATES) {
+    if (await templateById(db, builtin.id)) continue;
+    const now = nowIso();
+    await insertTemplateRow(db, {
+      id: builtin.id,
+      name: translatedOr(t, builtin.nameKey, builtin.fallback),
+      icon: builtin.icon,
+      title: '',
+      content: serializeBlocks(builtin.blocks()),
+      tags: [],
+      sort_order: await nextTemplateSortOrder(db),
+      created_at: now,
+      updated_at: now,
+      deleted_at: null,
+    });
+    await startCategoryWith(db, builtin.categoryId, builtin.id);
+  }
 }

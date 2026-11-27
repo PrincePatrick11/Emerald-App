@@ -87,11 +87,6 @@ export interface EditorSettings {
   autoLinks: boolean;
 }
 
-export interface JournalSettings {
-  /** Whether a new journal entry gets the day's moon phase. */
-  moonPhase: boolean;
-}
-
 export interface TemplateSettings {
   /**
    * The vault's default template: what a new entry starts with when its
@@ -118,7 +113,6 @@ export interface VaultSettings {
   images: ImageSettings;
   tags: TagSettings;
   editor: EditorSettings;
-  journal: JournalSettings;
   templates: TemplateSettings;
 }
 
@@ -127,7 +121,7 @@ export type SettingsGroup = Exclude<keyof VaultSettings, 'version'>;
 /** Each group exactly once — the record forces a new one not to be missing. */
 const GROUP_SET: Record<SettingsGroup, true> = {
   appearance: true, trash: true, leftList: true, emojis: true, images: true, tags: true,
-  editor: true, journal: true, templates: true,
+  editor: true, templates: true,
 };
 export const SETTINGS_GROUPS = Object.keys(GROUP_SET) as SettingsGroup[];
 
@@ -162,9 +156,6 @@ export const DEFAULT_VAULT_SETTINGS: VaultSettings = {
     typography: true,
     autoLinks: true,
   },
-  journal: {
-    moonPhase: true,
-  },
   templates: {
     defaultTemplateId: null,
   },
@@ -198,7 +189,6 @@ export function normalizeVaultSettings(raw: unknown): VaultSettings {
   const images = asRecord(root.images);
   const tags = asRecord(root.tags);
   const editor = asRecord(root.editor);
-  const journal = asRecord(root.journal);
   const templates = asRecord(root.templates);
   const flag = (value: unknown, fallback: boolean) => (typeof value === 'boolean' ? value : fallback);
   const version = typeof root.version === 'number' && Number.isInteger(root.version) && root.version > 1
@@ -242,10 +232,6 @@ export function normalizeVaultSettings(raw: unknown): VaultSettings {
       markdownShortcuts: flag(editor.markdownShortcuts, DEFAULT_VAULT_SETTINGS.editor.markdownShortcuts),
       typography: flag(editor.typography, DEFAULT_VAULT_SETTINGS.editor.typography),
       autoLinks: flag(editor.autoLinks, DEFAULT_VAULT_SETTINGS.editor.autoLinks),
-    },
-    journal: {
-      ...journal,
-      moonPhase: flag(journal.moonPhase, DEFAULT_VAULT_SETTINGS.journal.moonPhase),
     },
     templates: {
       ...templates,

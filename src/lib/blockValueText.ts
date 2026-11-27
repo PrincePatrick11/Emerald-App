@@ -1,5 +1,5 @@
 import type { TFunction } from 'i18next';
-import { phraseText, type BlockValue } from './blocks/blockType';
+import { phraseText, valueLabel, type BlockValue, type BlockValueLabel } from './blocks/blockType';
 import { linkValueTitle, type LinkTitleOf } from './blocks/blockValue';
 import type { InfoForm } from './blocks/listInfo';
 import { formatIsoDate, formatIsoDateShort } from './formatDate';
@@ -21,4 +21,13 @@ export function blockValueText(t: TFunction, value: BlockValue, { form = 'long',
     case 'link': return linkValueTitle(value, titleOf);
     case 'phrase': return phraseText(value, t);
   }
+}
+
+/**
+ * A labelled value in its long form, "Label: value" (`common.labelValue`;
+ * French puts a space before the colon) — the detailed info line and the
+ * tooltip of a block's icon in the entry's header.
+ */
+export function blockValueLine(t: TFunction, named: BlockValueLabel & { value: BlockValue }, titleOf?: LinkTitleOf): string {
+  return t('common.labelValue', { label: valueLabel(named, t), value: blockValueText(t, named.value, { titleOf }) });
 }

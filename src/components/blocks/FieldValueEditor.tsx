@@ -3,9 +3,7 @@ import { CheckSquare, Plus, Square, ToggleLeft, ToggleRight, X } from 'lucide-re
 import Dropdown from '../ui/Dropdown';
 import { elementLabel, type ChecklistItem, type ElementDef, type FieldValue } from '../../lib/blocks/fields';
 import { generateId } from '../../lib/helpers';
-import { MOON_PHASE_ORDER, MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
 import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
-import type { MoonPhase } from '../../types';
 
 /**
  * The inputs for the values of a field element that sit in the JSON: everything
@@ -68,18 +66,6 @@ export default function FieldValueEditor({ element, value, onChange }: {
       return <ToggleSwitch value={value === true} onChange={onChange} />;
     case 'checklist':
       return <ChecklistEditor items={Array.isArray(value) ? value : []} onChange={(items) => onChange(items.length ? items : undefined)} />;
-    case 'moon':
-      return (
-        <Dropdown<string>
-          portal
-          value={MOON_PHASE_ORDER.includes(value as MoonPhase) ? (value as string) : ''}
-          onChange={(v) => onChange(v || undefined)}
-          options={[
-            { value: '', label: t('blocks.fields.choose') },
-            ...MOON_PHASE_ORDER.map((p) => ({ value: p, label: t(`moonPhase.${p}`), emoji: MOON_PHASE_SYMBOLS[p] })),
-          ]}
-        />
-      );
     default: // Slot kinds: FieldSlotEditor
       return null;
   }

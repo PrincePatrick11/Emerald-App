@@ -147,7 +147,7 @@
       "title": "First Working",
       "category_id": "journal",
       "entry_number": 6,
-      "content": "<p>Opened the circle just after dusk. Followed @@chip(seed-entry-banishing,entry,Banishing)@@ first, then sat with the intention for twenty minutes.</p><p>Quiet, but the focus held longer than last time.</p>",
+      "content": "<section data-block=\"core.moon\" data-block-id=\"5eed0000-0000-4000-8000-00000000a001\"></section><p>Opened the circle just after dusk. Followed @@chip(seed-entry-banishing,entry,Banishing)@@ first, then sat with the intention for twenty minutes.</p><p>Quiet, but the focus held longer than last time.</p>",
       "tags": [
         "seed-tag-ritual",
         "seed-tag-moon"
@@ -233,7 +233,7 @@
       "title": "Tower by the Sea",
       "category_id": "dreams",
       "entry_number": 14,
-      "content": "<p>A white tower on a cliff, the stairs going down instead of up. Woke before the bottom.</p>",
+      "content": "<section data-block=\"core.moon\" data-block-id=\"5eed0000-0000-4000-8000-00000000a002\"></section><p>A white tower on a cliff, the stairs going down instead of up. Woke before the bottom.</p>",
       "tags": [
         "seed-tag-moon"
       ],

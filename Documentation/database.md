@@ -14,7 +14,7 @@ Emerald uses one SQLite file per vault, always named `emerald.db`, inside the va
 
 `runMigrations` first reads the highest version in `schema_version` — before it writes anything — and then takes one of these routes:
 
-- **Empty file** — a new vault. It runs the DDL from `schema.ts`, seeds the built-in categories, the starter categories, the built-in dashboards and the `core-sigil` and `core-altar` templates (as the start templates of `sigils` and `altars`) — in the language active at first open, since `main.tsx` waits for the stored language before anything touches the database — and stamps one `baseline` row at `BASELINE_VERSION`, last. A new vault whose creation was cut short before the stamp — tables of `schema.ts` only, no entries or tasks — is dropped and created again on the next open.
+- **Empty file** — a new vault. It runs the DDL from `schema.ts`, seeds the built-in categories, the starter categories, the built-in dashboards and the `core-journal`, `core-dreams`, `core-sigil` and `core-altar` templates (as the start templates of `journal`, `dreams`, `sigils` and `altars`) — in the language active at first open, since `main.tsx` waits for the stored language before anything touches the database — and stamps one `baseline` row at `BASELINE_VERSION`, last. A new vault whose creation was cut short before the stamp — tables of `schema.ts` only, no entries or tasks — is dropped and created again on the next open.
 - **Below `FRESH_START_VERSION`** (102), or tables without a version that are not such an unfinished new vault — a vault from before the fresh start of the schema, built by the old migration chain v1–v66 that this version no longer has, or by one of the fresh schemas before (v100, entries with a type; v101, tags as JSON and icons as data URLs in the rows; neither released). It is refused with `VAULT_OUTDATED` and left exactly as it was; the vault picker says so (`vault.outdated`). A converter for such vaults is a task of its own.
 - **Above `BASELINE_VERSION`** — a vault of a newer app: refused with `VAULT_TOO_NEW` (`vault.tooNew`), unchanged too.
 - **Between the two** — the steps of `MIGRATIONS` above the stored version run in order, each stamping `schema_version` with version, name and ISO timestamp. The first step is v103 (`block_refs_tags`: `block_refs` takes the tags a block gives its entry); a step carries its own DDL, so it never changes with `schema.ts`, and `runMigrations` throws at startup if the last step and `BASELINE_VERSION` disagree.
@@ -70,7 +70,7 @@ When a category is merged into a namesake instead (`reassignCategoryContent(db, 
 
 Only a **permanent** deletion reassigns: `categoryStore.permanentlyDeleteCategory`, `trashStore.emptyTrash`, and the periodic cleanup for an expired category (`purgeCategory`). That is why `categories` is **not in `CLEANUP_TABLES`** — it is purged separately, after its content is released. A *soft* delete never reassigns: content keeps pointing at the trashed category, the UI groups it under "Uncategorized", and restoring the category brings everything back. `reassignCategoriesInMemory` in `categoryStore.ts` applies the same move to the loaded content stores, so an in-memory row doesn't write back a `category_id` the foreign key would reject.
 
-The built-ins, `journal`, `sigils` and `altars`, cannot be deleted: the journal's entries are what the Journal shows, with their moon phase; an entry in `sigils` is a sigil, and a new one starts with a sigil block through its start template, the built-in `core-sigil`; an entry in `altars` is an altar and starts with an altar block and a text for notes through `core-altar`.
+The built-ins, `journal`, `sigils` and `altars`, cannot be deleted: the journal's entries are what the Journal shows, and a new one starts with a moon phase block and a text through `core-journal` (the starter category `dreams` likewise through `core-dreams`); an entry in `sigils` is a sigil, and a new one starts with a sigil block through its start template, the built-in `core-sigil`; an entry in `altars` is an altar and starts with an altar block and a text for notes through `core-altar`.
 
 ## Tables
 
@@ -168,7 +168,7 @@ The templates dashboard's rows, behind every entry's "insert a template" flow �
 
 | Column | Type | Notes |
 |---|---|---|
-| id | TEXT PK | UUID (or `'core-sigil'`, `'core-altar'` for the built-ins) |
+| id | TEXT PK | UUID (or `'core-journal'`, `'core-dreams'`, `'core-sigil'`, `'core-altar'` for the built-ins) |
 | name | TEXT | NOT NULL |
 | icon | TEXT | emoji or an icon file (see [Icons](#icons)), NOT NULL DEFAULT `'📄'` |
 | title | TEXT | NOT NULL DEFAULT `''`; the title a new entry gets — empty means the entry starts untitled |
@@ -176,7 +176,7 @@ The templates dashboard's rows, behind every entry's "insert a template" flow �
 | created_at / updated_at | TEXT | ISO 8601 |
 | deleted_at | TEXT | NULL = active; purged after the retention period (`CLEANUP_TABLES`) |
 
-`core-sigil` is seeded with one sigil block (`createSigilBlock()` in `lib/blocks/sigil.ts`) as the start template of `sigils`, and `core-altar` with an altar block on a dark night and a text block (`altarBlockSet()` in `lib/blocks/canvas.ts`) as that of `altars`; otherwise each is an ordinary row — editable, deletable. Which categories start with a template is said by the categories (`template_id`); deleting a template for good clears it there (`ON DELETE SET NULL`), and a template in the Trash counts as none. Older blocks may still carry `data-block-origin`, `data-block-rev` and `data-template-origin`, which nothing reads.
+`core-journal` and `core-dreams` are seeded with a moon phase block and a text block (`moonBlockSet()` in `lib/blocks/moon.ts`) as the start templates of `journal` and `dreams`, `core-sigil` with one sigil block (`createSigilBlock()` in `lib/blocks/sigil.ts`) as the start template of `sigils`, and `core-altar` with an altar block on a dark night and a text block (`altarBlockSet()` in `lib/blocks/canvas.ts`) as that of `altars`; otherwise each is an ordinary row — editable, deletable. Which categories start with a template is said by the categories (`template_id`); deleting a template for good clears it there (`ON DELETE SET NULL`), and a template in the Trash counts as none. Older blocks may still carry `data-block-origin`, `data-block-rev` and `data-template-origin`, which nothing reads.
 
 ### languages
 
@@ -299,7 +299,7 @@ What a block points at, rewritten whenever its block is written (`blockRefs` in 
 
 ### Moon phase
 
-Not stored — derived from `created_at` for an entry of the category Journal; see [Moon Phase](architecture/modules.md#moon-phase).
+Not stored — a moon phase block (`core.moon`, one row in `blocks` with no data) shows the phase of its entry's `created_at`; see [Moon Phase](architecture/modules.md#moon-phase).
 
 ### tasks
 
@@ -495,7 +495,7 @@ A definition's prefills need their own remap, since nothing else touches `elemen
 
 **Templates are added, never replaced or deleted** — `insertTemplates`, `INSERT OR IGNORE` by id, before the deletes in `doReplace` and after the merge's id remap in `doMerge`. A local template (including trashed) keeps its local version; new ones land at the end of the sort order. Their blocks go through `insertImportedBlocks`/`remapBlock` like an entry's, and only for templates that were actually inserted.
 
-A fresh vault (add-vault) seeds its own `core-sigil` and `core-altar` before the import runs. If the file carries its own `templates` and the import includes entries, those seeded rows are deleted first, so the file's version of them — edited, deleted or otherwise — wins.
+A fresh vault (add-vault) seeds its own built-in templates (`core-journal`, `core-dreams`, `core-sigil`, `core-altar`) before the import runs. If the file carries its own `templates` and the import includes entries, those seeded rows are deleted first, so the file's version of them — edited, deleted or otherwise — wins.
 
 **The Lexicon is added, never replaced or deleted** — `insertLexicon`, `INSERT OR IGNORE` by id; a word is inserted only when its language exists in the target vault, since `lexicon_entries.language_id` is a real foreign key.
 

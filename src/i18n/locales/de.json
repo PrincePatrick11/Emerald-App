@@ -184,7 +184,7 @@
       },
       "fields": {
         "label": "Felder",
-        "description": "Beschriftete Werte: Text, Zahl, Datum, Auswahl, Ja/Nein, Checkliste, Verknüpfung, Bild, Mondphase."
+        "description": "Beschriftete Werte: Text, Zahl, Datum, Auswahl, Ja/Nein, Checkliste, Verknüpfung, Bild."
       },
       "sigil": {
         "label": "Sigille",
@@ -208,6 +208,11 @@
       "altar": {
         "label": "Altar",
         "description": "Eine Leinwand mit „Bilder“ darunter, aus denen du Bilder ziehst."
+      },
+      "moon": {
+        "label": "Mondphase",
+        "description": "Die Mondphase des Tages, an dem der Eintrag angelegt wurde – Symbol und Name, nichts auszuwählen.",
+        "outsideEntry": "Zeigt im Eintrag die Mondphase seines Erstellungstags."
       }
     },
     "kinds": {
@@ -219,8 +224,7 @@
       "toggle": "Ja/Nein",
       "checklist": "Checkliste",
       "link": "Verknüpfung",
-      "image": "Bild",
-      "moon": "Mondphase"
+      "image": "Bild"
     },
     "fields": {
       "yes": "Ja",
@@ -865,7 +869,6 @@
     "title": "Eigenschaften",
     "category": "Kategorie",
     "noCategory": "Keine",
-    "moonPhase": "Mondphase",
     "tags": "Tags",
     "noTags": "Keine Tags",
     "linkedEntries": "Verlinkungen",
@@ -1108,7 +1111,6 @@
     "tagCreateDashboardOnly": "Nur unter Tags",
     "groupTags": "Tags",
     "groupEditor": "Formatierung",
-    "groupJournal": "Journal",
     "uiScaleHint": "Vergrößert oder verkleinert die ganze Oberfläche — Text, Symbole und Abstände.",
     "editorFontSizeHint": "Schriftgröße in Einträgen und Feldwerten, unabhängig von der Größe der Oberfläche.",
     "sidebarListHint": "Welche Einträge die Seitenleiste links zeigt: alle oder die eines Dashboards.",
@@ -1132,10 +1134,6 @@
     "typographyHint": "Gerade Anführungszeichen werden zu „typografischen“, -- zum Gedankenstrich, -> zum Pfeil, 1/2 zu ½.",
     "autoLinks": "Automatische Links",
     "autoLinksHint": "Eine getippte oder eingefügte Adresse wird zum Link.",
-    "moonPhase": "Mondphase",
-    "moonPhaseHint": "Die Mondphase des Tages, an dem ein Journal-Eintrag angelegt wurde.",
-    "moonPhaseShow": "Bei Journal-Einträgen zeigen",
-    "moonPhaseShowHint": "Gilt für alle Journal-Einträge, auch für alte. Aus: keine Mondphase als Icon, in der Seitenleiste und im Export.",
     "trashRetentionHint": "So lange bleibt Gelöschtes im Papierkorb. Danach wird es beim Öffnen des Vaults endgültig gelöscht.",
     "customThemeImport": "Theme importieren…",
     "customThemeRemove": "„{{name}}“ entfernen",
@@ -1291,7 +1289,9 @@
     "untitled": "Unbenannte Vorlage",
     "builtin": {
       "sigil": "Sigille",
-      "altar": "Altar"
+      "altar": "Altar",
+      "journal": "Journal",
+      "dreams": "Traumtagebuch"
     },
     "newTemplate": "Neue Vorlage",
     "defaultName": "Neue Vorlage",

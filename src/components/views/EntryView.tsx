@@ -3,12 +3,12 @@ import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { entryBlockSummary } from '../../lib/blocks/entrySummary';
 import { resolveProperty } from '../../lib/blocks/entryProperties';
+import { blockValueLine } from '../../lib/blockValueText';
+import { useLinkTitle } from '../../hooks/useLinkItems';
 import { imageSrc } from '../../lib/images';
 import { formatEntryDate } from '../../lib/formatDate';
 import { displayTitle } from '../../lib/entryTitle';
-import { entryMoonPhase, MOON_PHASE_SYMBOLS } from '../../lib/moonPhase';
 import { useUIStore } from '../../store/uiStore';
-import { useSettingsStore } from '../../store/settingsStore';
 import { dashboardOrAll, useDashboardStore } from '../../store/dashboardStore';
 import { entryView } from '../../store/entryViews';
 import { dashboardDateField, entryDateOf } from '../../lib/dashboards';
@@ -21,14 +21,15 @@ import { deleteEntryWithUndo } from '../../store/entryActions';
 import BlockStack from '../blocks/BlockStack';
 import EntryDetailFrame from '../ui/EntryDetailFrame';
 import DashboardView from './DashboardView';
+import { FaviconGlyph } from '../sidebar/fields/Favicon';
 
 /**
  * The one entry page (`{ type: 'entry', id, dashboard }`): every entry opens
  * here, whatever its category, inside the dashboard it was opened from —
  * "All entries" when that is unset or gone. The dashboard decides only where
  * "back" leads and which date the header shows (the one it sorts by); what is
- * special about an entry comes from its category (the moon phase of the
- * category Journal) and its blocks.
+ * special about an entry comes from its category and its blocks (the icon a
+ * block suggests beside the date, the cover it suggests).
  *
  * An entry that does not exist (deleted in another tab) shows the
  * dashboard's list instead.
@@ -43,7 +44,6 @@ export default function EntryView() {
   const { updateEntry, getEntry } = useEntryStore(
     useShallow((s) => ({ updateEntry: s.updateEntry, getEntry: s.getEntry }))
   );
-  const showMoonPhase = useSettingsStore((s) => s.settings.journal.moonPhase);
 
   const entry = useEntryStore((s) => (activeView.id ? findEntry(s.entries, activeView.id) : undefined)) ?? null;
   // Startup loads content after the lists: until it arrives, the frame with
@@ -54,6 +54,13 @@ export default function EntryView() {
   const locked = !!summary?.effects.lockEntry;
   // The user's cover — or the one a block suggests (`resolveProperty`).
   const cover = entry && summary ? resolveProperty(entry.cover_image, summary.properties.cover, null)?.value : undefined;
+  // Beside the date: the entry's icon, only when it comes from a block (the
+  // moon phase of the entry's day) — the one lists and tabs show. Its tooltip
+  // is that block's panel row.
+  const icon = entry && summary ? resolveProperty(entry.icon, summary.properties.icon, null) : null;
+  const blockIcon = icon?.source === 'block' ? icon : null;
+  const blockIconRow = blockIcon ? summary?.properties.rows.find((row) => row.blockId === blockIcon.blockId) : undefined;
+  const linkTitle = useLinkTitle();
   const isEditing = activeView.mode === 'edit' && !locked;
 
   const [title, setTitle] = useState('');
@@ -159,7 +166,6 @@ export default function EntryView() {
 
   if (!entry) return <DashboardView dashboardId={dashboardId} />;
 
-  const phase = entryMoonPhase(entry, showMoonPhase);
   // The date the dashboard sorts by — the same the list shows.
   const date = entryDateOf(entry, dashboardDateField(dashboard));
 
@@ -169,7 +175,14 @@ export default function EntryView() {
       isEditing={isEditing}
       meta={(
         <>
-          {phase && <span title={t(`moonPhase.${phase}`)}>{MOON_PHASE_SYMBOLS[phase]}</span>}
+          {blockIcon && (
+            <span
+              className="inline-flex"
+              title={blockIconRow ? blockValueLine(t, blockIconRow, linkTitle) : undefined}
+            >
+              <FaviconGlyph value={blockIcon.value} className="w-4 h-4 text-sm" />
+            </span>
+          )}
           <span>{formatEntryDate(date)}</span>
         </>
       )}

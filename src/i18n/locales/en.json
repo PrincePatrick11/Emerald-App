@@ -184,7 +184,7 @@
       },
       "fields": {
         "label": "Fields",
-        "description": "Labelled values: text, number, date, choice, yes/no, checklist, link, image, moon phase."
+        "description": "Labelled values: text, number, date, choice, yes/no, checklist, link, image."
       },
       "sigil": {
         "label": "Sigil",
@@ -208,6 +208,11 @@
       "altar": {
         "label": "Altar",
         "description": "A canvas with \"Images\" below it to drag pictures from."
+      },
+      "moon": {
+        "label": "Moon phase",
+        "description": "The moon phase of the day the entry was created — symbol and name, nothing to choose.",
+        "outsideEntry": "Shows the moon phase of the entry's creation day."
       }
     },
     "kinds": {
@@ -219,8 +224,7 @@
       "toggle": "Yes/No",
       "checklist": "Checklist",
       "link": "Link",
-      "image": "Image",
-      "moon": "Moon phase"
+      "image": "Image"
     },
     "fields": {
       "yes": "Yes",
@@ -865,7 +869,6 @@
     "title": "Properties",
     "category": "Category",
     "noCategory": "None",
-    "moonPhase": "Moon phase",
     "tags": "Tags",
     "noTags": "No tags",
     "linkedEntries": "Linked entries",
@@ -1108,7 +1111,6 @@
     "tagCreateDashboardOnly": "Only in Tags",
     "groupTags": "Tags",
     "groupEditor": "Formatting",
-    "groupJournal": "Journal",
     "uiScaleHint": "Scales the whole interface — text, icons and spacing.",
     "editorFontSizeHint": "Text size in entries and field values, independent of the UI size.",
     "sidebarListHint": "Which entries the left sidebar shows: all of them, or those of one dashboard.",
@@ -1132,10 +1134,6 @@
     "typographyHint": "Straight quotes become curly ones, -- an em dash, -> an arrow, 1/2 becomes ½.",
     "autoLinks": "Automatic links",
     "autoLinksHint": "A typed or pasted address becomes a link.",
-    "moonPhase": "Moon phase",
-    "moonPhaseHint": "The moon phase of the day a journal entry was created.",
-    "moonPhaseShow": "Show on journal entries",
-    "moonPhaseShowHint": "Applies to every journal entry, old ones included. Off: no moon phase as icon, in the sidebar or in exports.",
     "trashRetentionHint": "How long deleted items stay in the trash. After that they are removed for good when the vault opens.",
     "customThemeImport": "Import theme…",
     "customThemeRemove": "Remove “{{name}}”",
@@ -1291,7 +1289,9 @@
     "untitled": "Untitled template",
     "builtin": {
       "sigil": "Sigil",
-      "altar": "Altar"
+      "altar": "Altar",
+      "journal": "Journal",
+      "dreams": "Dream Journal"
     },
     "newTemplate": "New template",
     "defaultName": "New template",

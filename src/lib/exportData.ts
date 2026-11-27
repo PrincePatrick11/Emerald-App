@@ -4,14 +4,12 @@ import { renderBlocksForExport, type ExportText } from './blocks/exportRender';
 import { linkedIdsOf } from './blocks/blockRefs';
 import type { BlockExportFormat } from './blocks/blockType';
 import { blockLabel } from './blocks/blockAttrs';
-import { translatedOr } from './blocks/toolkit';
+import { entryDate, translatedOr } from './blocks/toolkit';
 import { linkTitleSnapshot } from './linkItemsSnapshot';
 import { withCurrentLinkTitles } from './internalLinkHtml';
 import type { LinkTitleOf } from './blocks/blockValue';
 import { formatIsoDateLong } from './formatDate';
 import { useCategoryStore } from '../store/categoryStore';
-import { entryMoonPhase, MOON_PHASE_SYMBOLS } from './moonPhase';
-import { useSettingsStore } from '../store/settingsStore';
 import { displayTitle } from './entryTitle';
 import { categoryLabel } from './categories';
 import i18n from '../i18n';
@@ -53,18 +51,12 @@ export interface ExportData {
   /** The entries and tasks it links to — what its blocks report (`linkedIdsOf` over the stored blocks, not the rendered `content`). */
   linkedIds: string[];
   createdAt: string;
-  // journal
-  moonPhase?: string;         // emoji + label, e.g. "🌕 Full Moon"
   // the entry's category, shown in the header line; its ID groups the HTML export's sidebar
   category?: ChipData;
   // the entry's icon by the app's rule (`entryIcon`): emoji or data-URL
   icon: string;
   // common
   tagNames?: string[];
-}
-
-function moonLabel(phase: string): string {
-  return phase.split('_').map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
 }
 
 /** An entry as the PDF, HTML or Markdown export (`format`) reads it — `null` if it is gone. */
@@ -75,8 +67,6 @@ export async function collectExportDataFor(id: string, format: BlockExportFormat
   if (!entry) return null;
 
   const cat = useCategoryStore.getState().categories.find((c) => c.id === entry.category_id);
-  const showMoon = useSettingsStore.getState().settings.journal.moonPhase;
-  const phase = entryMoonPhase(entry, showMoon);
   const linkTitle = linkTitleSnapshot();
 
   return {
@@ -85,14 +75,13 @@ export async function collectExportDataFor(id: string, format: BlockExportFormat
     entryNumber: entry.entry_number,
     // Every link — a chip in a text, a link field — names its target's current
     // title, as in the app; the stored one only once the target is gone.
-    content: withCurrentLinkTitles(renderBlocksForExport(entry.content, format, exportText(linkTitle)), linkTitle),
+    content: withCurrentLinkTitles(renderBlocksForExport(entry.content, format, exportText(linkTitle), { entryDate: entryDate(entry) }), linkTitle),
     // Exactly what "Linked entries" lists (`linkedIdsOf`).
     linkedIds: [...linkedIdsOf(entry.content)],
     createdAt: entry.created_at,
-    moonPhase: phase ? `${MOON_PHASE_SYMBOLS[phase]} ${moonLabel(phase)}` : undefined,
     category: cat ? { id: cat.id, label: categoryLabel(i18n.t, cat), icon: cat.emoji } : undefined,
     // An uploaded icon as a data URL: the export document cannot reach the vault's files.
-    icon: await portableIcon(entryIcon(entry, cat, showMoon)),
+    icon: await portableIcon(entryIcon(entry, cat)),
     tagNames: liveTagNames(entry.tags),
   };
 }

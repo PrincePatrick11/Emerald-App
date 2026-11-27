@@ -6,7 +6,7 @@ import { entryDateOf } from '../lib/dashboards';
 import { entryIcon } from '../lib/entryIcon';
 import { displayTitle } from '../lib/entryTitle';
 import { formatEntryDate } from '../lib/formatDate';
-import { blockValueText } from '../lib/blockValueText';
+import { blockValueLine, blockValueText } from '../lib/blockValueText';
 import { entryBlockSummary } from '../lib/blocks/entrySummary';
 import type { InfoForm, ShownListInfoPart } from '../lib/blocks/listInfo';
 import { setDragItem } from '../lib/dragState';
@@ -14,7 +14,6 @@ import { useCategoryStore } from '../store/categoryStore';
 import { useEntryStore } from '../store/entryStore';
 import { deleteEntryWithUndo } from '../store/entryActions';
 import { entryView } from '../store/entryViews';
-import { useSettingsStore } from '../store/settingsStore';
 import { useUIStore } from '../store/uiStore';
 import ContextMenu, { type ContextMenuAction } from '../components/ui/ContextMenu';
 import DashboardItem, { CardContent, ItemGlyph, RENAME_INPUT_CLASS, RowContent } from '../components/ui/DashboardItem';
@@ -23,7 +22,6 @@ import { useOpenInNewTabAction } from './useOpenInNewTabAction';
 import { useSaveAsTemplateAction } from './useSaveAsTemplateAction';
 import { useLinkTitle } from './useLinkItems';
 import type { ActiveView, Entry } from '../types';
-import { valueLabel } from '../lib/blocks/blockType';
 
 interface EntryRowOptions {
   /** The dashboard the entries open in; without one, "All entries". */
@@ -79,7 +77,6 @@ export function useEntryRows({ dashboardId, dateField }: EntryRowOptions): Entry
   const duplicateEntry = useEntryStore((s) => s.duplicateEntry);
   const updateEntry = useEntryStore((s) => s.updateEntry);
   const categories = useCategoryStore((s) => s.categories);
-  const showMoonPhase = useSettingsStore((s) => s.settings.journal.moonPhase);
 
   // A link field shows its target's current title, not the one stored with it.
   const linkTitle = useLinkTitle();
@@ -92,8 +89,7 @@ export function useEntryRows({ dashboardId, dateField }: EntryRowOptions): Entry
   // No fallback to the raw category_id: for a deleted category the label is omitted.
   const category = (e: Entry) => categoryLabel(t, lookupCategory(catById, e.category_id));
   const meta = (e: Entry) => [category(e), formatEntryDate(date(e))].filter(Boolean).join(' · ');
-  // "Label: value" as a key: French puts a space before the colon.
-  const longInfo = (part: ShownListInfoPart) => t('common.labelValue', { label: valueLabel(part, t), value: blockValueText(t, part.value, { titleOf: linkTitle }) });
+  const longInfo = (part: ShownListInfoPart) => blockValueLine(t, part, linkTitle);
 
   const duplicate = async (e: Entry) => {
     const copy = await duplicateEntry(e.id);
@@ -101,7 +97,7 @@ export function useEntryRows({ dashboardId, dateField }: EntryRowOptions): Entry
   };
 
   return {
-    icon: (e) => entryIcon(e, lookupCategory(catById, e.category_id), showMoonPhase),
+    icon: (e) => entryIcon(e, lookupCategory(catById, e.category_id)),
     title: (e) => displayTitle(t, 'entry', e.title),
     editTitle: (e) => e.title,
     meta,

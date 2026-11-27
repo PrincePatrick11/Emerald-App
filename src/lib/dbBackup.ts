@@ -18,7 +18,7 @@
  * content as any `.vault.emerald`.
  */
 
-import { copyBlockStatements, OWNER, type BlockOwnerKind, type CopiedBlock, type Statement } from './blockStore';
+import { copyBlockStatements, OWNER, placeholders, type BlockOwnerKind, type CopiedBlock, type Statement } from './blockStore';
 import { blockRefs } from './blocks/blockRefs';
 import { fromBlockRow, type StoredBlockRow } from './blocks/blockRows';
 import { remapBlock, renameAll, type BlockRemap } from './blocks/blockRemap';
@@ -48,7 +48,7 @@ import { alphabetToJson, DEFAULT_LANGUAGE_ICON } from './lexicon';
 import { readUserSymbol, type UserSymbol } from './userSymbols';
 import type { Language } from '../types';
 import {
-  ALTAR_TEMPLATE_ID, isTemplateId, SIGIL_TEMPLATE_ID, templateToRow,
+  BUILTIN_TEMPLATE_IDS, isTemplateId, templateToRow,
 } from './blocks/templates';
 import { isBuiltinDashboard, parseDashboardFilter } from './dashboards';
 import { fromRow } from './row';
@@ -1789,7 +1789,10 @@ export async function importDatabase(
     // Via the working copy as with replace: an abort leaves the new vault empty rather than half filled.
     await importViaStaging(db, async (staging) => {
       if (bringsTemplates && selectsEntries(types)) {
-        await staging.execute('DELETE FROM templates WHERE id IN ($1, $2)', [SIGIL_TEMPLATE_ID, ALTAR_TEMPLATE_ID]);
+        await staging.execute(
+          `DELETE FROM templates WHERE id IN (${placeholders(BUILTIN_TEMPLATE_IDS.length)})`,
+          [...BUILTIN_TEMPLATE_IDS],
+        );
       }
       await doReplace(staging, filteredBackup, files);
     });

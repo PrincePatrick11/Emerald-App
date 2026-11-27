@@ -137,7 +137,8 @@ writeFileSync(
    export { assertPayloadReferencesResolve, collectVaultContent, definitionRows, doMerge, doReplace, FULL_BACKUP_OPTIONS, insertBlockDefinitions, prepareRawDatabase, resolveImportedCategories, vaultContentOf, vaultManifestOf } from '${root}/src/lib/dbBackup';
    export { categoryRowsOf, contentToBlocks, manifestCategoryOf, parseManifest, parseVaultManifest, usedDefinitionIds, EMERALD_FORMAT_VERSION } from '${root}/src/lib/emerald/manifest';
    export { invalidateVaultCache } from '${root}/src/lib/vaultManager';
-   export { clearSavedBlocks, readContents, replaceOwnerBlocks, retagBlocks, dropBlockTagStatements } from '${root}/src/lib/blockStore';
+   export { clearSavedBlocks, readContents, replaceOwnerBlocks, retagBlocks, dropBlockTagStatements, placeholders } from '${root}/src/lib/blockStore';
+   export { BUILTIN_TEMPLATE_IDS } from '${root}/src/lib/blocks/templates';
    export { registerBlockType } from '${root}/src/lib/blocks/blockTypes';
    export { collectImageUses } from '${root}/src/lib/imageUsage';
    export { imageDetailsOf, importImageDetails } from '${root}/src/lib/emerald/imageDetails';`
@@ -180,7 +181,7 @@ const {
   assertPayloadReferencesResolve, collectVaultContent, definitionRows, doMerge, doReplace, insertBlockDefinitions,
   resolveImportedCategories, vaultContentOf, vaultManifestOf, FULL_BACKUP_OPTIONS, prepareRawDatabase,
   categoryRowsOf, contentToBlocks, manifestCategoryOf, parseManifest, parseVaultManifest, usedDefinitionIds, EMERALD_FORMAT_VERSION,
-  invalidateVaultCache, clearSavedBlocks, readContents, replaceOwnerBlocks, retagBlocks, dropBlockTagStatements, registerBlockType, collectImageUses,
+  invalidateVaultCache, clearSavedBlocks, readContents, replaceOwnerBlocks, retagBlocks, dropBlockTagStatements, placeholders, BUILTIN_TEMPLATE_IDS, registerBlockType, collectImageUses,
   imageDetailsOf, importImageDetails,
 } = await import(pathToFileURL(bundlePath).href);
 
@@ -674,8 +675,18 @@ console.log('\n7. Seeds: built-in categories, starter set, built-in templates an
     t?.name === 'Sigil' && (content.match(/data-block="/g) ?? []).length === 1 && content.includes('data-block="core.sigil"'),
     content
   );
-  check('the altar template, the start template of "altars"; no other category has one',
-    starts.altars === 'core-altar' && Object.entries(starts).every(([id, tpl]) => ['sigils', 'altars'].includes(id) || tpl === null), JSON.stringify(starts));
+  check('the altar template, the start template of "altars"',
+    starts.altars === 'core-altar', JSON.stringify(starts));
+  check('the journal and dream journal templates start "journal" and "dreams"; no other category has one',
+    starts.journal === 'core-journal' && starts.dreams === 'core-dreams'
+      && Object.entries(starts).every(([id, tpl]) => ['sigils', 'altars', 'journal', 'dreams'].includes(id) || tpl === null), JSON.stringify(starts));
+  for (const [id, name] of [['core-journal', 'Journal'], ['core-dreams', 'Dream Journal']]) {
+    const [row] = await baseline.select('SELECT name FROM templates WHERE id=$1', [id]);
+    const stack = await stackOf(baseline, 'template', id);
+    const types = [...stack.matchAll(/data-block="([^"]+)"/g)].map((m) => m[1]).join();
+    check(`${id}: a moon phase, then text (harness: English name)`,
+      row?.name === name && types === 'core.moon,core.text', stack);
+  }
   const dashboards = await baseline.select('SELECT id, builtin, position, filter, sort FROM dashboards ORDER BY position');
   const filterOf = (id) => JSON.parse(dashboards.find((d) => d.id === id)?.filter ?? 'null');
   check('four built-in dashboards, "all" first, each with its key as ID',
@@ -969,6 +980,7 @@ console.log('\n11. .vault.emerald: the round trip of a vault content, other vers
   await src.execute("UPDATE blocks SET updated_at = '2025-05-05T05:05:05.000Z' WHERE entry_id = $1 AND id = 'p1'", [J]);
   const journalBefore = await blockRows(src, 'entry', J);
   const sigilBefore = await blockRows(src, 'template', 'core-sigil');
+  const journalTplBefore = await blockRows(src, 'template', 'core-journal');
 
   const collected = await collectVaultContent(src, FULL);
   const backup = collected.content;
@@ -1061,14 +1073,18 @@ console.log('\n11. .vault.emerald: the round trip of a vault content, other vers
     (await dst2.select('SELECT COUNT(*) AS n FROM task_links'))[0].n === 0);
   dst2.close();
 
-  // As a new vault (add-vault): the seeded sigil template goes first, the file's arrives with its own blocks.
+  // As a new vault (add-vault): the seeded built-in templates go first (as `importDatabase` does), the file's arrive with their own blocks.
   const fresh = await freshVault('backup-add-vault.db');
   clearSavedBlocks();
-  await fresh.execute("DELETE FROM templates WHERE id = 'core-sigil'");
+  check('new vault: the seeded templates are exactly the built-ins a restore replaces',
+    JSON.stringify((await fresh.select('SELECT id FROM templates ORDER BY id')).map((r) => r.id)) === JSON.stringify([...BUILTIN_TEMPLATE_IDS].sort()));
+  await fresh.execute(`DELETE FROM templates WHERE id IN (${placeholders(BUILTIN_TEMPLATE_IDS.length)})`, [...BUILTIN_TEMPLATE_IDS]);
   const asNew = asFile(collected);
   await doReplace(fresh, asNew.content, asNew.files);
   check('new vault: the sigil template has exactly the blocks of the file',
     JSON.stringify(await blockRows(fresh, 'template', 'core-sigil')) === JSON.stringify(renamed(sigilBefore, asNew.files.images)));
+  check('new vault: the journal template has exactly the blocks of the file',
+    journalTplBefore.length === 2 && JSON.stringify(await blockRows(fresh, 'template', 'core-journal')) === JSON.stringify(journalTplBefore), journalTplBefore);
   fresh.close();
 
   // A crafted file with short picture keys: every name is renamed once, nothing grows key by key.

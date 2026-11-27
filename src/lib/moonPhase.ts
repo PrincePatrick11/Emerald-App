@@ -1,11 +1,10 @@
 import type { MoonPhase } from '../types';
-import { JOURNAL_CATEGORY_ID } from './schema';
 
 /**
  * Calculates the approximate moon phase for a given date.
  * Based on the known new moon on 2000-01-06 and the synodic period of ~29.53 days.
  */
-function getMoonPhase(date: Date = new Date()): MoonPhase {
+function getMoonPhase(date: Date): MoonPhase {
   const knownNewMoon = new Date('2000-01-06T18:14:00Z');
   const synodicPeriod = 29.53058867;
 
@@ -24,12 +23,6 @@ function getMoonPhase(date: Date = new Date()): MoonPhase {
   return 'waning_crescent';
 }
 
-/** The eight phases in cycle order — journal groups, filter chips, moon phase field. */
-export const MOON_PHASE_ORDER: readonly MoonPhase[] = [
-  'new', 'waxing_crescent', 'first_quarter', 'waxing_gibbous',
-  'full', 'waning_gibbous', 'last_quarter', 'waning_crescent',
-];
-
 export const MOON_PHASE_SYMBOLS: Record<MoonPhase, string> = {
   new: '🌑',
   waxing_crescent: '🌒',
@@ -42,15 +35,10 @@ export const MOON_PHASE_SYMBOLS: Record<MoonPhase, string> = {
 };
 
 /**
- * The moon phase of an entry of the category Journal: that of the day it was
- * created. Entries of any other category have none.
- * No column — a stored value was only a copy of it, which had to be reset on
- * import, category change and duplication.
- * `shown` is the vault setting `journal.moonPhase`: off means no
- * entry shows a phase, not even an old one.
+ * The moon phase of a day (local `yyyy-MM-dd`, as `BlockContext.entryDate`),
+ * taken at its local noon — one phase per day. `null` for anything else.
  */
-export function entryMoonPhase(entry: { created_at: string; category_id: string | null }, shown: boolean): MoonPhase | null {
-  if (!shown || entry.category_id !== JOURNAL_CATEGORY_ID) return null;
-  const created = new Date(entry.created_at);
-  return Number.isNaN(created.getTime()) ? null : getMoonPhase(created);
+export function moonPhaseOfDay(day: string | null): MoonPhase | null {
+  const m = day ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(day) : null;
+  return m ? getMoonPhase(new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12)) : null;
 }

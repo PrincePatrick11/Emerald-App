@@ -1,5 +1,4 @@
 import type { TFunction } from 'i18next';
-import { entryMoonPhase } from './moonPhase';
 import { DEFAULT_ENTRY_ICON, DEFAULT_TASK_ICON, entryIcon } from './entryIcon';
 import { displayTitle } from './entryTitle';
 import { categoryLabel, lookupCategory } from './categories';
@@ -35,8 +34,7 @@ export interface SuggestionItem {
   displayIcon?: string;
   /**
    * Translated name of the target's category — the heading under which an
-   * appended link lands in the entry. An entry with a moon phase (category
-   * Journal) shows the phase instead.
+   * appended link lands in the entry.
    */
   categoryLabel?: string;
   /**
@@ -67,8 +65,6 @@ interface LinkItemSources {
   tasks: readonly Task[];
   /** The one global list — entries and tasks both point into it. */
   categories: readonly Category[];
-  /** The vault setting `journal.moonPhase` — whether entries of the category Journal show their phase. */
-  showMoonPhase: boolean;
 }
 
 /**
@@ -89,15 +85,14 @@ export function buildLinkItems(s: LinkItemSources, t: TFunction): SuggestionItem
   return [
     ...s.entries.map((e) => {
       const cat = lookupCategory(catById, e.category_id);
-      const phase = entryMoonPhase(e, s.showMoonPhase);
       return {
         id: e.id,
         targetKind: 'entry' as const,
         label: displayTitle(t, 'entry', e.title),
         category: cat?.emoji,
         categoryId: cat?.id ?? null,
-        ...splitIcon(entryIcon(e, cat, s.showMoonPhase), cat?.emoji || DEFAULT_ENTRY_ICON),
-        categoryLabel: phase ? t(`moonPhase.${phase}`) : categoryLabel(t, cat),
+        ...splitIcon(entryIcon(e, cat), cat?.emoji || DEFAULT_ENTRY_ICON),
+        categoryLabel: categoryLabel(t, cat),
         updatedAt: e.updated_at,
         entry_number: e.entry_number,
       };

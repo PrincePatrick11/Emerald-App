@@ -13,7 +13,6 @@ import { extractInternalLinks } from '../../../lib/internalLinkHtml';
 import { linkedIdsOf } from '../../../lib/blocks/blockRefs';
 import { useCategoryStore } from '../../../store/categoryStore';
 import { categoryLabel } from '../../../lib/categories';
-import { MOON_PHASE_ORDER } from '../../../lib/moonPhase';
 import { viewOfLinkTarget } from '../../../store/entryViews';
 import {
   linkItemKey as itemKey, linkItemsByKey, resolveLink, type ResolvedLink as LinkedRow,
@@ -197,7 +196,7 @@ export default function LinkedEntriesField({ content }: Props) {
   const categories = useCategoryStore((s) => s.categories);
   const remove = ({ item, gone }: LinkedRow) => {
     const headingLabels = gone
-      ? [...categories.map((c) => categoryLabel(t, c)), ...MOON_PHASE_ORDER.map((p) => t(`moonPhase.${p}`))]
+      ? categories.map((c) => categoryLabel(t, c))
       : undefined;
     if (!requestEntryLinkRemove({ ...item, headingLabels })) return;
     setPending((prev) => prev.filter((p) => itemKey(p) !== itemKey(item)));

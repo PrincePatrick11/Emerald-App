@@ -1,19 +1,18 @@
 import {
-  Calendar, ChevronsUpDown, Hash, Image, Link2, ListChecks, ListFilter, Moon, PanelRight, Rows3, TextCursorInput, ToggleLeft, Type,
+  Calendar, ChevronsUpDown, Hash, Image, Link2, ListChecks, ListFilter, PanelRight, Rows3, TextCursorInput, ToggleLeft, Type,
   type LucideIcon,
 } from 'lucide-react';
 import { escapeHtml, internalLinkChipHtml, isBlankContent, isValidLinkTarget, linkTargetKindOf, decodeHtmlAttr } from '../internalLinkHtml';
 import { generateId, isRecord } from '../helpers';
 import { storedImageName } from '../schema';
-import { MOON_PHASE_ORDER, MOON_PHASE_SYMBOLS } from '../moonPhase';
-import type { LinkTargetKind, MoonPhase } from '../../types';
+import type { LinkTargetKind } from '../../types';
 import { neutralizeSectionTags } from './blockHtml';
 import { imageFromSlot, linkFromSlot, normalizeLinkCategoryFilter, translatedOr, type LinkCategoryFilter } from './toolkit';
 import { BLOCK_ATTR, type BlockInstance, type BlockTypeId } from './types';
 
 /**
  * The field block (`core.fields`): a sequence of elements — text, short text, number,
- * date, select, yes/no, checklist, link, image, moon phase. A
+ * date, select, yes/no, checklist, link, image. A
  * single field is a field block with one element; custom, composite
  * blocks (blocks view) are field blocks with several.
  *
@@ -37,7 +36,7 @@ import { BLOCK_ATTR, type BlockInstance, type BlockTypeId } from './types';
 export const FIELDS_BLOCK_TYPE = 'core.fields' satisfies BlockTypeId;
 
 export const ELEMENT_KINDS = [
-  'text', 'shorttext', 'number', 'date', 'select', 'toggle', 'checklist', 'link', 'image', 'moon',
+  'text', 'shorttext', 'number', 'date', 'select', 'toggle', 'checklist', 'link', 'image',
 ] as const;
 export type ElementKind = (typeof ELEMENT_KINDS)[number];
 
@@ -65,7 +64,6 @@ export const ELEMENT_KIND_ICONS: Record<ElementKind, LucideIcon> = {
   checklist: ListChecks,
   link: Link2,
   image: Image,
-  moon: Moon,
 };
 
 export interface SelectOption {
@@ -309,7 +307,6 @@ function parseValue(kind: ElementKind, raw: unknown): FieldValue | undefined {
     case 'shorttext':
     case 'date':
     case 'select':
-    case 'moon':
       return typeof raw === 'string' ? raw : undefined;
     case 'number':
       return typeof raw === 'number' && Number.isFinite(raw) ? raw : undefined;
@@ -466,8 +463,6 @@ export function isElementEmpty(element: ElementDef, model: FieldsModel): boolean
       return false;
     case 'checklist':
       return !Array.isArray(value) || value.length === 0;
-    case 'moon':
-      return !MOON_PHASE_ORDER.includes(value as MoonPhase);
     case 'text':
       // Visible content counts — an empty heading or an empty bullet point does not.
       return isBlankContent(model.slots[element.id] ?? '');
@@ -494,7 +489,6 @@ export interface FallbackText {
   label: (element: ElementDef) => string;
   yes: string;
   no: string;
-  moonName: (phase: MoonPhase) => string;
 }
 
 /** The label of a field element in the language of `t`: its own, otherwise the name of its kind. */
@@ -509,7 +503,6 @@ export function fieldFallbackText(t: (key: string) => string): FallbackText {
     label: (element) => elementLabel(t, element),
     yes: translatedOr(t, 'blocks.fields.yes', 'Yes'),
     no: translatedOr(t, 'blocks.fields.no', 'No'),
-    moonName: (phase) => translatedOr(t, `moonPhase.${phase}`, phase),
   };
 }
 
@@ -534,8 +527,6 @@ export function fieldValueHtml(element: ElementDef, model: FieldsModel, text: Fa
       return escapeHtml(value === true ? text.yes : text.no);
     case 'checklist':
       return checklistHtml(value as ChecklistItem[]);
-    case 'moon':
-      return `${MOON_PHASE_SYMBOLS[value as MoonPhase]} ${escapeHtml(text.moonName(value as MoonPhase))}`;
     default:
       return null;
   }

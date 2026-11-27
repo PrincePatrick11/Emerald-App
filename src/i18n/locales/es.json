@@ -184,7 +184,7 @@
       },
       "fields": {
         "label": "Campos",
-        "description": "Valores con etiqueta: texto, número, fecha, selección, sí/no, lista de verificación, enlace, imagen, fase lunar."
+        "description": "Valores con etiqueta: texto, número, fecha, selección, sí/no, lista de verificación, enlace, imagen."
       },
       "sigil": {
         "label": "Sigilo",
@@ -208,6 +208,11 @@
       "altar": {
         "label": "Altar",
         "description": "Un lienzo con «Imágenes» debajo para arrastrar imágenes."
+      },
+      "moon": {
+        "label": "Fase lunar",
+        "description": "La fase lunar del día en que se creó la entrada: símbolo y nombre, sin nada que elegir.",
+        "outsideEntry": "En la entrada muestra la fase lunar del día de su creación."
       }
     },
     "kinds": {
@@ -219,8 +224,7 @@
       "toggle": "Sí/No",
       "checklist": "Lista de verificación",
       "link": "Enlace",
-      "image": "Imagen",
-      "moon": "Fase lunar"
+      "image": "Imagen"
     },
     "fields": {
       "yes": "Sí",
@@ -865,7 +869,6 @@
     "title": "Propiedades",
     "category": "Categoría",
     "noCategory": "Ninguna",
-    "moonPhase": "Fase lunar",
     "tags": "Etiquetas",
     "noTags": "Sin etiquetas",
     "linkedEntries": "Entradas enlazadas",
@@ -1108,7 +1111,6 @@
     "tagCreateDashboardOnly": "Solo en Etiquetas",
     "groupTags": "Etiquetas",
     "groupEditor": "Formato",
-    "groupJournal": "Diario",
     "uiScaleHint": "Escala toda la interfaz — texto, iconos y espacios.",
     "editorFontSizeHint": "Tamaño del texto en entradas y valores de campo, independiente del tamaño de la interfaz.",
     "sidebarListHint": "Qué entradas muestra la barra lateral izquierda: todas o las de un panel.",
@@ -1132,10 +1134,6 @@
     "typographyHint": "Las comillas rectas se vuelven tipográficas, -- una raya, -> una flecha, 1/2 se convierte en ½.",
     "autoLinks": "Enlaces automáticos",
     "autoLinksHint": "Una dirección escrita o pegada se convierte en enlace.",
-    "moonPhase": "Fase lunar",
-    "moonPhaseHint": "La fase lunar del día en que se creó una entrada del diario.",
-    "moonPhaseShow": "Mostrar en las entradas del diario",
-    "moonPhaseShowHint": "Se aplica a todas las entradas del diario, también a las antiguas. Desactivado: sin fase lunar como icono, en la barra lateral ni en la exportación.",
     "trashRetentionHint": "Cuánto tiempo permanece lo eliminado en la papelera. Después se borra definitivamente al abrir el vault.",
     "customThemeImport": "Importar tema…",
     "customThemeRemove": "Quitar «{{name}}»",
@@ -1291,7 +1289,9 @@
     "untitled": "Plantilla sin título",
     "builtin": {
       "sigil": "Sigilo",
-      "altar": "Altar"
+      "altar": "Altar",
+      "journal": "Diario",
+      "dreams": "Diario de sueños"
     },
     "newTemplate": "Nueva plantilla",
     "defaultName": "Nueva plantilla",

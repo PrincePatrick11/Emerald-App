@@ -106,10 +106,9 @@ async function resolveInternalLinkIcons(html: string): Promise<string> {
 
     let icon = '';
     if (targetKind === 'entry') {
-      // The same icon as in the app, but without the moon phase, which the
-      // chip shows live only — so not the list's icon, which may carry it.
+      // The same icon as in the app (`entryIcon`).
       const entry = entries.find(e => e.id === id);
-      if (entry) icon = entryIcon(entry, categories.find(c => c.id === entry.category_id), false);
+      if (entry) icon = entryIcon(entry, categories.find(c => c.id === entry.category_id));
     } else {
       // Task chips from sidebar drags carry no data-icon — as in the
       // editor's live lookup: the list's icon (category emoji, else the fallback).
@@ -205,13 +204,10 @@ export function exportDate(iso: string | Date): string {
   return format(new Date(iso), 'MMMM d, yyyy');
 }
 
-// Top bar: icon, date and the moon phase's or category's name — 🌕 January 15, 2026 · Full Moon
+// Top bar: icon, date and the category's name — 📓 January 15, 2026 · Journal
 function buildTopBar(data: ExportData): string {
   const dateStr = exportDate(data.createdAt);
-
-  // data.moonPhase = "🌕 Full Moon" — the name after the first space
-  const sp = data.moonPhase?.indexOf(' ') ?? -1;
-  const subtitle = data.moonPhase ? (sp > 0 ? data.moonPhase.slice(sp + 1) : '') : data.category?.label ?? '';
+  const subtitle = data.category?.label ?? '';
 
   const icon = exportIcon(data);
   const iconHtml = icon.image
@@ -273,7 +269,7 @@ const PRINT_CSS = `
     margin-bottom: 0.5em; padding-bottom: 0.4em; border-bottom: 2px solid #eee;
   }
   .entry-number { font-size: 0.5em; font-weight: normal; color: #999; margin-left: 0.4em; vertical-align: middle; }
-  /* Top bar: 🌕 January 15, 2026 · Full Moon — plain, like the main view */
+  /* Top bar: 📓 January 15, 2026 · Journal — plain, like the main view */
   .entry-topbar {
     display: flex; align-items: baseline; gap: 6px;
     margin-bottom: 0.5em;
@@ -546,7 +542,6 @@ function createMarkdownConverter(): TurndownService {
 function markdownOf(data: ExportData, td: TurndownService): string {
   const lines: string[] = [`# ${data.title}`, ''];
   lines.push(`*${exportDate(data.createdAt)}*`);
-  if (data.moonPhase)   lines.push(`Moon: ${data.moonPhase}`);
   if (data.category)            lines.push(`Category: ${mdIcon(data.category.icon, data.category.fallbackIcon)}${data.category.label}`.trim());
   if (data.tagNames?.length)    lines.push(`Tags: ${data.tagNames.join(', ')}`);
   lines.push('', '---', '');

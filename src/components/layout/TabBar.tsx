@@ -17,7 +17,6 @@ import { useCategoryStore } from '../../store/categoryStore';
 import { useBlockDefinitionStore } from '../../store/blockDefinitionStore';
 import { useTemplateStore } from '../../store/templateStore';
 import { useLexiconStore } from '../../store/lexiconStore';
-import { useSettingsStore } from '../../store/settingsStore';
 import { definitionLabel, templateLabel } from '../../lib/blocks/blockAttrs';
 import { AUX_VIEWS, dashboardIcon, ENTRY_ICON, TASKS_VIEW } from '../../lib/modules';
 import { dashboardLabel } from '../../lib/dashboards';
@@ -56,7 +55,6 @@ function TabButton({ view, onSelect, onClose }: { view: ActiveView; onSelect: ()
   const language = useLexiconStore((s) => (type === 'lexicon' && id ? s.languages.find((l) => l.id === id) : undefined));
   const categoryId = entry?.category_id;
   const category = useCategoryStore((s) => (categoryId ? s.categories.find((c) => c.id === categoryId) : undefined));
-  const showMoonPhase = useSettingsStore((s) => s.settings.journal.moonPhase);
   // A dashboard's list — by name, as renamed. A deleted one shows "All entries"
   // (and so does an unknown dashboard id) — the tab says so too.
   const dashboardId = type === 'dashboard' ? (id ?? 'all') : undefined;
@@ -79,7 +77,7 @@ function TabButton({ view, onSelect, onClose }: { view: ActiveView; onSelect: ()
   if (dashboard) {
     icon = renderIconValue(dashboard.icon, <Icon size={14} />);
   } else if (isEntry) {
-    icon = entry ? renderIconValue(entryIcon(entry, category, showMoonPhase), null) : <Icon size={14} />;
+    icon = entry ? renderIconValue(entryIcon(entry, category), null) : <Icon size={14} />;
   } else if (type === 'blocks' && id) {
     icon = renderIconValue(definition?.icon, <Icon size={14} />);
   } else if (type === 'templates' && id) {
