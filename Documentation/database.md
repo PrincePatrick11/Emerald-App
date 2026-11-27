@@ -152,7 +152,7 @@ The user-built blocks of the Blocks view. A row is only the template — an inse
 | id | TEXT PK | UUID |
 | name | TEXT | NOT NULL |
 | icon | TEXT | emoji or an icon file (see [Icons](#icons)), NOT NULL DEFAULT `'🧩'`; a copy carries it in its config |
-| elements | TEXT | JSON array of `ElementDef` (`id`, `kind`, `label`, `options`, `hideWhenEmpty`, `defaultValue`), NOT NULL DEFAULT `'[]'`; read through the same validation as a copy in content |
+| elements | TEXT | JSON array of `ElementDef` (`id`, `kind`, `label`, `hideWhenEmpty`, `uses`, `defaultValue`, the kind's own settings — a choice's `options`, a link's `linkCategories` — and `v`, the kind's data version, only above 1), NOT NULL DEFAULT `'[]'`; read through the same validation as a copy in content |
 | display | TEXT | JSON `{ readHideEmpty, readOnly, showTitle }`, NOT NULL DEFAULT `'{}'` (missing keys fall back to their defaults) |
 | sort_order | INTEGER | NOT NULL DEFAULT 0 |
 | created_at / updated_at | TEXT | ISO 8601 |
@@ -160,7 +160,7 @@ The user-built blocks of the Blocks view. A row is only the template — an inse
 
 An element's kind never changes — the builder adds a new element instead.
 
-An element's `defaultValue` (the builder's "Prefill") is what a new copy starts with. A scalar (checklist, choice, …) is stored as the value itself; a `link` element stores `{id, targetKind, label}`; an `image` element stores the filename. Nothing here is markup — `instantiateDefinition` turns a default into a link chip or `<img>` only inside the copy it creates, so the definition row never needs the link or image machinery to understand it.
+An element's `defaultValue` (the builder's "Prefill") is what a new copy starts with. Its shape is the kind's, checked by the kind on reading. A scalar (checklist, choice, …) is stored as the value itself; a `link` element stores `{id, targetKind, label}`; an `image` element stores the filename. Nothing here is markup — `instantiateDefinition` turns a default into a link chip or `<img>` only inside the copy it creates, so the definition row never needs the link or image machinery to understand it.
 
 ### templates
 

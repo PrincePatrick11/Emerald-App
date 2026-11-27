@@ -359,7 +359,8 @@ export interface BlockTypeDef {
   /**
    * 11 — the block without its link to an entry or task, where no mounted text
    * editor holds it ("Linked entries" removing one): a link field emptied, a
-   * chip in a text turned into its word. `t` words what the block writes
+   * chip in a text turned into its word, a sigil's charging technique cleared.
+   * `t` words what the block writes
    * along (its readable markup). The same block if it holds none.
    */
   withoutLink?: (block: BlockInstance, target: string, t: (key: string) => string) => BlockInstance;

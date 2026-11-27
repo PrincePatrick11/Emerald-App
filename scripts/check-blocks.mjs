@@ -10,7 +10,7 @@
  *   npm run check:blocks
  */
 import { build } from 'esbuild';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -26,6 +26,7 @@ writeFileSync(
   `export { parseBlocks, serializeBlocks, createTextBlock, blockSectionHtml, neutralizeSectionTags } from '${root}/src/lib/blocks/blockHtml';
    export { TEXT_BLOCK_TYPE, BLOCK_ATTR } from '${root}/src/lib/blocks/types';
    export { parseFields, serializeFields, createFieldsBlock, isElementEmpty, isHiddenInRead } from '${root}/src/lib/blocks/fields';
+   export { fieldKinds, fieldKindOf, registerFieldKind } from '${root}/src/lib/blocks/fieldKinds';
    export { instantiateDefinition, parseDefinitionElements, parseDefinitionDisplay, remapDefinitionDefaults, definitionImageRefs } from '${root}/src/lib/blocks/definitions';
    export { entryBlockSummary, entryBlockValue } from '${root}/src/lib/blocks/entrySummary';
    export { createSigilBlock, parseSigilCharge, serializeSigilCharge, sigilPartBlock, sigilPartId, withSigilPart, shownSigilParts, isSigilBroken, SIGIL_SETTINGS } from '${root}/src/lib/blocks/sigil';
@@ -57,6 +58,9 @@ writeFileSync(
    export { moonPhaseOfDay } from '${root}/src/lib/moonPhase';`
 );
 
+/** The texts a field kind writes into the readable fallback (`FallbackText.t`): yes and no. */
+const yesNo = (yes, no) => (key) => ({ 'blocks.fields.yes': yes, 'blocks.fields.no': no })[key] ?? key;
+
 const bundlePath = join(workDir, 'bundle.mjs');
 let bundle;
 try {
@@ -76,6 +80,7 @@ try {
 const {
   parseBlocks, serializeBlocks, createTextBlock, neutralizeSectionTags, TEXT_BLOCK_TYPE, BLOCK_ATTR, extractInternalLinks, withCurrentLinkTitles,
   parseFields, serializeFields, createFieldsBlock, isElementEmpty, isHiddenInRead, linkFromSlot, imageFromSlot,
+  fieldKinds, fieldKindOf, registerFieldKind,
   internalLinkChipHtml,
   instantiateDefinition, parseDefinitionElements, parseDefinitionDisplay, entryBlockSummary, entryBlockValue,
   extractUniqueLetters, parseSigilCalc, serializeSigilCalc, letterList, contentSearchText,
@@ -249,7 +254,7 @@ console.log('\n4b. Deception attempts\n');
 
 console.log('\n4c. Field block\n');
 {
-  const text = { label: (el) => el.label || el.kind, yes: 'Ja', no: 'Nein' }; // lang-ok
+  const text = { label: (el) => el.label || el.kind, t: yesNo('Ja', 'Nein') }; // lang-ok
 
   const fresh = parseFields(createFieldsBlock('shorttext'));
   check(
@@ -366,9 +371,81 @@ console.log('\n4c. Field block\n');
     !isHiddenInRead(keepEmpty, { ...model, elements: [keepEmpty] }) && isHiddenInRead(el, model));
 }
 
+console.log('\n4c2. Field kinds as building blocks (lib/blocks/fieldKinds.ts)\n');
+{
+  const locales = ['de', 'en', 'es', 'fr'].map((lang) => JSON.parse(readFileSync(`${root}/src/i18n/locales/${lang}.json`, 'utf8')));
+  const textOf = (locale, key) => key.split('.').reduce((node, part) => (node && typeof node === 'object' ? node[part] : undefined), locale);
+  for (const kind of fieldKinds()) {
+    const problems = [];
+    if (!locales.every((locale) => typeof textOf(locale, kind.labelKey) === 'string')) problems.push('name missing in a locale');
+    if (kind.storage === 'value' && (!kind.parseValue || !kind.fallbackHtml)) problems.push('a value kind checks and writes its value');
+    if (!kind.startUses.every((use) => kind.uses.includes(use))) problems.push('starts with a use it cannot have');
+    if (kind.textEditor && kind.storage !== 'slot') problems.push('a text editor keeps its HTML in a slot');
+    if (!Number.isInteger(kind.dataVersion) || kind.dataVersion < 1) problems.push('data version');
+    // A kind that cannot be empty says so in both places: no "hide when empty", and never empty when asked.
+    const neverEmpty = kind.isEmpty({ element: { id: 'x', kind: kind.id, label: '' }, stored: undefined }) === false;
+    if ((kind.canBeEmpty === false) !== neverEmpty) problems.push('canBeEmpty and isEmpty disagree');
+    check(`the field kind "${kind.id}" brings everything along`, problems.length === 0, problems);
+  }
+  check('the kinds are offered in their order, text first',
+    fieldKinds().map((k) => k.id).join() === 'text,shorttext,number,date,select,toggle,checklist,link,image');
+
+  // A kind in its second data version: an element stored in the first is brought up, value and all.
+  // It stays registered for the rest of the run; nothing after this enumerates the kinds.
+  registerFieldKind({
+    id: 'test.versioned', icon: fieldKindOf('number').icon, labelKey: 'blocks.kinds.number', dataVersion: 2, storage: 'value',
+    upgrade: ({ element, value }, from) => ({
+      element: { ...element, label: `${element.label} (v${from})` },
+      stored: typeof value === 'string' ? Number(value) : value,
+    }),
+    parseValue: (raw) => (typeof raw === 'number' ? raw : undefined),
+    isEmpty: ({ stored }) => typeof stored !== 'number',
+    uses: [], startUses: [], sortable: true,
+    fallbackHtml: ({ stored }) => String(stored),
+    value: ({ stored }) => ({ kind: 'number', value: stored }),
+  });
+  const versioned = (v, value) => ({ id: 'tv', type: 'core.fields', html: '', attrs: {
+    [BLOCK_ATTR.config]: JSON.stringify({ elements: [{ id: 'n', kind: 'test.versioned', label: 'Zahl', ...(v ? { v } : {}) }] }), // lang-ok
+    [BLOCK_ATTR.data]: JSON.stringify({ values: { n: value } }),
+  } });
+  const oldBlock = versioned(undefined, '7');
+  const old = parseFields(oldBlock);
+  const rewritten = JSON.parse(serializeFields(oldBlock, old, { label: (e) => e.label, t: (k) => k }).attrs[BLOCK_ATTR.config]);
+  check('an element of an older data version is brought up with its value, and written in the new one',
+    !old.broken && old.elements[0].label === 'Zahl (v1)' && old.values.n === 7 && rewritten.elements[0].v === 2, old); // lang-ok
+  const current = parseFields(versioned(2, 5));
+  check('an element of the current data version is read as it is',
+    !current.broken && current.elements[0].label === 'Zahl' && current.values.n === 5, current); // lang-ok
+  const unknownKind = { ...oldBlock, attrs: { [BLOCK_ATTR.config]: JSON.stringify({ elements: [{ id: 'q', kind: 'test.unknown', label: '' }] }) } };
+  check('an element of a newer data version leaves the block unreadable, as an unknown kind does',
+    parseFields(versioned(3, 5)).broken && parseFields(unknownKind).broken);
+  // A kind whose second version keeps in the JSON what its first kept as markup.
+  registerFieldKind({
+    id: 'test.moved', icon: fieldKindOf('number').icon, labelKey: 'blocks.kinds.shorttext', dataVersion: 2, storage: 'value',
+    upgrade: ({ element, slot }) => ({ element, stored: slot ? slot.replace(/<[^>]*>/g, '') : undefined }),
+    parseConfig: () => ({ id: 'hijacked', label: 'hijacked' }),
+    parseValue: (raw) => (typeof raw === 'string' ? raw : undefined),
+    isEmpty: ({ stored }) => !stored,
+    uses: [], startUses: [], sortable: true,
+    fallbackHtml: ({ stored }) => String(stored),
+    value: ({ stored }) => ({ kind: 'text', text: stored }),
+  });
+  const moved = parseFields({ id: 'tm', type: 'core.fields', html: '<dl><dd data-block-slot="el:m"><p>alt</p></dd></dl>', attrs: {
+    [BLOCK_ATTR.config]: JSON.stringify({ elements: [{ id: 'm', kind: 'test.moved', label: 'Feld' }] }),
+  } });
+  check('an upgrade gets what the field held as markup and moves it into the JSON; the old slot is gone',
+    !moved.broken && moved.values.m === 'alt' && moved.slots.m === undefined, moved);
+  check('a kind’s own settings never overwrite an element’s ID or label',
+    moved.elements[0].id === 'm' && moved.elements[0].label === 'Feld', moved.elements[0]);
+  check('a definition drops an element of a newer data version or of an unknown kind',
+    parseDefinitionElements(JSON.stringify([
+      { id: 'a', kind: 'test.versioned', label: '', v: 3 }, { id: 'b', kind: 'test.unknown', label: '' }, { id: 'c', kind: 'number', label: '' },
+    ])).map((e) => e.id).join() === 'c');
+}
+
 console.log('\n4d. Custom blocks: copies\n');
 {
-  const text = { label: (el) => el.label || el.kind, yes: 'Ja', no: 'Nein' };
+  const text = { label: (el) => el.label || el.kind, t: yesNo('Ja', 'Nein') };
   const def = {
     id: 'def-1', name: 'Ritual', icon: '🕯️', sort_order: 0,
     created_at: '', updated_at: '', deleted_at: null,
@@ -856,7 +933,7 @@ console.log('\n4g. Link and image defaults with markup\n');
     title: (b) => `T:${b.type}`, date: (iso) => iso, number: String, t: (key) => key,
     yes: 'Ja', no: 'Nein', concealed: (until) => `C:${until}`, reveal: 'R', conceal: 'Z',
   };
-  const fallbackText = { label: (e) => e.label, yes: 'Ja', no: 'Nein' };
+  const fallbackText = { label: (e) => e.label, t: yesNo('Ja', 'Nein') };
 
   const elements = parseDefinitionElements(JSON.stringify([
     { id: 'lnk', kind: 'link', label: 'Quelle', defaultValue: { id: linkTargetId, targetKind: 'entry', label: 'Artikel' } },
@@ -1052,7 +1129,7 @@ console.log('\n7. Blocks as rows (blocks, block_refs)\n');
   const def = `${'5'.repeat(64)}.webp`;
   const linked = '33333333-3333-3333-3333-333333333333';
   const chip = internalLinkChipHtml({ id: linked, targetKind: 'entry', label: 'Ziel' }); // lang-ok
-  const fallback = { label: (e) => e.label, yes: 'Yes', no: 'No' };
+  const fallback = { label: (e) => e.label, t: yesNo('Yes', 'No') };
 
   const linkBlock = createFieldsBlock('link');
   const linkModel = parseFields(linkBlock);
@@ -1359,7 +1436,7 @@ console.log('\n7b. Block interfaces: registry, toolkit, copies, actions, setting
 
   // The export names a link field's target by its current title, as lists and the panel do.
   {
-    const fieldText = { label: (el) => el.label || el.kind, yes: 'Ja', no: 'Nein' }; // lang-ok
+    const fieldText = { label: (el) => el.label || el.kind, t: yesNo('Ja', 'Nein') }; // lang-ok
     const linkBlock = createFieldsBlock('link');
     const model = parseFields(linkBlock);
     const linkChip = internalLinkChipHtml({ id: target, targetKind: 'entry', label: 'Alter Titel' }); // lang-ok
@@ -1439,7 +1516,7 @@ console.log('\n7c. Interfaces that keep the app free of any one type\n');
     ] }) },
   };
   const model = parseFields(custom);
-  const filled = serializeFields(custom, { ...model, slots: { l1: chipTo(target), t1: `<p>siehe ${chipTo(target)} und ${chipTo(otherId)}</p>`, l2: chipTo(otherId) } }, { label: (e) => e.label, yes: 'J', no: 'N' }); // lang-ok
+  const filled = serializeFields(custom, { ...model, slots: { l1: chipTo(target), t1: `<p>siehe ${chipTo(target)} und ${chipTo(otherId)}</p>`, l2: chipTo(otherId) } }, { label: (e) => e.label, t: yesNo('J', 'N') }); // lang-ok
   const without = parseFields(blockWithoutLink(filled, target, T));
   check('removing a link (11): the link field holding it is emptied, a chip in a text field becomes its word, other links stay',
     !without.slots.l1 && without.slots.l2 === chipTo(otherId) && !without.slots.t1.includes(target) && without.slots.t1.includes(otherId) && without.slots.t1.includes('Z'),
@@ -1532,7 +1609,7 @@ console.log('\n8. .emerald manifest (lib/emerald/manifest.ts)\n');
   const contentA = serializeBlocks([
     { ...createTextBlock(`<p>see ${chipTo(idB, 'B')} and ${chipTo(outside, 'Elsewhere')}</p><img src="${pic}">`), id: 'blk-a' },
   ]);
-  const fields = createFieldsBlock();
+  const fields = createFieldsBlock('shorttext');
   const contentB = serializeBlocks([
     { ...createTextBlock(`<p>back to ${chipTo(idA, 'A')}</p><img src="${kept}">`), id: 'blk-b' },
     { ...fields, attrs: { ...fields.attrs, [BLOCK_ATTR.data]: JSON.stringify({ slots: { l: `link:${idA}` } }) } },

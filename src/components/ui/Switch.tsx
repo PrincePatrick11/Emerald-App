@@ -3,8 +3,8 @@ import type { LucideIcon } from 'lucide-react';
 /**
  * An on/off switch with track and knob. For settings that take effect
  * immediately and have no third state: in the dashboard sidebar,
- * grouping and display. A block's yes/no field (`ToggleSwitch` in
- * FieldValueEditor) is deliberately something else: there the value is content, with
+ * grouping and display. A block's yes/no field (`ToggleSwitch` in the
+ * yes/no kind's views) is deliberately something else: there the value is content, with
  * a label, not a control.
  */
 function Switch({ checked, onChange, disabled, title }: {

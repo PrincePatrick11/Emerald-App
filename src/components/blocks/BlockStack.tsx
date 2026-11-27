@@ -214,7 +214,7 @@ export default function BlockStack({
   }, [linkingEditors, linkingEditor, targetEditor, commit]);
 
   /**
-   * Links outside a mounted text editor (a link field) — by the blocks'
+   * Links outside a mounted text editor (a link field, a sigil's charging technique) — by the blocks'
    * references, as "Linked entries" lists them (`blockLinksTo`). Jumping goes
    * to the first block that links to `target`; removing takes the link out of
    * the first block whose type can (`withoutLink`) — a block linking without

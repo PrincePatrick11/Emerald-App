@@ -3,15 +3,15 @@ import {
   canBeEmpty, elementLabel, elementKindLabelKey, parseFields, serializeFields, withFieldUse, type ElementDef, type FieldsModel,
 } from '../../lib/blocks/fields';
 import { useFieldFallbackText } from './useFieldFallbackText';
-import OptionsEditor from './OptionsEditor';
 import FieldUseToggles from './FieldUseToggles';
+import { fieldKindView } from './fieldKindViews';
 import { SwitchRow } from '../ui/Switch';
 import type { BlockSidebarEditProps } from './blockSidebarViews';
 
 /**
  * The settings of a field block, expanded below its row in edit mode: per
  * element the label, where it shows outside the block (info line, panel,
- * filter and sort), for a choice the options, and whether it is hidden when empty in
+ * filter and sort), the settings of its own kind (a choice's options), and whether it is hidden when empty in
  * read mode; for the whole block "completely
  * read-only". Every change rewrites the block (JSON + fallback)
  * via the stack, and Cancel rolls it back. Labels and inputs in the
@@ -31,6 +31,7 @@ export default function FieldsSidebarEdit({ block, update }: BlockSidebarEditPro
     <div className="min-w-0 space-y-3">
       {elements.map((element, index) => {
         const hides = element.hideWhenEmpty ?? model.display.readHideEmpty;
+        const Settings = fieldKindView(element)?.Settings;
         return (
           <div key={element.id} className="space-y-2">
             {/* Several elements: one quiet subsection each, from the second on with a line before it. */}
@@ -52,9 +53,7 @@ export default function FieldsSidebarEdit({ block, update }: BlockSidebarEditPro
               <FieldUseToggles element={element} onChange={(use, on) => patchElement(element.id, { uses: withFieldUse(element, use, on).uses })} />
             </div>
 
-            {element.kind === 'select' && (
-              <OptionsEditor variant="panel" options={element.options ?? []} onChange={(options) => patchElement(element.id, { options })} />
-            )}
+            {Settings && <Settings element={element} variant="panel" onPatch={(patch) => patchElement(element.id, patch)} />}
 
             {canBeEmpty(element.kind) && (
               <SwitchRow

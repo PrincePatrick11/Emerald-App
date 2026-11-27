@@ -1,8 +1,12 @@
-import { generateId } from '../helpers';
+import { generateId, isRecord } from '../helpers';
+import { fieldKindOf } from './fieldKinds';
+import type { PrefillRemap } from './fieldKinds/fieldKind';
 import {
-  DEFAULT_DISPLAY, FIELDS_BLOCK_TYPE, isSlotKind, parseDisplay, parseElements, parseFields, serializeFields, slotFromDefault,
-  type DisplayRules, type ElementDef, type FallbackText, type FieldsModel, type FieldValue,
+  DEFAULT_DISPLAY, FIELDS_BLOCK_TYPE, isReadableElement, parseDisplay, parseElements, parseFields, prefillStored, reportPrefillRefs,
+  serializeFields, upgradedElement, withFieldStored,
+  type DisplayRules, type ElementDef, type FallbackText, type FieldsModel,
 } from './fields';
+import { RefReporter } from './toolkit';
 import { BLOCK_ATTR, type BlockInstance } from './types';
 
 /**
@@ -89,23 +93,27 @@ export function parseDefinitionDisplay(raw: unknown): DefinitionDisplay {
 /**
  * The image files that a definition's defaults name. They appear in no
  * content until a copy is made — backup, `.emerald` and the image cleanup
- * therefore have to know them specifically.
+ * therefore have to know them specifically. Each kind says what its prefill
+ * points at.
  */
 export function definitionImageRefs(elements: readonly ElementDef[]): string[] {
-  return elements
-    .filter((e) => e.kind === 'image' && typeof e.defaultValue === 'string')
-    .map((e) => e.defaultValue as string);
+  const report = new RefReporter();
+  for (const element of elements) reportPrefillRefs(element, report);
+  return report.refs.filter((ref) => ref.kind === 'image').map((ref) => ref.target);
 }
 
 /** A link target as the import resolves it — `null` means: does not exist here. */
-export type LinkDefaultResolver = (target: { id: string; targetKind: string; label: string }) => { id: string; label: string; targetKind?: string } | null;
+export type LinkDefaultResolver = PrefillRemap['link'];
 
 /**
  * The `elements` of a definition row from a foreign source with rewritten
- * defaults: image names via `image`, link targets via `link` (merge import
- * by the copies' fresh IDs, `.emerald` by the ID of an entry of the same file). If `link` finds no target, the
- * default is dropped — otherwise every new copy would carry a chip pointing
- * nowhere. Unreadable input comes back unchanged; reading validates anyway.
+ * defaults, each as its kind maps it: image names via `image`, link targets
+ * via `link` (merge import by the copies' fresh IDs, `.emerald` by the ID of
+ * an entry of the same file). A prefill its kind drops (a link whose target is
+ * not there) is taken out — otherwise every new copy would carry a chip
+ * pointing nowhere. An element of an older data version is brought up first;
+ * unreadable input, kinds this app does not know and an element of a newer
+ * version come back unchanged; reading validates anyway.
  */
 export function remapDefinitionDefaults(
   rawElements: unknown,
@@ -115,23 +123,16 @@ export function remapDefinitionDefaults(
   const parsed = parseJsonText(rawElements);
   if (!Array.isArray(parsed)) return rawElements;
   const remapped = parsed.map((el: unknown) => {
-    if (typeof el !== 'object' || el === null || !('defaultValue' in el)) return el;
-    const value = (el as { defaultValue: unknown }).defaultValue;
-    if (typeof value === 'string' && (el as { kind?: unknown }).kind === 'image') return { ...el, defaultValue: image(value) };
-    if (typeof value === 'object' && value !== null && typeof (value as { id?: unknown }).id === 'string') {
-      const raw = value as { id: string; targetKind?: unknown; label?: unknown };
-      const target = link({
-        id: raw.id,
-        targetKind: typeof raw.targetKind === 'string' ? raw.targetKind : '',
-        label: typeof raw.label === 'string' ? raw.label : '',
-      });
-      if (!target) {
-        const { defaultValue: _dropped, ...rest } = el as Record<string, unknown>;
-        return rest;
-      }
-      return { ...el, defaultValue: { ...raw, id: target.id, label: target.label, ...(target.targetKind ? { targetKind: target.targetKind } : {}) } };
+    if (!isRecord(el) || el.defaultValue === undefined || typeof el.kind !== 'string' || !isReadableElement(el)) return el;
+    const remap = fieldKindOf(el.kind)?.prefill?.remap;
+    if (!remap) return el;
+    const up = upgradedElement(el, { value: undefined, slot: undefined }).raw as Record<string, unknown>;
+    const value = remap(up.defaultValue, { image, link });
+    if (value === undefined) {
+      const { defaultValue: _dropped, ...rest } = up;
+      return rest;
     }
-    return el;
+    return { ...up, defaultValue: value };
   });
   return typeof rawElements === 'string' ? JSON.stringify(remapped) : remapped;
 }
@@ -141,24 +142,18 @@ function blockDisplay(display: DefinitionDisplay): DisplayRules {
 }
 
 /**
- * The elements' defaults — what a new copy (or a new element in it)
- * receives: scalars as values, link and image as a slot.
+ * The elements' prefills — what a new copy receives, each as its kind makes
+ * a value or a slot of it (a checklist's items with IDs of their own).
  */
-function defaultsOf(elements: readonly ElementDef[]): Pick<FieldsModel, 'values' | 'slots'> {
-  const values: Record<string, FieldValue> = {};
-  const slots: Record<string, string> = {};
+function withPrefills(model: FieldsModel, elements: readonly ElementDef[]): { model: FieldsModel; filled: boolean } {
+  let filled = false;
   for (const element of elements) {
-    if (element.defaultValue === undefined) continue;
-    if (isSlotKind(element.kind)) {
-      const slot = slotFromDefault(element);
-      if (slot) slots[element.id] = slot;
-      continue;
-    }
-    const value = element.defaultValue as FieldValue;
-    // A checklist gets its own item IDs so that two copies do not carry the same ones.
-    values[element.id] = Array.isArray(value) ? value.map((item) => ({ ...item, id: generateId() })) : value;
+    const stored = prefillStored(element, true);
+    if (stored === undefined) continue;
+    model = withFieldStored(model, element, stored);
+    filled = true;
   }
-  return { values, slots };
+  return { model, filled };
 }
 
 /**
@@ -180,12 +175,6 @@ export function instantiateDefinition(def: BlockDefinition, text: FallbackText):
   // The field block's default is "without title"; only the deviation becomes an attribute.
   if (def.display.showTitle) attrs[BLOCK_ATTR.showTitle] = '1';
   const block: BlockInstance = { id: generateId(), type: FIELDS_BLOCK_TYPE, html: '', attrs };
-  const defaults = defaultsOf(elements);
-  if (Object.keys(defaults.values).length === 0 && Object.keys(defaults.slots).length === 0) return block;
-  const model = parseFields(block);
-  return serializeFields(block, {
-    ...model,
-    values: { ...model.values, ...defaults.values },
-    slots: { ...model.slots, ...defaults.slots },
-  }, text);
+  const prefilled = withPrefills(parseFields(block), elements);
+  return prefilled.filled ? serializeFields(block, prefilled.model, text) : block;
 }

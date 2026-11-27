@@ -1,32 +1,34 @@
-import {
-  Calendar, ChevronsUpDown, Hash, Image, Link2, ListChecks, ListFilter, PanelRight, Rows3, TextCursorInput, ToggleLeft, Type,
-  type LucideIcon,
-} from 'lucide-react';
-import { escapeHtml, internalLinkChipHtml, isBlankContent, isValidLinkTarget, linkTargetKindOf, decodeHtmlAttr } from '../internalLinkHtml';
+import { ListFilter, PanelRight, Rows3, type LucideIcon } from 'lucide-react';
+import { escapeHtml, decodeHtmlAttr } from '../internalLinkHtml';
 import { generateId, isRecord } from '../helpers';
-import { storedImageName } from '../schema';
-import type { LinkTargetKind } from '../../types';
 import { neutralizeSectionTags } from './blockHtml';
-import { imageFromSlot, linkFromSlot, normalizeLinkCategoryFilter, translatedOr, type LinkCategoryFilter } from './toolkit';
+import { fieldKindOf } from './fieldKinds';
+import {
+  FIELD_USES, type ElementDef, type FallbackText, type FieldKindDef, type FieldRead, type FieldUse, type FieldUses, type FieldValue,
+} from './fieldKinds/fieldKind';
+import type { RefReporter } from './toolkit';
 import { BLOCK_ATTR, type BlockInstance, type BlockTypeId } from './types';
 
 /**
- * The field block (`core.fields`): a sequence of elements — text, short text, number,
- * date, select, yes/no, checklist, link, image. A
- * single field is a field block with one element; custom, composite
- * blocks (blocks view) are field blocks with several.
+ * The field block (`core.fields`): a sequence of fields (elements), each of a
+ * kind of its own — text, short text, number, date, choice, yes/no, checklist,
+ * link, image (`fieldKinds.ts`). A single field is a field block with one
+ * element; custom, composite blocks (blocks view) are field blocks with several.
+ *
+ * This module knows no kind: what a field holds, when it is empty, how it reads
+ * and writes, the kind says (`FieldKindDef`, `fieldKinds/fieldKind.ts`).
  *
  * Where things are — the same convention as for all blocks:
  * - `data-block-config` (JSON): the elements and the display rules.
- * - `data-block-data` (JSON): scalar values, under the ID of their element.
- * - References, images and text are NOT in the JSON, but stand as a real link chip,
- *   `<img src>` or the text editor's HTML in the inner HTML, in a
- *   `<dd data-block-slot="el:<id>">`.
- *   That way the link table, backlinks, merge-import remap and image cleanup
- *   find them without a special case.
+ * - `data-block-data` (JSON): the values of kinds stored as `value`, under the ID of their element.
+ * - The values of kinds stored as `slot` (references, images, text) are NOT in
+ *   the JSON, but stand as a real link chip, `<img src>` or the text editor's
+ *   HTML in the inner HTML, in a `<dd data-block-slot="el:<id>">`. That way the
+ *   link table, backlinks, merge-import remap and image cleanup find them
+ *   without a special case.
  * - The inner HTML is also the readable fallback (`<dl>` with label
  *   and value) for search, export and an app that does not know the type. It is
- *   rewritten on every change; the truth for scalars is the JSON.
+ *   rewritten on every change; the truth for values is the JSON.
  *
  * Pure and DOM-free like the rest of `lib/blocks`. Slot contents are a chip,
  * an image or TipTap HTML (whose schema has no definition lists), never
@@ -35,87 +37,22 @@ import { BLOCK_ATTR, type BlockInstance, type BlockTypeId } from './types';
 
 export const FIELDS_BLOCK_TYPE = 'core.fields' satisfies BlockTypeId;
 
-export const ELEMENT_KINDS = [
-  'text', 'shorttext', 'number', 'date', 'select', 'toggle', 'checklist', 'link', 'image',
-] as const;
-export type ElementKind = (typeof ELEMENT_KINDS)[number];
+export type { ElementDef, ElementDefault, FallbackText, FieldKindDef, FieldUse, FieldUses, FieldValue, SelectOption } from './fieldKinds/fieldKind';
+export { FIELD_USES } from './fieldKinds/fieldKind';
 
-const KIND_SET: ReadonlySet<string> = new Set(ELEMENT_KINDS);
-/** Element kinds whose value is in the markup instead of the JSON. */
-const SLOT_KINDS: ReadonlySet<ElementKind> = new Set<ElementKind>(['text', 'link', 'image']);
-
-export function isSlotKind(kind: ElementKind): boolean {
-  return SLOT_KINDS.has(kind);
+/** The kind of a field read from a block or a definition — every one of them is registered (`parseElements` drops the others). */
+export function elementKind(element: ElementDef): FieldKindDef {
+  const kind = fieldKindOf(element.kind);
+  if (!kind) throw new Error(`Unknown field kind: ${element.kind}`);
+  return kind;
 }
 
-/** The i18n key for the name of an element kind — picker, label, placeholder. */
-export function elementKindLabelKey(kind: ElementKind): string {
-  return `blocks.kinds.${kind}`;
-}
-
-/** The icon of an element kind — picker, builder, a single field's block. */
-export const ELEMENT_KIND_ICONS: Record<ElementKind, LucideIcon> = {
-  text: Type,
-  shorttext: TextCursorInput,
-  number: Hash,
-  date: Calendar,
-  select: ChevronsUpDown,
-  toggle: ToggleLeft,
-  checklist: ListChecks,
-  link: Link2,
-  image: Image,
-};
-
-export interface SelectOption {
-  id: string;
-  label: string;
-}
-
-export interface ElementDef {
-  id: string;
-  kind: ElementKind;
-  /** Empty = name of the element kind in the current language. */
-  label: string;
-  /** Select only. Values store the option ID, renaming loses nothing. */
-  options?: SelectOption[];
-  /** Overrides `display.readHideEmpty` for this element. */
-  hideWhenEmpty?: boolean;
-  /**
-   * Only in a custom block definition: the value with which every new copy
-   * prefills the element (checklist with items, yes/no set to "yes", a
-   * linked entry …). The copy carries it as a value, not as a default.
-   * Link gives its target, image its file name — only the
-   * copy writes a chip or `<img>` from it into its slot (`slotFromDefault`).
-   * That way the definition contains no markup, and merge import and image cleanup
-   * find target ID and file.
-   */
-  defaultValue?: ElementDefault;
-  /**
-   * Link only: the search offers just entries and tasks of these categories (and,
-   * with `includeUncategorized`, those without one). Missing = no filter.
-   * A link already set stays, whatever its category.
-   */
-  linkCategories?: LinkCategoryFilter;
-  /**
-   * How the field shows outside its block (`FieldUse`) — set in the builder
-   * and travelling with every copy like the rest of the element. A use not
-   * stored is off: nothing shows outside unasked. The builder writes the
-   * start values of a new field (`initialUses`) out.
-   */
-  uses?: Partial<FieldUses>;
+/** The i18n key for the name of a kind — picker, label, placeholder. */
+export function elementKindLabelKey(kind: string): string {
+  return fieldKindOf(kind)?.labelKey ?? `blocks.kinds.${kind}`;
 }
 
 /* ---------------- Uses outside the block ---------------- */
-
-/**
- * The block's settings per field (interface 14, for user-built blocks): does
- * the field appear in the entry's info line in lists, in the properties
- * panel, among the values dashboards filter and sort by. The fields block
- * reads them in its interfaces 1, 3 and 4/9 (`kinds/fields.ts`).
- */
-export const FIELD_USES = ['info', 'panel', 'values'] as const;
-export type FieldUse = (typeof FIELD_USES)[number];
-export type FieldUses = Record<FieldUse, boolean>;
 
 /** How a field's setting is shown, alike in the builder and in the block's sidebar. */
 export const FIELD_USE_SETTINGS: Readonly<Record<FieldUse, { icon: LucideIcon; labelKey: string; hintKey: string }>> = {
@@ -124,21 +61,22 @@ export const FIELD_USE_SETTINGS: Readonly<Record<FieldUse, { icon: LucideIcon; l
   values: { icon: ListFilter, labelKey: 'blocks.fields.uses.values', hintKey: 'blocks.fields.uses.valuesHint' },
 };
 
-/** Kinds a new builder field offers to filter and sort by from the start (others may be switched on, as far as `canUse` allows). */
-const VALUES_ON_AT_START: ReadonlySet<ElementKind> = new Set<ElementKind>(['date', 'number', 'select', 'toggle', 'link', 'shorttext']);
+const usesOf = (on: (use: FieldUse) => boolean): FieldUses => ({ info: on('info'), panel: on('panel'), values: on('values') });
 
 /**
- * Can a field of this kind be used so? A picture has no value to show or
- * filter by, a long text none to filter by.
+ * Can a field of this kind be used so? The block's settings per field
+ * (interface 14, for user-built blocks): the entry's info line in lists, the
+ * properties panel, the values dashboards filter and sort by. The fields
+ * block reads them in its interfaces 1, 3 and 4/9 (`kinds/fields.ts`).
  */
-export function canUse(kind: ElementKind, use: FieldUse): boolean {
-  if (kind === 'image') return false;
-  return use !== 'values' || kind !== 'text';
+export function canUse(kind: string, use: FieldUse): boolean {
+  return fieldKindOf(kind)?.uses.includes(use) ?? false;
 }
 
-/** The start values of a new field of a custom block: the panel on, filtering for short values, the info line off. */
-export function initialUses(kind: ElementKind): FieldUses {
-  return { info: false, panel: canUse(kind, 'panel'), values: VALUES_ON_AT_START.has(kind) };
+/** The start values of a new field of a custom block, as its kind says. */
+export function initialUses(kind: string): FieldUses {
+  const start = fieldKindOf(kind)?.startUses ?? [];
+  return usesOf((use) => start.includes(use) && canUse(kind, use));
 }
 
 /** A single field (added on its own) starts with every use off: it is shown in its block, not twice. */
@@ -146,8 +84,7 @@ export const NO_USES: FieldUses = { info: false, panel: false, values: false };
 
 /** How the field is used — as stored, off where nothing is; never what its kind cannot do. */
 export function elementUses(element: ElementDef): FieldUses {
-  const used = (use: FieldUse) => canUse(element.kind, use) && element.uses?.[use] === true;
-  return { info: used('info'), panel: used('panel'), values: used('values') };
+  return usesOf((use) => canUse(element.kind, use) && element.uses?.[use] === true);
 }
 
 /** The field with one use switched; all three are stored from then on, so the field no longer depends on what is not stored. */
@@ -161,17 +98,6 @@ export function fieldLabel(element: ElementDef): { label: string } | { labelKey:
   return label ? { label } : { labelKey: elementKindLabelKey(element.kind) };
 }
 
-export { normalizeLinkCategoryFilter, passesLinkCategoryFilter, type LinkCategoryFilter } from './toolkit';
-
-/** The default of a link: the target together with its name at the time of selection. */
-interface LinkDefault {
-  id: string;
-  targetKind: LinkTargetKind;
-  label: string;
-}
-
-export type ElementDefault = FieldValue | LinkDefault;
-
 export interface DisplayRules {
   /** Hide empty elements in read mode. */
   readHideEmpty: boolean;
@@ -180,14 +106,6 @@ export interface DisplayRules {
 }
 
 export const DEFAULT_DISPLAY: DisplayRules = { readHideEmpty: true, readOnly: false };
-
-export interface ChecklistItem {
-  id: string;
-  text: string;
-  checked: boolean;
-}
-
-export type FieldValue = string | number | boolean | ChecklistItem[];
 
 export interface FieldsModel {
   /**
@@ -198,15 +116,15 @@ export interface FieldsModel {
   broken: boolean;
   elements: ElementDef[];
   display: DisplayRules;
-  /** Scalar values of known elements, validated by their kind. */
+  /** Values of known elements stored as `value`, checked by their kind. */
   values: Record<string, FieldValue>;
   /**
    * Values without a known element — written back unchanged. (A value of the
    * wrong kind for a known element, on the other hand, is dropped; a new
-   * value format would come with a new `data-block-v` and not be read at all.)
+   * value format would come with a new data version and not be read at all.)
    */
   orphans: Record<string, unknown>;
-  /** Element ID → inner HTML of its slot (link chip or `<img>`), also without a known element. */
+  /** Element ID → inner HTML of its slot (link chip, `<img>`, text), also without a known element. */
   slots: Record<string, string>;
   /** Name and icon (an emoji or an icon file, `blockRefs` names it) of the custom block definition the block was copied from — empty for single fields. */
   name: string;
@@ -217,6 +135,32 @@ export interface FieldsModel {
    * takes the definitions of an entry's copies along by it.
    */
   definition?: string;
+}
+
+/* ---------------- What a field holds ---------------- */
+
+/** What the field holds — its JSON value, or for a kind stored as `slot` its markup. */
+export function fieldStored(element: ElementDef, model: FieldsModel): FieldValue | undefined {
+  return elementKind(element).storage === 'slot' ? model.slots[element.id] : model.values[element.id];
+}
+
+/** The field as its kind is asked about it. */
+export function fieldRead(element: ElementDef, model: FieldsModel): FieldRead {
+  return { element, stored: fieldStored(element, model) };
+}
+
+/** The model with the field holding `stored` (`undefined`: nothing) — in the JSON or the slot, as its kind keeps it. */
+export function withFieldStored(model: FieldsModel, element: ElementDef, stored: FieldValue | undefined): FieldsModel {
+  if (elementKind(element).storage === 'slot') {
+    const slots = { ...model.slots };
+    if (typeof stored === 'string' && stored) slots[element.id] = stored;
+    else delete slots[element.id];
+    return { ...model, slots };
+  }
+  const values = { ...model.values };
+  if (stored === undefined) delete values[element.id];
+  else values[element.id] = stored;
+  return { ...model, values };
 }
 
 /* ---------------- Reading ---------------- */
@@ -247,50 +191,97 @@ function bareRecord<T>(): Record<string, T> {
   return Object.create(null) as Record<string, T>;
 }
 
+/** The data version an element was stored in (`ElementDef.v`, missing = 1). */
+function storedVersion(raw: Record<string, unknown>): number {
+  return typeof raw.v === 'number' && Number.isInteger(raw.v) && raw.v >= 1 ? raw.v : 1;
+}
+
+/**
+ * Can this app read the element? Not if its kind is unknown here or its data
+ * version is newer than the kind's: reading would drop the field and the next
+ * save lose it.
+ */
+export function isReadableElement(raw: unknown): boolean {
+  if (!isRecord(raw) || typeof raw.kind !== 'string') return true; // Merely invalid — dropped.
+  const kind = fieldKindOf(raw.kind);
+  return !!kind && storedVersion(raw) <= kind.dataVersion;
+}
+
+/** What a field held as it was stored: its JSON value and its slot's markup — the kind's `storage` says which counts. */
+interface RawStored {
+  value: unknown;
+  slot: string | undefined;
+}
+
+/**
+ * An element, and what it holds, brought up to its kind's data version
+ * (`FieldKindDef.upgrade`). `upgraded` is false where nothing had to be done.
+ */
+export function upgradedElement(raw: unknown, stored: RawStored): { raw: unknown; stored: unknown; upgraded: boolean } {
+  const kind = isRecord(raw) && typeof raw.kind === 'string' ? fieldKindOf(raw.kind) : undefined;
+  const current = kind?.storage === 'slot' ? stored.slot : stored.value;
+  if (!isRecord(raw) || !kind?.upgrade || storedVersion(raw) >= kind.dataVersion) return { raw, stored: current, upgraded: false };
+  const up = kind.upgrade({ element: raw, ...stored }, storedVersion(raw));
+  return { raw: up.element, stored: up.stored, upgraded: true };
+}
+
+/** The keys every element has; a kind's own settings (`parseConfig`) never set them. */
+const COMMON_KEYS: ReadonlySet<string> = new Set(['id', 'kind', 'label', 'hideWhenEmpty', 'uses', 'v', 'defaultValue']);
+
 function parseElement(raw: unknown): ElementDef | null {
   if (!isRecord(raw) || typeof raw.id !== 'string' || !isSafeElementId(raw.id)
-    || typeof raw.kind !== 'string' || !KIND_SET.has(raw.kind)) {
+    || typeof raw.kind !== 'string' || !isReadableElement(raw)) {
     return null;
   }
+  const kind = fieldKindOf(raw.kind)!;
+  const own = Object.entries(kind.parseConfig?.(raw) ?? {}).filter(([key]) => !COMMON_KEYS.has(key));
   const element: ElementDef = {
     id: raw.id,
-    kind: raw.kind as ElementKind,
+    kind: kind.id,
     label: typeof raw.label === 'string' ? raw.label : '',
+    ...Object.fromEntries(own),
   };
-  if (Array.isArray(raw.options)) {
-    element.options = raw.options
-      .filter((o): o is Record<string, unknown> => isRecord(o) && typeof o.id === 'string')
-      .map((o) => ({ id: o.id as string, label: typeof o.label === 'string' ? o.label : '' }));
-  }
   if (typeof raw.hideWhenEmpty === 'boolean') element.hideWhenEmpty = raw.hideWhenEmpty;
-  if (element.kind === 'link' && isRecord(raw.linkCategories)) {
-    const ids = Array.isArray(raw.linkCategories.categoryIds)
-      ? raw.linkCategories.categoryIds.filter((i): i is string => typeof i === 'string')
-      : [];
-    const filter = normalizeLinkCategoryFilter({ categoryIds: ids, includeUncategorized: raw.linkCategories.includeUncategorized === true });
-    if (filter) element.linkCategories = filter;
-  }
   if (isRecord(raw.uses)) {
     const uses: Partial<FieldUses> = {};
     for (const use of FIELD_USES) if (typeof raw.uses[use] === 'boolean') uses[use] = raw.uses[use];
     element.uses = uses;
   }
-  if (raw.defaultValue !== undefined) {
-    const value = parseDefault(element, raw.defaultValue);
+  if (kind.dataVersion > 1) element.v = kind.dataVersion;
+  if (raw.defaultValue !== undefined && kind.prefill) {
+    const value = kind.prefill.parse(raw.defaultValue, element);
     if (value !== undefined) element.defaultValue = value;
   }
   return element;
 }
 
-/** An element list from an unreliable source (content, import, database): invalid entries and duplicate IDs are dropped. */
-export function parseElements(raw: unknown): ElementDef[] {
+interface ReadElement {
+  element: ElementDef;
+  /** What it holds as its kind keeps it now; only meaningful where `upgraded`, else it is read from the block as stored. */
+  stored: unknown;
+  upgraded: boolean;
+}
+
+/** Elements with what they hold, from an unreliable list: brought up, checked, invalid entries and duplicate IDs dropped. */
+function readElements(raw: unknown, storedOf: (raw: unknown) => RawStored): ReadElement[] {
   if (!Array.isArray(raw)) return [];
   const seen = new Set<string>();
-  return raw.map(parseElement).filter((e): e is ElementDef => {
-    if (!e || seen.has(e.id)) return false;
-    seen.add(e.id);
-    return true;
-  });
+  const out: ReadElement[] = [];
+  for (const item of raw) {
+    const up = upgradedElement(item, storedOf(item));
+    const element = parseElement(up.raw);
+    if (!element || seen.has(element.id)) continue;
+    seen.add(element.id);
+    out.push({ element, stored: up.stored, upgraded: up.upgraded });
+  }
+  return out;
+}
+
+const NOTHING_STORED: RawStored = { value: undefined, slot: undefined };
+
+/** An element list from an unreliable source (content, import, database): invalid entries and duplicate IDs are dropped. */
+export function parseElements(raw: unknown): ElementDef[] {
+  return readElements(raw, () => NOTHING_STORED).map(({ element }) => element);
 }
 
 /** Display rules from an unreliable source; anything missing falls back to `DEFAULT_DISPLAY`. */
@@ -300,27 +291,6 @@ export function parseDisplay(raw: unknown): DisplayRules {
     readHideEmpty: typeof rules.readHideEmpty === 'boolean' ? rules.readHideEmpty : DEFAULT_DISPLAY.readHideEmpty,
     readOnly: typeof rules.readOnly === 'boolean' ? rules.readOnly : DEFAULT_DISPLAY.readOnly,
   };
-}
-
-function parseValue(kind: ElementKind, raw: unknown): FieldValue | undefined {
-  switch (kind) {
-    case 'shorttext':
-    case 'date':
-    case 'select':
-      return typeof raw === 'string' ? raw : undefined;
-    case 'number':
-      return typeof raw === 'number' && Number.isFinite(raw) ? raw : undefined;
-    case 'toggle':
-      return typeof raw === 'boolean' ? raw : undefined;
-    case 'checklist':
-      return Array.isArray(raw)
-        ? raw
-            .filter((i): i is Record<string, unknown> => isRecord(i) && typeof i.id === 'string')
-            .map((i) => ({ id: i.id as string, text: typeof i.text === 'string' ? i.text : '', checked: i.checked === true }))
-        : undefined;
-    default:
-      return undefined;
-  }
 }
 
 // The attribute sections are bounded (IDs are at most 64 characters anyway):
@@ -344,34 +314,47 @@ export function parseFields(block: BlockInstance): FieldsModel {
       || (config.value.elements !== undefined && !Array.isArray(config.value.elements))))
     || (data.value !== undefined && (!isRecord(data.value)
       || (data.value.values !== undefined && !isRecord(data.value.values))))
-    // An element of a kind this version does not know would be dropped on
-    // reading and lost on the next save; the block stays as it is instead.
-    || (isRecord(config.value) && Array.isArray(config.value.elements)
-      && config.value.elements.some((e) => isRecord(e) && typeof e.kind === 'string' && !KIND_SET.has(e.kind)));
+    // An element of a kind (or a kind's data version) this app does not know
+    // would be dropped on reading and lost on the next save; the block stays as it is instead.
+    || (isRecord(config.value) && Array.isArray(config.value.elements) && !config.value.elements.every(isReadableElement));
 
   const cfg = isRecord(config.value) ? config.value : {};
-  const elements = parseElements(cfg.elements);
   const display = parseDisplay(cfg.display);
-
   const rawValues = isRecord(data.value) && isRecord(data.value.values) ? data.value.values : {};
-  const values = bareRecord<FieldValue>();
-  const orphans = bareRecord<unknown>();
-  const byId = new Map(elements.map((e) => [e.id, e]));
-  for (const [id, raw] of Object.entries(rawValues)) {
-    const element = byId.get(id);
-    if (!element) {
-      if (isSafeElementId(id)) orphans[id] = raw;
-      continue;
-    }
-    if (isSlotKind(element.kind)) continue;
-    const value = parseValue(element.kind, raw);
-    if (value !== undefined) values[id] = value;
-  }
 
   const slots = bareRecord<string>();
   for (const m of block.html.matchAll(SLOT_RE)) {
     const id = decodeHtmlAttr(m[1]);
     if (isSafeElementId(id) && m[2].trim()) slots[id] = m[2];
+  }
+
+  // The ID is checked before it is used as a key: no built-in property is read.
+  const read = readElements(cfg.elements, (raw) => (isRecord(raw) && typeof raw.id === 'string' && isSafeElementId(raw.id)
+    ? { value: rawValues[raw.id], slot: slots[raw.id] }
+    : NOTHING_STORED));
+  const elements = read.map(({ element }) => element);
+  const byId = new Map(read.map((r) => [r.element.id, r]));
+
+  const values = bareRecord<FieldValue>();
+  const orphans = bareRecord<unknown>();
+  const readValue = (element: ElementDef, raw: unknown) => {
+    const value = raw === undefined ? undefined : elementKind(element).parseValue?.(raw, element);
+    if (value !== undefined) values[element.id] = value;
+  };
+  // In the stored order, so that a block written back unchanged stays so.
+  for (const id of Object.keys(rawValues)) {
+    const known = byId.get(id);
+    if (!known) {
+      if (isSafeElementId(id)) orphans[id] = rawValues[id];
+    } else if (!known.upgraded && elementKind(known.element).storage === 'value') {
+      readValue(known.element, rawValues[id]);
+    }
+  }
+  // What an upgrade made of a field, in the place its kind keeps it now.
+  for (const { element, stored } of read.filter((r) => r.upgraded)) {
+    delete slots[element.id];
+    if (elementKind(element).storage === 'value') readValue(element, stored);
+    else if (typeof stored === 'string' && stored.trim()) slots[element.id] = stored;
   }
 
   const model: FieldsModel = {
@@ -385,96 +368,43 @@ export function parseFields(block: BlockInstance): FieldsModel {
   return model;
 }
 
-/* ---------------- Defaults ---------------- */
+/* ---------------- Prefills ---------------- */
 
 /**
- * A default from an unreliable source (database, backup, `.emerald`), validated
- * by the element's kind — `undefined` for anything that does not fit.
+ * What a field holds with its prefill (`ElementDef.defaultValue`) — the value
+ * or the slot markup its kind makes of it; `fresh` for a new copy. `undefined`
+ * without one.
  */
-function parseDefault(element: ElementDef, raw: unknown): ElementDefault | undefined {
-  switch (element.kind) {
-    case 'link': {
-      if (!isRecord(raw) || !isValidLinkTarget(raw)) return undefined;
-      return {
-        id: raw.id as string,
-        // `isValidLinkTarget` has checked the kind against the list.
-        targetKind: linkTargetKindOf(String(raw.targetKind)),
-        label: typeof raw.label === 'string' ? raw.label : '',
-      };
-    }
-    case 'image':
-      return typeof raw === 'string' ? storedImageName(raw) ?? undefined : undefined;
-    case 'text':
-      return undefined; // Text starts empty.
-    default: {
-      const value = parseValue(element.kind, raw);
-      // A select default only for an option that still exists — otherwise every copy would get a dead value.
-      const stale = element.kind === 'select' && !element.options?.some((o) => o.id === value);
-      return stale ? undefined : value;
-    }
-  }
+export function prefillStored(element: ElementDef, fresh = false): FieldValue | undefined {
+  const prefill = elementKind(element).prefill;
+  return prefill && element.defaultValue !== undefined ? prefill.toStored(element.defaultValue, element, fresh) : undefined;
 }
 
-function isLinkDefault(value: ElementDefault | undefined): value is LinkDefault {
-  return isRecord(value) && typeof value.id === 'string';
-}
-
-/** The slot content that a default yields in the copy — chip or `<img>`; `null` for non-slot kinds. */
-export function slotFromDefault(element: ElementDef): string | null {
-  const value = element.defaultValue;
-  if (element.kind === 'image') return typeof value === 'string' ? imageSlotHtml(value) : null;
-  if (!isSlotKind(element.kind) || !isLinkDefault(value)) return null;
-  return internalLinkChipHtml({ id: value.id, targetKind: value.targetKind, label: value.label });
+/** What the field's prefill points at, as its kind reports it (role `default`). */
+export function reportPrefillRefs(element: ElementDef, report: RefReporter): void {
+  const refs = fieldKindOf(element.kind)?.prefill?.refs;
+  if (refs && element.defaultValue !== undefined) refs(element.defaultValue, report);
 }
 
 /**
- * The reverse: the default that a slot content yields (builder) — `undefined`
- * for empty or unusable input. Through the same validation as when reading, so
- * that nothing is saved that `parseElement` would later discard.
+ * The reverse, for the builder: the prefill an input yields — `undefined` for
+ * empty or unusable input.
  */
-export function defaultFromSlot(element: ElementDef, html: string | null): ElementDefault | undefined {
-  // Text has no default (it would be markup in the definition).
-  if (!html || element.kind === 'text') return undefined;
-  return parseDefault(element, element.kind === 'image' ? imageFromSlot(html) : linkFromSlot(html));
-}
-
-/** The slot of an image field: a real `<img src>` — that is how the image cleanup finds the file. */
-export function imageSlotHtml(filename: string): string {
-  return `<img src="${escapeHtml(filename)}">`;
+export function prefillFromStored(element: ElementDef, stored: FieldValue | undefined): FieldValue | undefined {
+  const prefill = elementKind(element).prefill;
+  return prefill && stored !== undefined && stored !== '' ? prefill.fromStored(stored, element) : undefined;
 }
 
 /* ---------------- Empty / visible ---------------- */
 
-/**
- * Does the element have no (valid) value? Yes/no is never empty: unset
- * means "no" — so input, read mode and fallback show the same.
- */
+/** Does the element have no (valid) value? Its kind says (yes/no is never empty: unset means "no"). */
 export function isElementEmpty(element: ElementDef, model: FieldsModel): boolean {
-  const value = model.values[element.id];
-  switch (element.kind) {
-    case 'shorttext':
-    case 'date':
-      return typeof value !== 'string' || !value.trim();
-    case 'number':
-      return typeof value !== 'number';
-    case 'select':
-      return typeof value !== 'string' || !element.options?.some((o) => o.id === value);
-    case 'toggle':
-      return false;
-    case 'checklist':
-      return !Array.isArray(value) || value.length === 0;
-    case 'text':
-      // Visible content counts — an empty heading or an empty bullet point does not.
-      return isBlankContent(model.slots[element.id] ?? '');
-    case 'link':
-    case 'image':
-      return !model.slots[element.id];
-  }
+  return elementKind(element).isEmpty(fieldRead(element, model));
 }
 
-/** Can an element of this kind be empty? Yes/no never — for it there is no "hide when empty". */
-export function canBeEmpty(kind: ElementKind): boolean {
-  return kind !== 'toggle';
+/** Can an element of this kind be empty? Where not, there is no "hide when empty". */
+export function canBeEmpty(kind: string): boolean {
+  return fieldKindOf(kind)?.canBeEmpty !== false;
 }
 
 /** Does read mode hide this element? Empty AND (element or block rule). */
@@ -484,13 +414,6 @@ export function isHiddenInRead(element: ElementDef, model: FieldsModel): boolean
 
 /* ---------------- Writing ---------------- */
 
-/** What the readable fallback says in the current language — the callers pass `t` in. */
-export interface FallbackText {
-  label: (element: ElementDef) => string;
-  yes: string;
-  no: string;
-}
-
 /** The label of a field element in the language of `t`: its own, otherwise the name of its kind. */
 export function elementLabel(t: (key: string) => string, element: ElementDef): string {
   const named = fieldLabel(element);
@@ -499,37 +422,13 @@ export function elementLabel(t: (key: string) => string, element: ElementDef): s
 
 /** The texts with which `serializeFields` writes the readable fallback — in the language of `t`. */
 export function fieldFallbackText(t: (key: string) => string): FallbackText {
-  return {
-    label: (element) => elementLabel(t, element),
-    yes: translatedOr(t, 'blocks.fields.yes', 'Yes'),
-    no: translatedOr(t, 'blocks.fields.no', 'No'),
-  };
+  return { label: (element) => elementLabel(t, element), t };
 }
 
-/** A checklist as readable markup — fallback and export alike. */
-export function checklistHtml(items: readonly ChecklistItem[]): string {
-  return `<ul>${items.map((item) => `<li>${item.checked ? '☑' : '☐'} ${escapeHtml(item.text)}</li>`).join('')}</ul>`;
-}
-
-/** The value of a field as HTML (not a slot) — `null` for empty — for the readable fallback. The export maps the same kinds to values (`fieldExportValue` in `kinds/fields.ts`). */
+/** The value of a field stored as `value`, as HTML for the readable fallback — `null` for empty. */
 export function fieldValueHtml(element: ElementDef, model: FieldsModel, text: FallbackText): string | null {
   if (isElementEmpty(element, model)) return null;
-  const value = model.values[element.id];
-  switch (element.kind) {
-    case 'shorttext':
-    case 'date':
-      return escapeHtml(value as string);
-    case 'number':
-      return String(value);
-    case 'select':
-      return escapeHtml(element.options!.find((o) => o.id === value)!.label);
-    case 'toggle':
-      return escapeHtml(value === true ? text.yes : text.no);
-    case 'checklist':
-      return checklistHtml(value as ChecklistItem[]);
-    default:
-      return null;
-  }
+  return elementKind(element).fallbackHtml?.(fieldRead(element, model), text) ?? null;
 }
 
 function slotRow(id: string, html: string): string {
@@ -546,7 +445,7 @@ export function serializeFields(block: BlockInstance, model: FieldsModel, text: 
   const known = new Set(model.elements.map((e) => e.id));
   const rows = model.elements.map((element) => {
     const dt = `<dt>${escapeHtml(text.label(element))}</dt>`;
-    if (isSlotKind(element.kind)) {
+    if (elementKind(element).storage === 'slot') {
       const slot = model.slots[element.id];
       return slot ? `${dt}${slotRow(element.id, slot)}` : '';
     }
@@ -605,14 +504,19 @@ export function withoutElementContent(block: BlockInstance, ids: ReadonlySet<str
   return { ...block, attrs, html };
 }
 
+/** A new element of this kind, with its kind's own start settings. */
+export function newElement(kind: FieldKindDef, uses: FieldUses): ElementDef {
+  return { id: generateId(), kind: kind.id, label: '', uses: { ...uses }, ...kind.initialConfig?.() };
+}
+
 /** A new field block with exactly one element of this kind — shown in its block only (`NO_USES`). */
-export function createFieldsBlock(kind: ElementKind): BlockInstance {
-  const element: ElementDef = { id: generateId(), kind, label: '', uses: { ...NO_USES } };
-  if (kind === 'select') element.options = [];
+export function createFieldsBlock(kind: string): BlockInstance {
+  const def = fieldKindOf(kind);
+  if (!def) throw new Error(`Unknown field kind: ${kind}`);
   return {
     id: generateId(),
     type: FIELDS_BLOCK_TYPE,
     html: '',
-    attrs: { [BLOCK_ATTR.config]: JSON.stringify({ elements: [element], display: DEFAULT_DISPLAY }) },
+    attrs: { [BLOCK_ATTR.config]: JSON.stringify({ elements: [newElement(def, NO_USES)], display: DEFAULT_DISPLAY }) },
   };
 }

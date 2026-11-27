@@ -1,63 +1,49 @@
 import { SlidersHorizontal } from 'lucide-react';
 import { decodeHtmlAttr } from '../../internalLinkHtml';
 import type {
-  BlockExportPart, BlockExportValue, BlockFieldValue, BlockGroup, BlockPreset, BlockPropertyRow, BlockTypeDef, BlockValue,
+  BlockExportPart, BlockExportValue, BlockFieldValue, BlockPreset, BlockPropertyRow, BlockTypeDef, BlockValue,
 } from '../blockType';
+import { fieldKinds } from '../fieldKinds';
 import {
-  checklistHtml, createFieldsBlock, ELEMENT_KIND_ICONS, ELEMENT_KINDS, elementKindLabelKey, elementUses, fieldFallbackText, fieldLabel, FIELDS_BLOCK_TYPE, isElementEmpty, isHiddenInRead,
-  parseFields, serializeFields, withoutElementContent,
-  type ChecklistItem, type ElementDef, type ElementKind, type FieldUse, type FieldsModel,
+  createFieldsBlock, elementKind, elementUses, fieldFallbackText, fieldLabel, fieldRead, FIELDS_BLOCK_TYPE, isElementEmpty, isHiddenInRead,
+  parseFields, reportPrefillRefs, serializeFields, withFieldStored, withoutElementContent,
+  type ElementDef, type FieldUse, type FieldsModel,
 } from '../fields';
-import { extractInternalLinks, withoutInternalLinksTo } from '../../internalLinkHtml';
 import type { ListInfoPart } from '../listInfo';
 import { htmlPlainText } from '../plainText';
-import { blockTypeTextKey, imageFromSlot, linkFromSlot, type RefReporter } from '../toolkit';
+import { blockTypeTextKey, type RefReporter } from '../toolkit';
 import type { BlockInstance } from '../types';
 
 /**
- * What a kind of field's prefill points at — the fields block's own
- * knowledge about its kinds. Every slot reports the link chips and pictures
- * of its markup (text, link, image fields alike).
+ * The fields block's interfaces. Each one asks the fields' kinds
+ * (`FieldKindDef`, `fieldKinds.ts`) and names none of them.
  */
-const ELEMENT_PREFILL_REFS: Partial<Record<ElementKind, (element: ElementDef, report: RefReporter) => void>> = {
-  image: (element, report) => {
-    if (typeof element.defaultValue === 'string') report.image(element.defaultValue, 'default');
-  },
-  link: (element, report) => {
-    const value = element.defaultValue;
-    if (value && typeof value === 'object' && 'id' in value) report.entry(String(value.id), 'default');
-  },
-};
 
+/** Every slot reports the link chips and pictures of its markup; each prefill what its kind says it points at. */
 function fieldsRefs(block: BlockInstance, report: RefReporter): void {
   const model = parseFields(block);
   for (const html of Object.values(model.slots)) report.markup(html);
   report.icon(model.icon);
-  for (const element of model.elements) ELEMENT_PREFILL_REFS[element.kind]?.(element, report);
+  for (const element of model.elements) reportPrefillRefs(element, report);
 }
 
 /**
- * The block without its link to `target`: a link field holding it emptied, a
- * chip in a text field turned into its word (the text stays). Text fields
+ * The block without its link to `target`, as each field's kind takes it out
+ * (a link field emptied, a chip in a text turned into its word). Text fields
  * with a mounted editor are reached through the editor first (the stack's
  * link requests); this is for the rest.
  */
 function fieldsWithoutLink(block: BlockInstance, target: string, t: (key: string) => string): BlockInstance {
-  const model = parseFields(block);
-  const slots = { ...model.slots };
+  let model = parseFields(block);
   let changed = false;
   for (const element of model.elements) {
-    const slot = slots[element.id];
-    if (!slot) continue;
-    if (element.kind === 'link' && linkFromSlot(slot)?.id === target) {
-      delete slots[element.id];
-      changed = true;
-    } else if (element.kind === 'text' && extractInternalLinks(slot).some((link) => link.id === target)) {
-      slots[element.id] = withoutInternalLinksTo(slot, target);
-      changed = true;
-    }
+    const slot = model.slots[element.id];
+    const without = slot ? elementKind(element).withoutLink?.(slot, target) : undefined;
+    if (without === undefined) continue;
+    model = withFieldStored(model, element, without ?? undefined);
+    changed = true;
   }
-  return changed ? serializeFields(block, { ...model, slots }, fieldFallbackText(t)) : block;
+  return changed ? serializeFields(block, model, fieldFallbackText(t)) : block;
 }
 
 const SLOT_RE = /\bdata-block-slot="el:([^"]{1,200})"[^<>]*>([\s\S]*?)<\/dd>/gi;
@@ -72,47 +58,9 @@ function fieldsWithoutImage(block: BlockInstance, file: string): BlockInstance {
   return withoutElementContent(block, slots);
 }
 
-/** How much of a long text the info line and the panel get. */
-const LONG_TEXT_SHOWN = 120;
-
-/**
- * A field's value as the info line, the panel and the dashboards take it —
- * `null` for empty. A long text by its plain text (none if it holds only a
- * rule or a picture), a checklist as "done/all"; a picture has none
- * (`canUse`). The export takes the same values except where it shows markup
- * or the picture (`fieldExportValue`).
- */
+/** A field's value as the info line, the panel and the dashboards take it — `null` for empty or none (its kind's `value`). */
 function fieldValue(element: ElementDef, model: FieldsModel): BlockValue | null {
-  if (isElementEmpty(element, model)) return null;
-  const value = model.values[element.id];
-  switch (element.kind) {
-    case 'text': {
-      // Shown in a line, never filtered by: its beginning is enough.
-      const text = htmlPlainText(model.slots[element.id] ?? '');
-      if (!text) return null;
-      return { kind: 'text', text: text.length > LONG_TEXT_SHOWN ? `${text.slice(0, LONG_TEXT_SHOWN).trimEnd()}…` : text };
-    }
-    case 'link': {
-      const link = linkFromSlot(model.slots[element.id]);
-      return link ? { kind: 'link', id: link.id, targetKind: link.targetKind, label: link.label } : null;
-    }
-    case 'checklist': {
-      const items = value as ChecklistItem[];
-      return { kind: 'text', text: `${items.filter((i) => i.checked).length}/${items.length}` };
-    }
-    case 'image':
-      return null;
-    case 'shorttext':
-      return { kind: 'text', text: value as string };
-    case 'date':
-      return { kind: 'date', iso: value as string };
-    case 'number':
-      return { kind: 'number', value: value as number };
-    case 'select':
-      return { kind: 'text', text: element.options!.find((o) => o.id === value)!.label };
-    case 'toggle':
-      return { kind: 'bool', value: value === true };
-  }
+  return isElementEmpty(element, model) ? null : elementKind(element).value(fieldRead(element, model));
 }
 
 /**
@@ -128,31 +76,19 @@ function usedFields(block: BlockInstance, use: FieldUse) {
     .filter((element) => elementUses(element)[use])
     .map((element) => {
       const value = fieldValue(element, model);
-      return { key: `field:${element.id}`, ...fieldLabel(element), value, rank: value === null ? 1 : 0, kind: element.kind };
+      return { key: `field:${element.id}`, ...fieldLabel(element), value, rank: value === null ? 1 : 0, element };
     });
 }
 
 /** The type's marker in the raw content — the cheap pre-check of lists. */
 const mayHold = (content: string) => content.includes(FIELDS_BLOCK_TYPE);
 
-/** A field's value as the export shows it — `null` for empty (a dash): markup for a link, a text and a checklist, the picture of an image field, else `fieldValue`. */
+/** A field's value as the export shows it — `null` for empty (a dash): its kind's `exportValue` (markup, a picture), else its `value`. */
 function fieldExportValue(element: ElementDef, model: FieldsModel): BlockExportValue | null {
-  const slot = model.slots[element.id];
-  switch (element.kind) {
-    case 'image': {
-      const file = imageFromSlot(slot);
-      // Named after its row.
-      return file ? { kind: 'image', file } : null;
-    }
-    case 'link':
-      return slot ? { kind: 'html', html: slot } : null;
-    case 'text':
-      return isElementEmpty(element, model) ? null : { kind: 'html', html: slot! };
-    case 'checklist':
-      return isElementEmpty(element, model) ? null : { kind: 'html', html: checklistHtml(model.values[element.id] as ChecklistItem[]) };
-    default:
-      return fieldValue(element, model);
-  }
+  if (isElementEmpty(element, model)) return null;
+  const kind = elementKind(element);
+  const field = fieldRead(element, model);
+  return kind.exportValue ? kind.exportValue(field) : kind.value(field);
 }
 
 /** What read mode shows: a row per field it shows (empty ones missing as the display rule says). */
@@ -160,21 +96,19 @@ function fieldsExport(block: BlockInstance): BlockExportPart[] {
   const model = parseFields(block);
   return model.elements
     .filter((element) => !isHiddenInRead(element, model))
-    .map((element): BlockExportPart => {
-      return { kind: 'row', ...fieldLabel(element), value: fieldExportValue(element, model) };
-    });
+    .map((element): BlockExportPart => ({ kind: 'row', ...fieldLabel(element), value: fieldExportValue(element, model) }));
 }
 
-const KIND_GROUPS: Partial<Record<ElementKind, BlockGroup>> = { link: 'reference', image: 'media' };
-
-/** "Add block" offers a single field of each kind — but no text field: one inserts the text block. */
-const FIELD_PRESETS: readonly BlockPreset[] = ELEMENT_KINDS.filter((kind) => kind !== 'text').map((kind) => ({
-  id: `field.${kind}`,
-  labelKey: elementKindLabelKey(kind),
-  icon: ELEMENT_KIND_ICONS[kind],
-  group: KIND_GROUPS[kind] ?? 'fields',
-  create: () => createFieldsBlock(kind),
-}));
+/** "Add block" offers a single field of each kind that says where (no text field: one inserts the text block). */
+const FIELD_PRESETS: readonly BlockPreset[] = fieldKinds().flatMap((kind) => (kind.presetGroup
+  ? [{
+      id: `field.${kind.id}`,
+      labelKey: kind.labelKey,
+      icon: kind.icon,
+      group: kind.presetGroup,
+      create: () => createFieldsBlock(kind.id),
+    }]
+  : []));
 
 /** The fields block: user-built blocks and single fields. */
 export const fieldsBlockType: BlockTypeDef = {
@@ -189,17 +123,17 @@ export const fieldsBlockType: BlockTypeDef = {
   defaultShowTitle: false,
   presets: FIELD_PRESETS,
   isBroken: (block) => parseFields(block).broken,
-  // Its text fields are editors of the stack's, under the element's ID.
-  textEditors: (block) => parseFields(block).elements.filter((el) => el.kind === 'text').map((el) => el.id),
+  // Its fields whose kind is a text editor are editors of the stack's, under the element's ID.
+  textEditors: (block) => parseFields(block).elements.filter((el) => elementKind(el).textEditor).map((el) => el.id),
   // Each field as its settings say (`FieldUses`): the short info line shows the value alone, the long one and the panel "Field: value".
   listInfo: {
     mayContribute: mayHold,
-    parts: (block) => usedFields(block, 'info').map(({ kind: _kind, ...field }): ListInfoPart => field),
+    parts: (block) => usedFields(block, 'info').map(({ element: _element, ...field }): ListInfoPart => field),
   },
   properties: {
     mayContribute: mayHold,
     rows: (block) => usedFields(block, 'panel')
-      .flatMap(({ kind: _kind, rank: _rank, value, ...field }): BlockPropertyRow[] => (value ? [{ ...field, value }] : [])),
+      .flatMap(({ element: _element, rank: _rank, value, ...field }): BlockPropertyRow[] => (value ? [{ ...field, value }] : [])),
     overridable: { icon: true, cover: true },
     // A copy of a custom block carries its name and emoji; a single field is named and iconed after its label or kind.
     name: (block) => {
@@ -207,15 +141,14 @@ export const fieldsBlockType: BlockTypeDef = {
       const single = model.elements.length === 1 ? model.elements[0] : null;
       return {
         name: model.name.trim() ? { label: model.name.trim() } : single ? fieldLabel(single) : undefined,
-        glyph: model.icon || (single ? ELEMENT_KIND_ICONS[single.kind] : undefined),
+        glyph: model.icon || (single ? elementKind(single).icon : undefined),
       };
     },
   },
   values: {
     mayContribute: mayHold,
-    // "done/all" is no order: a checklist filters, it does not sort.
     read: (block) => usedFields(block, 'values')
-      .map(({ kind, ...field }): BlockFieldValue => ({ ...field, filter: true, sort: kind !== 'checklist' })),
+      .map(({ element, ...field }): BlockFieldValue => ({ ...field, filter: true, sort: elementKind(element).sortable })),
   },
   // The readable fallback (`<dl>`) is what there is to find.
   searchText: (block) => htmlPlainText(block.html),

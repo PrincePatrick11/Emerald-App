@@ -13,22 +13,17 @@ import { useBlockDraftStore, type DefinitionDraft } from '../../store/draftStore
 import { useDraftPage } from '../../hooks/useDraftPage';
 import { useShrunkIcon } from '../../hooks/useShrunkIcon';
 import {
-  canBeEmpty, defaultFromSlot, ELEMENT_KIND_ICONS, ELEMENT_KINDS, elementKindLabelKey, initialUses, isSlotKind, slotFromDefault,
-  type ElementDef, type ElementKind, type FieldUse, type FieldValue, type LinkCategoryFilter, normalizeLinkCategoryFilter, withFieldUse,
+  canBeEmpty, elementKind, elementKindLabelKey, initialUses, newElement, prefillFromStored, prefillStored, withFieldUse,
+  type ElementDef, type FieldKindDef, type FieldUse,
 } from '../../lib/blocks/fields';
-import { categoryLabel } from '../../lib/categories';
-import { useCategoryStore } from '../../store/categoryStore';
-import { SettingsCheckboxGrid, SettingsDescription } from '../layout/settings/SettingsSection';
+import { fieldKinds } from '../../lib/blocks/fieldKinds';
 import { definitionLabel } from '../../lib/blocks/blockAttrs';
 import { DEFAULT_DEFINITION_ICON, type BlockDefinition, type DefinitionDisplay } from '../../lib/blocks/definitions';
-import { generateId } from '../../lib/helpers';
 import { REORDER_SPRING } from '../../lib/motion';
 import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
-import OptionsEditor from './OptionsEditor';
 import BlockCheckbox from './BlockCheckbox';
-import FieldValueEditor from './FieldValueEditor';
-import FieldSlotEditor from './FieldSlotEditor';
 import FieldUseToggles from './FieldUseToggles';
+import { fieldKindView } from './fieldKindViews';
 
 const draftOf = (d: DefinitionDraft): DefinitionDraft => ({
   name: d.name, icon: d.icon, elements: d.elements, display: d.display,
@@ -74,12 +69,8 @@ export default function BlockDefinitionEditor({ definition, onClose, onDelete, i
   const patchElement = (id: string, p: Partial<ElementDef>) =>
     setElements((els) => els.map((e) => (e.id === id ? { ...e, ...p } : e)));
 
-  const addElement = (kind: ElementKind) => {
-    // Its start values written out: the copies keep them whatever later start values are.
-    const element: ElementDef = { id: generateId(), kind, label: '', uses: initialUses(kind) };
-    if (kind === 'select') element.options = [];
-    setElements((els) => [...els, element]);
-  };
+  // Its start values written out: the copies keep them whatever later start values are.
+  const addElement = (kind: FieldKindDef) => setElements((els) => [...els, newElement(kind, initialUses(kind.id))]);
   const removeElement = (id: string) => setElements((els) => els.filter((e) => e.id !== id));
   const reorderElements = (ids: string[]) => setElements((els) => {
     const byId = new Map(els.map((e) => [e.id, e]));
@@ -89,9 +80,9 @@ export default function BlockDefinitionEditor({ definition, onClose, onDelete, i
   const openAddMenu = (e: MouseEvent) => setMenu({
     x: e.clientX,
     y: e.clientY,
-    actions: ELEMENT_KINDS.map((kind) => {
-      const Icon = ELEMENT_KIND_ICONS[kind];
-      return { label: t(elementKindLabelKey(kind)), icon: <Icon size={12} />, onClick: () => addElement(kind) };
+    actions: fieldKinds().map((kind) => {
+      const Icon = kind.icon;
+      return { label: t(kind.labelKey), icon: <Icon size={12} />, onClick: () => addElement(kind) };
     }),
   });
 
@@ -187,7 +178,8 @@ function ElementRow({ element, blockHidesEmpty, onPatch, onUse, onRemove }: {
 }) {
   const { t } = useTranslation();
   const controls = useDragControls();
-  const Icon = ELEMENT_KIND_ICONS[element.kind];
+  const Icon = elementKind(element).icon;
+  const view = fieldKindView(element);
   const hides = element.hideWhenEmpty ?? blockHidesEmpty;
   return (
     <Reorder.Item
@@ -229,9 +221,7 @@ function ElementRow({ element, blockHidesEmpty, onPatch, onUse, onRemove }: {
         </button>
       </div>
       <div className="block-def-element-body">
-        {element.kind === 'select' && (
-          <OptionsEditor options={element.options ?? []} onChange={(options) => onPatch({ options })} />
-        )}
+        {view?.Settings && <view.Settings element={element} variant="builder" onPatch={onPatch} />}
         {canBeEmpty(element.kind) && (
           <BlockCheckbox
             checked={hides}
@@ -240,50 +230,17 @@ function ElementRow({ element, blockHidesEmpty, onPatch, onUse, onRemove }: {
             label={t('blocks.fields.hideEmpty')}
           />
         )}
-        {element.kind === 'link' && <LinkCategoriesEditor element={element} onPatch={onPatch} />}
-        {/* Text has no default: it would be markup in the definition. */}
-        {element.kind !== 'text' && <PrefillEditor element={element} onPatch={onPatch} />}
+        {view?.DefinitionSettings && <view.DefinitionSettings element={element} variant="builder" onPatch={onPatch} />}
+        {/* A kind without a prefill (text: it would be markup in the definition) offers none. */}
+        {elementKind(element).prefill && <PrefillEditor element={element} onPatch={onPatch} />}
       </div>
     </Reorder.Item>
   );
 }
 
-/** The category filter of a link field: one box per category plus "Uncategorized"; none checked = no filter. */
-function LinkCategoriesEditor({ element, onPatch }: { element: ElementDef; onPatch: (p: Partial<ElementDef>) => void }) {
-  const { t } = useTranslation();
-  const categories = useCategoryStore((s) => s.categories);
-  const known = new Set(categories.map((c) => c.id));
-  // Categories that are gone are neither shown nor kept.
-  const filter = normalizeLinkCategoryFilter(element.linkCategories, known) ?? { categoryIds: [], includeUncategorized: false };
-  const set = (next: LinkCategoryFilter) => onPatch({ linkCategories: normalizeLinkCategoryFilter(next, known) });
-  return (
-    <div>
-    <SettingsCheckboxGrid label={t('blocks.library.linkCategories')}>
-      {categories.map((c) => (
-        <BlockCheckbox
-          key={c.id}
-          checked={filter.categoryIds.includes(c.id)}
-          onChange={(on) => set({
-            ...filter,
-            categoryIds: on ? [...filter.categoryIds, c.id] : filter.categoryIds.filter((i) => i !== c.id),
-          })}
-          label={`${c.emoji} ${categoryLabel(t, c)}`}
-        />
-      ))}
-      <BlockCheckbox
-        checked={filter.includeUncategorized}
-        onChange={(on) => set({ ...filter, includeUncategorized: on })}
-        label={t('categories.uncategorized')}
-      />
-    </SettingsCheckboxGrid>
-    <SettingsDescription className="mt-2">{t('blocks.library.linkCategoriesHint')}</SettingsDescription>
-    </div>
-  );
-}
-
 /**
  * The default of a field: when checked, every new copy gets this value,
- * a checklist with its items, yes/no set to "Yes". Whether it is checked is held by
+ * in the field's own input (a checklist with its items, yes/no set to "Yes"). Whether it is checked is held by
  * the builder itself: an emptied input (the number while retyping) should not
  * immediately collapse the field again.
  */
@@ -292,27 +249,23 @@ function PrefillEditor({ element, onPatch }: { element: ElementDef; onPatch: (p:
   // A default being present means checked; `armed` keeps the check while the input is still empty.
   const [armed, setArmed] = useState(false);
   const on = armed || element.defaultValue !== undefined;
+  const prefill = elementKind(element).prefill;
+  const Input = fieldKindView(element)?.Input;
   const toggle = (next: boolean) => {
     setArmed(next);
-    // Yes/no is already "No" without a value; whoever prefills wants "Yes".
-    onPatch({ defaultValue: next && element.kind === 'toggle' ? true : undefined });
+    // What a ticked prefill starts with, as the kind says (yes/no: "Yes" — "No" it is without one).
+    onPatch({ defaultValue: next ? prefill?.startValue : undefined });
   };
   return (
     <>
       <BlockCheckbox checked={on} onChange={toggle} label={t('blocks.library.prefill')} hint={t('blocks.library.prefillHint')} />
-      {on && (isSlotKind(element.kind) ? (
-        <FieldSlotEditor
+      {on && Input && (
+        <Input
           element={element}
-          slot={slotFromDefault(element) ?? undefined}
-          onChange={(html) => onPatch({ defaultValue: defaultFromSlot(element, html) })}
+          stored={prefillStored(element)}
+          onChange={(stored) => onPatch({ defaultValue: prefillFromStored(element, stored) })}
         />
-      ) : (
-        <FieldValueEditor
-          element={element}
-          value={element.defaultValue as FieldValue | undefined}
-          onChange={(defaultValue) => onPatch({ defaultValue })}
-        />
-      ))}
+      )}
     </>
   );
 }
