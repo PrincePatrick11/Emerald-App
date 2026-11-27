@@ -8,7 +8,8 @@ import type { CanvasTypes } from './types';
  * What one place offers in the canvas editor: which element types exist
  * (and so what can be added), which of the editor's own tools, and which
  * paint tools. A place picks or builds one and spreads it over the editor's
- * props; the concrete profiles live with the places (their adapters).
+ * props. The shapes places start from and the named ones a decision fixed
+ * (the sigil's drawing) live here; what a place only adjusts stays with it.
  */
 export interface CanvasProfile {
   types: CanvasTypes;
@@ -35,7 +36,20 @@ export function paintOnlyProfile(drawing: DrawingTypeOptions = {}, paint: Partia
   };
 }
 
-/** Everything: images, shapes, text and drawings, and all tools. */
+/**
+ * The sigil's drawing, kept spare: the pen, the line, the eraser, selecting,
+ * symmetry, the palette with the free colour, and clearing. No shapes,
+ * layers, bucket or picker — a sigil is a figure of lines.
+ */
+export function sigilDrawingProfile(drawing: DrawingTypeOptions = {}): CanvasProfile {
+  return paintOnlyProfile(drawing, { shapes: false, layers: false, fill: false, picker: false });
+}
+
+/**
+ * Everything: images, shapes, text and drawings, and all tools. The canvas
+ * block and the altar both take it; the altar differs only in its parts
+ * (`CanvasParts`), not in its tools.
+ */
 export function fullProfile(drawing: DrawingTypeOptions = {}): CanvasProfile {
   return {
     types: { ...BUILTIN_CANVAS_TYPES, drawing: createDrawingType(drawing) },

@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react';
 const cache = new Map<string, HTMLImageElement | null>();
 const pending = new Map<string, Promise<HTMLImageElement | null>>();
 
-function loadCanvasImage(src: string): Promise<HTMLImageElement | null> {
+function loadCached(src: string): Promise<HTMLImageElement | null> {
   if (cache.has(src)) return Promise.resolve(cache.get(src)!);
   let promise = pending.get(src);
   if (!promise) {
@@ -43,7 +43,7 @@ export function useCanvasResources(sources: readonly string[], fonts: readonly s
     let alive = true;
     const bump = () => { if (alive) setVersion((v) => v + 1); };
     for (const src of sourceKey ? sourceKey.split('\n') : []) {
-      if (!cache.has(src)) void loadCanvasImage(src).then(bump);
+      if (!cache.has(src)) void loadCached(src).then(bump);
     }
     if (fontKey && document.fonts) {
       void Promise.all(fontKey.split('\n').map((f) => document.fonts.load(f).catch(() => []))).then(bump);

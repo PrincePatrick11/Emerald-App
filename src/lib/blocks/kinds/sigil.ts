@@ -1,14 +1,14 @@
-import { CalendarClock, Sparkles } from 'lucide-react';
-import type { BlockExportPart, BlockTypeDef, ExportContext, ReadContext } from '../blockType';
+import { CalendarClock, Sparkles, Wallpaper } from 'lucide-react';
+import type { BlockActionDef, BlockExportPart, BlockTypeDef, ExportContext, ReadContext } from '../blockType';
 import type { ListInfoPart } from '../listInfo';
 import { drawingImage } from '../paint';
 import { htmlPlainText } from '../plainText';
 import {
-  createSigilBlock, isSigilBroken, parseSigilCharge, serializeSigilCharge, shownSigilParts, sigilEffect, sigilPartBlock, sigilPartId, sigilTargetDate,
-  SIGIL_BLOCK_TYPE, SIGIL_SETTINGS, withSigilPart, type SigilPartName,
+  createSigilBlock, isSigilBroken, parseSigilCharge, serializeSigilCharge, shownSigilParts, sigilBackground, sigilEffect, sigilPartBlock, sigilPartId,
+  sigilTargetDate, SIGIL_BACKGROUND_ACTION, SIGIL_BLOCK_TYPE, SIGIL_SETTINGS, withSigilPart, type SigilPartName,
 } from '../sigil';
 import { extractInternalLinks } from '../../internalLinkHtml';
-import { blockTypeTextKey, type RefReporter } from '../toolkit';
+import { backgroundFile, blockTypeTextKey, type RefReporter } from '../toolkit';
 import type { BlockInstance } from '../types';
 import { reportDrawing } from './paint';
 
@@ -59,6 +59,7 @@ function sigilSearchText(block: BlockInstance, ctx: ReadContext): string {
 function sigilRefs(block: BlockInstance, report: RefReporter): void {
   // Switched off or concealed, a part still holds what it points at.
   reportDrawing(sigilPartBlock(block, 'drawing'), report);
+  report.image(backgroundFile(sigilBackground(block)), 'background');
   report.markup(sigilPartBlock(block, 'charge').html);
 }
 
@@ -119,6 +120,18 @@ function sigilExport(block: BlockInstance, ctx: ExportContext): BlockExportPart[
   return parts;
 }
 
+/**
+ * "Background …" while editing, as long as the drawing shows and can be
+ * painted on: a loaded sigil keeps its picture as it was charged.
+ */
+const SIGIL_ACTIONS: readonly BlockActionDef[] = [{
+  id: SIGIL_BACKGROUND_ACTION,
+  labelKey: 'blocks.sigil.background',
+  icon: Wallpaper,
+  inRead: false,
+  available: (block) => shownSigilParts(block).drawing && !parseSigilCharge(sigilPartBlock(block, 'charge')).loaded,
+}];
+
 export const sigilBlockType: BlockTypeDef = {
   id: SIGIL_BLOCK_TYPE,
   origin: 'core',
@@ -166,5 +179,6 @@ export const sigilBlockType: BlockTypeDef = {
   searchText: sigilSearchText,
   refs: sigilRefs,
   withoutLink: sigilWithoutLink,
+  actions: SIGIL_ACTIONS,
   settings: SIGIL_SETTINGS,
 };

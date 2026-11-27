@@ -276,6 +276,8 @@
     "sigil": {
       "hidden": "Verborgen, solange die Sigille geladen ist",
       "emptyDrawing": "Noch keine Zeichnung",
+      "background": "Hintergrund …",
+      "backgroundTitle": "Hintergrund der Zeichnung",
       "loaded": "Geladen",
       "notLoaded": "Noch nicht geladen",
       "revealedSince": "enthüllt seit {{date}}",

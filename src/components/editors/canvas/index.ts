@@ -10,8 +10,10 @@ export type { CanvasEditorHandle, CanvasEditorProps, CanvasPaintOptions } from '
 export type { CanvasExportFormat, CanvasExportOptions } from './ExportDialog';
 export { FULL_CANVAS_FEATURES, type CanvasFeatures } from './features';
 export type { RulerGuide } from './Rulers';
-export { EMPTY_BACKGROUND, backgroundCss, hasBackground, parseCanvasBackground, type CanvasBackground, type CanvasFill } from './background';
-export type { CanvasBackgroundImages } from './BackgroundPanel';
+export {
+  EMPTY_BACKGROUND, backgroundCss, drawCanvasBackground, hasBackground, parseCanvasBackground, type CanvasBackground, type CanvasFill,
+} from './background';
+export { BackgroundFields, type CanvasBackgroundImages } from './BackgroundPanel';
 export type { CanvasSymbolLibrary } from './symbols/library';
 export {
   byZ,
@@ -23,5 +25,5 @@ export { renderCanvasImage, renderCanvasSvg, canvasToDataUrl, type RenderOptions
 export { createDrawingType, type DrawingElement, type DrawingProps, type DrawingTypeOptions } from './paint/drawing';
 export { FULL_PAINT_FEATURES, type PaintFeatures } from './paint/features';
 export { drawPaintDoc, layerImageRefs, loadLayerImages, polygonPoints, renderPaintPng, type ImageLoader, type LayerImages } from './paint/render';
-export { fullProfile, paintOnlyProfile, type CanvasProfile } from './profiles';
+export { fullProfile, paintOnlyProfile, sigilDrawingProfile, type CanvasProfile } from './profiles';
 export * from '../../../lib/paint/document';

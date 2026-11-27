@@ -4,6 +4,7 @@ import { storedImageName } from '../schema';
 import { paintDocToJson, type PaintDoc } from '../paint/document';
 import { createTextBlock } from './blockHtml';
 import { readBlockJson } from './blockJson';
+import { backgroundFile } from './toolkit';
 import { BLOCK_ATTR, type BlockInstance, type BlockTypeId } from './types';
 
 /**
@@ -197,19 +198,13 @@ export function canvasElementFile(element: Pick<StoredCanvasElement, 'type' | 'r
   return storedImageName(element.ref) ?? storedImageName(typeof element.props.src === 'string' ? element.props.src : null);
 }
 
-/** The stored file of the background picture, or `null` (none, or one of the app's own). */
-export function canvasBackgroundFile(background: unknown): string | null {
-  if (!isRecord(background) || !isRecord(background.image)) return null;
-  return storedImageName(typeof background.image.src === 'string' ? background.image.src : null);
-}
-
 /** The block with a new scene and rendered picture (`null`: none yet). */
 export function withCanvasScene(block: BlockInstance, scene: CanvasScene, render: string | null): BlockInstance {
   const tags: string[] = [];
   if (render) tags.push(`<img src="${escapeHtml(render)}" alt="" data-canvas="${RENDER}">`);
   const files = new Set(scene.elements.map(canvasElementFile).filter((f): f is string => !!f));
   for (const file of files) tags.push(`<img src="${escapeHtml(file)}" alt="" data-canvas="image">`);
-  const background = canvasBackgroundFile(scene.background);
+  const background = backgroundFile(scene.background);
   if (background) tags.push(`<img src="${escapeHtml(background)}" alt="" data-canvas="background">`);
   return { ...block, html: tags.join(''), attrs: { ...block.attrs, [BLOCK_ATTR.data]: JSON.stringify(scene) } };
 }
@@ -236,7 +231,7 @@ export function withoutCanvasFile(block: BlockInstance, file: string): BlockInst
   const parsed = parseCanvasBlock(block);
   if (parsed.broken) return block;
   const elements = parsed.scene.elements.filter((el) => canvasElementFile(el) !== file);
-  const background = canvasBackgroundFile(parsed.scene.background) === file && isRecord(parsed.scene.background)
+  const background = backgroundFile(parsed.scene.background) === file && isRecord(parsed.scene.background)
     ? { ...parsed.scene.background, image: null }
     : parsed.scene.background;
   if (elements.length === parsed.scene.elements.length && background === parsed.scene.background) return block;

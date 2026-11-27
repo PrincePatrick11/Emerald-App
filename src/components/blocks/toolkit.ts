@@ -1,7 +1,10 @@
 import { useCallback, useContext, useEffect, useRef } from 'react';
+import type { CanvasBackgroundImages } from '../editors/canvas';
+import { altarBackgroundUrl } from '../../lib/altarBackground';
 import { blockStorageTag } from '../../lib/blocks/blockTypes';
 import type { BlockInstance } from '../../lib/blocks/types';
 import { fileBaseName, storeImageFromPath } from '../../lib/storeImage';
+import { pickPictures } from '../../store/imagePickerStore';
 import { useImageStore } from '../../store/imageStore';
 import { useTagStore } from '../../store/tagStore';
 import { BlockStackContext, type BlockActionHandler } from './blockStackContext';
@@ -49,3 +52,13 @@ export function useBlockAction(blockId: string, actionId: string, handler: Block
   latest.current = handler;
   useEffect(() => stack?.registerAction(blockId, actionId, () => latest.current()), [stack, blockId, actionId]);
 }
+
+/**
+ * Where a block's background picture comes from (the canvas editor's
+ * background panel or fields): one of the app's own as it is, a stored one
+ * through `imageSrc`; chosen from "Images" with the picture picker.
+ */
+export const BLOCK_BACKGROUND_IMAGES: CanvasBackgroundImages = {
+  resolve: altarBackgroundUrl,
+  pick: async () => (await pickPictures({ multiple: false }))?.[0] ?? null,
+};

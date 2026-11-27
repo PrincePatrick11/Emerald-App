@@ -37,15 +37,39 @@ function fillOfKind(kind: FillKind, from: CanvasFill): CanvasFill {
 }
 
 /**
- * The bar's background button and its panel: the fill (none, a colour, a
- * linear or radial gradient of two or three colours), a picture over it
- * (covering or contained), and a tint over both. Every change applies at once.
+ * The bar's background button and its panel (`BackgroundFields`). Every
+ * change applies at once.
  */
 export default function BackgroundPanel({ value, onChange, images, onDismiss }: {
   value: CanvasBackground;
   onChange: (background: CanvasBackground) => void;
   images?: CanvasBackgroundImages;
   onDismiss?: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <PopoverButton
+      icon={<Wallpaper size={14} />}
+      title={t('canvas.background.title')}
+      active={false}
+      onDismiss={onDismiss}
+    >
+      {() => <BackgroundFields value={value} onChange={onChange} images={images} />}
+    </PopoverButton>
+  );
+}
+
+/**
+ * A background's fields, with a preview on top: the fill (none, a colour, a
+ * linear or radial gradient of two or three colours), a picture over it
+ * (covering or contained), and a tint over both. The canvas editor shows
+ * them in its bar's panel; a place may show them elsewhere (the sigil's
+ * drawing, from its block's menu).
+ */
+export function BackgroundFields({ value, onChange, images }: {
+  value: CanvasBackground;
+  onChange: (background: CanvasBackground) => void;
+  images?: CanvasBackgroundImages;
 }) {
   const { t } = useTranslation();
   const [stop, setStop] = useState(0);
@@ -72,127 +96,118 @@ export default function BackgroundPanel({ value, onChange, images, onDismiss }: 
   };
 
   return (
-    <PopoverButton
-      icon={<Wallpaper size={14} />}
-      title={t('canvas.background.title')}
-      active={false}
-      onDismiss={onDismiss}
-    >
-      {() => (
-        <div className="canvas-panel canvas-bg-panel">
-          <div className="canvas-bg-preview" style={{ background: backgroundCss(value, images?.resolve ?? ((src) => src)) }} />
+    <div className="canvas-panel canvas-bg-panel">
+      <div className="canvas-bg-preview" style={{ background: backgroundCss(value, images?.resolve ?? ((src) => src)) }} />
 
-          <div className="canvas-bg-heading">{t('canvas.background.fill')}</div>
-          {segment<FillKind>([
-            { value: 'none', label: t('canvas.background.none') },
-            { value: 'color', label: t('canvas.background.color') },
-            { value: 'linear', label: t('canvas.background.linear') },
-            { value: 'radial', label: t('canvas.background.radial') },
-          ], fill.kind, (kind) => { setFill(fillOfKind(kind, fill)); setStop(0); })}
+      <div className="canvas-bg-heading">{t('canvas.background.fill')}</div>
+      {segment<FillKind>([
+        { value: 'none', label: t('canvas.background.none') },
+        { value: 'color', label: t('canvas.background.color') },
+        { value: 'linear', label: t('canvas.background.linear') },
+        { value: 'radial', label: t('canvas.background.radial') },
+      ], fill.kind, (kind) => { setFill(fillOfKind(kind, fill)); setStop(0); })}
 
-          {fill.kind === 'color' && <ColorPanel value={fill.color} onPick={(color) => color && setFill({ ...fill, color })} />}
+      {fill.kind === 'color' && <ColorPanel value={fill.color} onPick={(color) => color && setFill({ ...fill, color })} />}
 
-          {gradient && (<>
-            <div className="canvas-bg-stops">
-              {gradient.colors.map((color, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  className={`canvas-swatch${i === current ? ' canvas-swatch-active' : ''}`}
-                  style={{ background: color }}
-                  title={t('canvas.background.stop', { n: i + 1 })}
-                  onClick={() => setStop(i)}
-                />
-              ))}
-              <Button
-                tone="neutral"
-                compact
-                small
-                disabled={gradient.colors.length >= MAX_STOPS}
-                title={t('canvas.background.addStop')}
-                onClick={() => { setFill({ ...gradient, colors: [...gradient.colors, gradient.colors[gradient.colors.length - 1]] }); setStop(gradient.colors.length); }}
-              >
-                <Plus size={12} />
-              </Button>
-              <Button
-                tone="neutral"
-                compact
-                small
-                disabled={gradient.colors.length <= MIN_STOPS}
-                title={t('canvas.background.removeStop')}
-                onClick={() => setFill({ ...gradient, colors: gradient.colors.filter((_, i) => i !== current) })}
-              >
-                <Minus size={12} />
-              </Button>
-            </div>
-            <ColorPanel
-              value={gradient.colors[current]}
-              onPick={(color) => color && setFill({ ...gradient, colors: gradient.colors.map((c, i) => (i === current ? color : c)) })}
+      {gradient && (<>
+        <div className="canvas-bg-stops">
+          {gradient.colors.map((color, i) => (
+            <button
+              key={i}
+              type="button"
+              className={`canvas-swatch${i === current ? ' canvas-swatch-active' : ''}`}
+              style={{ background: color }}
+              title={t('canvas.background.stop', { n: i + 1 })}
+              onClick={() => setStop(i)}
             />
-            {gradient.kind === 'linear' && (
-              <RangeField
-                label={t('canvas.background.angle')}
-                value={gradient.angle}
-                min={0}
-                max={359}
-                onChange={(angle) => setFill({ ...gradient, angle })}
-                format={(angle) => `${Math.round(angle)}°`}
-              />
-            )}
-            {gradient.kind === 'radial' && segment(
-              RADIAL_CENTRES.map((c) => ({ value: c.key, label: t(`canvas.background.${c.key}`) })),
-              RADIAL_CENTRES.find((c) => Math.abs(c.cy - gradient.cy) < 0.01 && gradient.cx === 0.5)?.key ?? null,
-              (key) => setFill({ ...gradient, cx: 0.5, cy: RADIAL_CENTRES.find((c) => c.key === key)!.cy }),
-            )}
-          </>)}
+          ))}
+          <Button
+            tone="neutral"
+            compact
+            small
+            disabled={gradient.colors.length >= MAX_STOPS}
+            title={t('canvas.background.addStop')}
+            onClick={() => { setFill({ ...gradient, colors: [...gradient.colors, gradient.colors[gradient.colors.length - 1]] }); setStop(gradient.colors.length); }}
+          >
+            <Plus size={12} />
+          </Button>
+          <Button
+            tone="neutral"
+            compact
+            small
+            disabled={gradient.colors.length <= MIN_STOPS}
+            title={t('canvas.background.removeStop')}
+            onClick={() => setFill({ ...gradient, colors: gradient.colors.filter((_, i) => i !== current) })}
+          >
+            <Minus size={12} />
+          </Button>
+        </div>
+        <ColorPanel
+          value={gradient.colors[current]}
+          onPick={(color) => color && setFill({ ...gradient, colors: gradient.colors.map((c, i) => (i === current ? color : c)) })}
+        />
+        {gradient.kind === 'linear' && (
+          <RangeField
+            label={t('canvas.background.angle')}
+            value={gradient.angle}
+            min={0}
+            max={359}
+            onChange={(angle) => setFill({ ...gradient, angle })}
+            format={(angle) => `${Math.round(angle)}°`}
+          />
+        )}
+        {gradient.kind === 'radial' && segment(
+          RADIAL_CENTRES.map((c) => ({ value: c.key, label: t(`canvas.background.${c.key}`) })),
+          RADIAL_CENTRES.find((c) => Math.abs(c.cy - gradient.cy) < 0.01 && gradient.cx === 0.5)?.key ?? null,
+          (key) => setFill({ ...gradient, cx: 0.5, cy: RADIAL_CENTRES.find((c) => c.key === key)!.cy }),
+        )}
+      </>)}
 
-          {images && (<>
-            <div className="canvas-bg-heading">{t('canvas.background.image')}</div>
-            <div className="canvas-bg-row">
-              <Button tone="neutral" small fill disabled={picking} onClick={() => void choosePicture()}>
-                <ImagePlus size={12} />
-                {t(image ? 'canvas.background.changeImage' : 'canvas.background.chooseImage')}
-              </Button>
-              {image && (
-                <Button
-                  tone="neutral"
-                  compact
-                  small
-                  title={t('canvas.background.removeImage')}
-                  onClick={() => set({ image: null })}
-                >
-                  <Trash2 size={12} />
-                </Button>
-              )}
-            </div>
-            {image && segment(
-              [{ value: 'cover', label: t('canvas.background.cover') }, { value: 'contain', label: t('canvas.background.contain') }],
-              image.fit,
-              (fit) => set({ image: { ...image, fit } }),
-            )}
-          </>)}
-
-          <div className="canvas-bg-heading">{t('canvas.background.tint')}</div>
-          {segment(
-            [
-              { value: 'none', label: t('canvas.background.none') },
-              { value: 'dark', label: t('canvas.background.darken') },
-              { value: 'light', label: t('canvas.background.lighten') },
-            ],
-            !tint ? 'none' : tint.color === '#ffffff' ? 'light' : 'dark',
-            (v) => set({ tint: v === 'none' ? null : { color: v === 'light' ? '#ffffff' : '#0a0a0f', opacity: tint?.opacity ?? 0.3 } }),
-          )}
-          {tint && (
-            <RangeField
-              label={t('canvas.layers.opacity')}
-              value={Math.round(tint.opacity * 100)}
-              min={5}
-              max={95}
-              onChange={(percent) => set({ tint: { ...tint, opacity: percent / 100 } })}
-            />
+      {images && (<>
+        <div className="canvas-bg-heading">{t('canvas.background.image')}</div>
+        <div className="canvas-bg-row">
+          <Button tone="neutral" small fill disabled={picking} onClick={() => void choosePicture()}>
+            <ImagePlus size={12} />
+            {t(image ? 'canvas.background.changeImage' : 'canvas.background.chooseImage')}
+          </Button>
+          {image && (
+            <Button
+              tone="neutral"
+              compact
+              small
+              title={t('canvas.background.removeImage')}
+              onClick={() => set({ image: null })}
+            >
+              <Trash2 size={12} />
+            </Button>
           )}
         </div>
+        {image && segment(
+          [{ value: 'cover', label: t('canvas.background.cover') }, { value: 'contain', label: t('canvas.background.contain') }],
+          image.fit,
+          (fit) => set({ image: { ...image, fit } }),
+        )}
+      </>)}
+
+      <div className="canvas-bg-heading">{t('canvas.background.tint')}</div>
+      {segment(
+        [
+          { value: 'none', label: t('canvas.background.none') },
+          { value: 'dark', label: t('canvas.background.darken') },
+          { value: 'light', label: t('canvas.background.lighten') },
+        ],
+        !tint ? 'none' : tint.color === '#ffffff' ? 'light' : 'dark',
+        (v) => set({ tint: v === 'none' ? null : { color: v === 'light' ? '#ffffff' : '#0a0a0f', opacity: tint?.opacity ?? 0.3 } }),
       )}
-    </PopoverButton>
+      {tint && (
+        <RangeField
+          label={t('canvas.layers.opacity')}
+          value={Math.round(tint.opacity * 100)}
+          min={5}
+          max={95}
+          onChange={(percent) => set({ tint: { ...tint, opacity: percent / 100 } })}
+        />
+      )}
+    </div>
   );
 }

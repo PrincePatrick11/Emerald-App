@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   canMergeDown, clamp, copyLayer, emptyLayer, emptyPaintDoc, IDENTITY, MAX_LAYERS, mergeDown, moveLayer as moveLayerIn, splitStroke, strokeSamples,
   MAX_SIDES, MIN_SIDES, moveLayerTo, PAINT_SIZE_MAX, PAINT_SIZE_MIN, paintId, symmetricCopies, transformStroke,
@@ -108,6 +108,14 @@ export interface PaintControls {
 export function usePaintBrush(startColor: string, startSize: number) {
   const [tool, setToolRaw] = useState<EditorTool>('pen');
   const [color, setColor] = useState(startColor);
+  // The place may change where the brush starts while painting (a sigil's
+  // background turned light): the colour follows unless one was picked since.
+  const lastStart = useRef(startColor);
+  useEffect(() => {
+    const before = lastStart.current;
+    lastStart.current = startColor;
+    if (before !== startColor) setColor((c) => (c === before ? startColor : c));
+  }, [startColor]);
   const [size, setSizeRaw] = useState(startSize);
   const [wantedLayer, setWantedLayer] = useState<string | null>(null);
   const [selection, setSelection] = useState<string[]>([]);

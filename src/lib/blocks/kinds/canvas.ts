@@ -3,16 +3,16 @@ import { AltarIcon } from '../../altarIcon';
 import { isRecord } from '../../helpers';
 import type { BlockActionDef, BlockExportPart, BlockTypeDef } from '../blockType';
 import {
-  ALTAR_BLOCK_TYPE, CANVAS_BLOCK_TYPE, canvasBackgroundFile, canvasElementFile, createCanvasBlock, parseCanvasBlock, withoutCanvasFile,
+  ALTAR_BLOCK_TYPE, CANVAS_BLOCK_TYPE, canvasElementFile, createCanvasBlock, parseCanvasBlock, withoutCanvasFile,
 } from '../canvas';
-import { blockTypeTextKey, type RefReporter } from '../toolkit';
+import { backgroundFile, blockTypeTextKey, type RefReporter } from '../toolkit';
 import type { BlockInstance } from '../types';
 
 /** A canvas's pictures: those on it (shown), its background, and its rendered picture (the thing itself). */
 function canvasRefs(block: BlockInstance, report: RefReporter): void {
   const { scene, render } = parseCanvasBlock(block);
   for (const el of scene.elements) report.image(canvasElementFile(el), 'content');
-  report.image(canvasBackgroundFile(scene.background), 'background');
+  report.image(backgroundFile(scene.background), 'background');
   report.image(render, 'render');
 }
 

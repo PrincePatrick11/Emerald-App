@@ -276,6 +276,8 @@
     "sigil": {
       "hidden": "Oculto mientras el sigilo está cargado",
       "emptyDrawing": "Aún no hay dibujo",
+      "background": "Fondo…",
+      "backgroundTitle": "Fondo del dibujo",
       "loaded": "Cargado",
       "notLoaded": "Aún no cargado",
       "revealedSince": "revelado desde {{date}}",

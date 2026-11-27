@@ -235,15 +235,17 @@ function canvasOf(width: number, height: number): HTMLCanvasElement {
 }
 
 /**
- * The document as a PNG data URL at its own size, on a transparent ground,
- * hidden layers left out — for wherever the drawing is shown without the
- * editor. The layer images must be loaded (`loadLayerImages`).
+ * The document as a PNG data URL at its own size, on a transparent ground
+ * or on what `under` draws first (a background), hidden layers left out —
+ * for wherever the drawing is shown without the editor. The layer images
+ * must be loaded (`loadLayerImages`).
  */
-export function renderPaintPng(doc: PaintDoc, images: LayerImages): string {
+export function renderPaintPng(doc: PaintDoc, images: LayerImages, under?: (ctx: CanvasRenderingContext2D, width: number, height: number) => void): string {
   const out = canvasOf(PAINT_WIDTH, PAINT_HEIGHT);
   const layer = canvasOf(PAINT_WIDTH, PAINT_HEIGHT);
   const octx = out.getContext('2d')!;
   const lctx = layer.getContext('2d')!;
+  under?.(octx, PAINT_WIDTH, PAINT_HEIGHT);
   for (const l of doc.layers) {
     if (l.hidden) continue;
     drawLayer(lctx, l, images);

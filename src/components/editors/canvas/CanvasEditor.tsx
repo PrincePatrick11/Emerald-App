@@ -1339,6 +1339,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
               api={paintControls}
               images={layerImages}
               editable={layerImages.size >= paintControls.doc.layers.filter((l) => l.image).length}
+              canPick={paintFeatures.picker}
             />
           )}
           {editable && painting && paintType && <PaintToolRail api={paintControls} features={paintFeatures} />}

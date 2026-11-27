@@ -50,6 +50,7 @@ export function toolEnabled(tool: EditorTool, features: PaintFeatures): boolean 
     case 'picker': return features.picker;
     case 'fill': return features.fill;
     case 'select': case 'lasso': case 'move': return features.select;
+    case 'line': return features.line;
     default: return features.shapes;
   }
 }

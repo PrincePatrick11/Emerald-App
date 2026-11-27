@@ -146,6 +146,24 @@ export async function canvasImageSrc(ref: string | null | undefined): Promise<st
   return readImageAsBase64(name);
 }
 
+/**
+ * A picture loaded for a canvas that is read back (`canvasImageSrc`), decoded;
+ * `null` if it is none of ours or does not load.
+ */
+export async function loadCanvasImage(ref: string | null | undefined): Promise<HTMLImageElement | null> {
+  try {
+    const readable = await canvasImageSrc(ref);
+    if (!readable) return null;
+    const img = new Image();
+    img.src = readable;
+    await img.decode();
+    return img;
+  } catch (e) {
+    console.error('[images] picture for a canvas failed to load:', e);
+    return null;
+  }
+}
+
 export interface StoredImage {
   name: string;
   bytes: number;

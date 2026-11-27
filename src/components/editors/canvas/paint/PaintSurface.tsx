@@ -84,11 +84,13 @@ interface SurfaceBox {
   rotation: number;
 }
 
-export default function PaintSurface({ box, api, images, editable }: {
+export default function PaintSurface({ box, api, images, editable, canPick = true }: {
   box: SurfaceBox;
   api: PaintControls;
   images: LayerImages;
   editable: boolean;
+  /** Alt with the pen or the bucket takes a colour (`PaintFeatures.picker`). */
+  canPick?: boolean;
 }) {
   const shellRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -108,8 +110,8 @@ export default function PaintSurface({ box, api, images, editable }: {
 
   const { doc } = api;
   // The latest props for the pointer handlers and the frame callback.
-  const props = useRef({ box, api, images, editable });
-  props.current = { box, api, images, editable };
+  const props = useRef({ box, api, images, editable, canPick });
+  props.current = { box, api, images, editable, canPick };
 
   // Bounded: a huge zoom must not ask for a canvas the browser refuses.
   useLayoutEffect(() => {
@@ -317,7 +319,7 @@ export default function PaintSurface({ box, api, images, editable }: {
   // ── Pointer ────────────────────────────────────────────────────────────
 
   /** Alt picks a colour with the pen or the bucket; with a shape it draws from the middle. */
-  const altPicks = (tool: EditorTool) => tool === 'pen' || tool === 'fill';
+  const altPicks = (tool: EditorTool) => props.current.canPick && (tool === 'pen' || tool === 'fill');
   const effectiveTool = (alt: boolean) => {
     const { tool } = props.current.api;
     return alt && altPicks(tool) ? 'picker' : tool;
@@ -562,7 +564,7 @@ export default function PaintSurface({ box, api, images, editable }: {
     const [x0, y0, x1 = x0, y1 = y0] = pickPath.points;
     pickPoints.push([x0, y0], [x1, y0], [x1, y1], [x0, y1]);
   }
-  const tool = altDown && (api.tool === 'pen' || api.tool === 'fill') ? 'picker' : api.tool;
+  const tool = altDown && altPicks(api.tool) ? 'picker' : api.tool;
   // The symmetry's axes or rays, from the middle of the page, while drawing.
   const guides: [number, number][][] = [];
   // The grid's lines as one path, the middle lines apart (stronger).

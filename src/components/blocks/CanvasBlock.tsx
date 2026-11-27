@@ -3,15 +3,14 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
   CANVAS_SWATCHES, CanvasEditor, canvasToDataUrl, fullProfile, parseCanvasBackground, renderCanvasImage, renderCanvasSvg,
-  type CanvasBackground, type CanvasBackgroundImages, type CanvasEditorHandle, type CanvasElement, type CanvasExportOptions,
+  type CanvasBackground, type CanvasEditorHandle, type CanvasElement, type CanvasExportOptions,
   type CanvasPaintOptions, type CanvasTypes, type RenderOptions, type RulerGuide,
 } from '../editors/canvas';
 import {
   CANVAS_BLOCK_TYPE, canvasElementFile, parseCanvasBlock, storedCanvasElement, storedImageElement, withCanvasScene, withCanvasStripTag, type CanvasParts, type CanvasScene, type StoredCanvasElement,
 } from '../../lib/blocks/canvas';
-import { canvasImageSrc, imageSrc, saveImage } from '../../lib/images';
+import { imageSrc, loadCanvasImage, saveImage } from '../../lib/images';
 import { emptyPaintDoc, paintDocFromJson, type PaintDoc } from '../../lib/paint/document';
-import { altarBackgroundUrl } from '../../lib/altarBackground';
 import { generateId } from '../../lib/helpers';
 import { acceptedImagePaths } from '../../lib/storeImage';
 import { getImageDragItem, setImageDragItem, subscribeImageDrag, type ImageDragItem } from '../../lib/imageDragState';
@@ -29,17 +28,11 @@ import AddImagesModal from '../images/AddImagesModal';
 import { resolveBlockType } from '../../lib/blocks/blockTypes';
 import { SAVE_PICTURE_ACTION } from '../../lib/blocks/kinds/canvas';
 import { blockTypeTextKey } from '../../lib/blocks/toolkit';
-import { storeBlockPicture, useBlockAction, useBlockStorage } from './toolkit';
+import { BLOCK_BACKGROUND_IMAGES, storeBlockPicture, useBlockAction, useBlockStorage } from './toolkit';
 import type { BlockViewProps } from './blockViews';
 
 /** The width of the rendered picture the export and the card show. */
 const RENDER_WIDTH = 1200;
-
-/** The background picture: one of the app's own as it is, a stored one through `imageSrc`; chosen from "Images". */
-const BACKGROUND_IMAGES: CanvasBackgroundImages = {
-  resolve: altarBackgroundUrl,
-  pick: async () => (await pickPictures({ multiple: false }))?.[0] ?? null,
-};
 
 /**
  * What the block offers in the canvas editor: everything, less the parts
@@ -82,21 +75,7 @@ async function ratioOf(file: string): Promise<number> {
   }
 }
 
-/** A picture loaded for a canvas that is read back: as a data URL, never through `emerald-img`. */
-async function loadReadable(src: string): Promise<HTMLImageElement | null> {
-  const readable = await canvasImageSrc(src);
-  if (!readable) return null;
-  const img = new Image();
-  img.src = readable;
-  try {
-    await img.decode();
-    return img;
-  } catch {
-    return null;
-  }
-}
-
-/** What drawing the scene off the editor takes: its elements with their pictures by file, read back as data URLs (`loadReadable`). */
+/** What drawing the scene off the editor takes: its elements with their pictures by file, read back as data URLs (`loadCanvasImage`). */
 function sceneRenderOptions(scene: CanvasScene, types: CanvasTypes, background: CanvasBackground | null, outWidth: number): RenderOptions {
   return {
     types,
@@ -107,7 +86,7 @@ function sceneRenderOptions(scene: CanvasScene, types: CanvasTypes, background: 
       : { ...el, props: { emoji: '', ...el.props } })),
     outWidth,
     background,
-    loadImage: loadReadable,
+    loadImage: loadCanvasImage,
   };
 }
 
@@ -392,7 +371,7 @@ export default function CanvasBlock({ block, isEditing, onBlockChange, onPersist
           onGuidesLockedChange={onGuidesLockedChange}
           canvasBackground={background}
           onCanvasBackgroundChange={onCanvasBackgroundChange}
-          backgroundImages={BACKGROUND_IMAGES}
+          backgroundImages={BLOCK_BACKGROUND_IMAGES}
           symbolLibrary={symbolLibrary}
           onInsertImage={editable ? () => void insertImages() : undefined}
           onExport={exportPicture}

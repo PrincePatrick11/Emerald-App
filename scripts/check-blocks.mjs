@@ -29,7 +29,7 @@ writeFileSync(
    export { fieldKinds, fieldKindOf, registerFieldKind } from '${root}/src/lib/blocks/fieldKinds';
    export { instantiateDefinition, parseDefinitionElements, parseDefinitionDisplay, remapDefinitionDefaults, definitionImageRefs } from '${root}/src/lib/blocks/definitions';
    export { entryBlockSummary, entryBlockValue } from '${root}/src/lib/blocks/entrySummary';
-   export { createSigilBlock, parseSigilCharge, serializeSigilCharge, sigilPartBlock, sigilPartId, withSigilPart, shownSigilParts, isSigilBroken, SIGIL_SETTINGS } from '${root}/src/lib/blocks/sigil';
+   export { createSigilBlock, parseSigilCharge, serializeSigilCharge, sigilPartBlock, sigilPartId, withSigilPart, shownSigilParts, isSigilBroken, SIGIL_SETTINGS, sigilBackground, withSigilBackground } from '${root}/src/lib/blocks/sigil';
    export { extractUniqueLetters, parseSigilCalc, serializeSigilCalc, letterList } from '${root}/src/lib/blocks/sigilCalc';
    export { contentSearchText } from '${root}/src/lib/searchText';
    export { paintDocFromJson, paintDocToJson, emptyPaintDoc, isPaintDocEmpty, thinPoints, transformStroke, mergeDown, canMergeDown, strokeSamples, inPolygon, symmetricCopies, mirrorStroke, splitStroke } from '${root}/src/lib/paint/document';
@@ -85,6 +85,7 @@ const {
   instantiateDefinition, parseDefinitionElements, parseDefinitionDisplay, entryBlockSummary, entryBlockValue,
   extractUniqueLetters, parseSigilCalc, serializeSigilCalc, letterList, contentSearchText,
   createSigilBlock, parseSigilCharge, serializeSigilCharge, sigilPartBlock, sigilPartId, withSigilPart, shownSigilParts, isSigilBroken, SIGIL_SETTINGS,
+  sigilBackground, withSigilBackground,
   drawingImage, withDrawingImage, renderBlocksForExport, parseDrawing, withDrawing,
   paintDocFromJson, paintDocToJson, emptyPaintDoc, isPaintDocEmpty, thinPoints, transformStroke, mergeDown, canMergeDown, strokeSamples, inPolygon, symmetricCopies, mirrorStroke, splitStroke,
   group, ungroup, withGroups, moveInStack, copiesOf, align,
@@ -622,6 +623,20 @@ console.log('\n4f. Sigils\n');
   check('settings: a loaded charge stays shown even switched off, an unloaded one does not',
     shownSigilParts(withBlockSetting(sigil, chargeSetting, false)).charge
       && !shownSigilParts(withBlockSetting(sigilOf({ charge: { ...chargeData, loaded: false } }), chargeSetting, false)).charge);
+
+  // The drawing's background: in the data JSON beside the parts, its picture a reference of its own.
+  const backgroundPicture = `${'b7'.repeat(32)}.png`;
+  const background = { fill: { kind: 'color', color: '#112233' }, image: { src: backgroundPicture, fit: 'cover' }, tint: null };
+  const withBg = parseBlocks(serializeBlocks([withSigilBackground(sigil, background)]))[0];
+  const bgRefs = blockRefs(withBg).filter((r) => r.role === 'background').map((r) => r.target);
+  check('background: kept beside the parts, which stay as they were',
+    JSON.stringify(sigilBackground(withBg)) === JSON.stringify(background)
+      && parseSigilCharge(sigilPartBlock(withBg, 'charge')).revealDate === '2030-01-01' && drawingImage(sigilPartBlock(withBg, 'drawing')) === drawnFile);
+  check('background: its picture is a reference, an app picture is none',
+    bgRefs.join() === backgroundPicture
+      && !blockRefs(withSigilBackground(sigil, { ...background, image: { src: '/backgrounds/night.webp', fit: 'cover' } })).some((r) => r.role === 'background'), bgRefs);
+  check('background: a part written afterwards keeps it, null takes it away',
+    sigilBackground(withPart(withBg, 'calc', (b) => b)) !== null && sigilBackground(withSigilBackground(withBg, null)) === null);
 
   // The paint document: vector strokes as data JSON, the rendered image and layer images as src.
   {

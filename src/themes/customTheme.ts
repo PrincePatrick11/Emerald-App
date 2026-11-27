@@ -324,7 +324,8 @@ function hexAlpha(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-function luminance(hex: string): number {
+/** Relative luminance of a hex colour, 0 (black) to 1 (white). */
+export function luminance(hex: string): number {
   const full = fullHex(hex);
   const [r, g, b] = [1, 3, 5].map((i) => {
     const channel = parseInt(full.slice(i, i + 2), 16) / 255;

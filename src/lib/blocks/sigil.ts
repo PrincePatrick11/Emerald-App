@@ -157,6 +157,32 @@ export function shownSigilParts(block: BlockInstance): Record<SigilPartName, boo
   };
 }
 
+/* ---------------- Background ---------------- */
+
+/**
+ * The drawing's background, as the block stores it under `background` in its
+ * data JSON: the canvas editor's background (`CanvasBackground`, read by the
+ * view with `parseCanvasBackground`), or nothing — the page shows through, as
+ * a sigil always did. Set from the block's menu while editing; the drawing's
+ * rendered picture carries it, so read mode and the exports show it without
+ * knowing it. Its picture is one of the block's references (`kinds/sigil.ts`).
+ */
+export function sigilBackground(block: BlockInstance): unknown {
+  return parseSigil(block).data.background ?? null;
+}
+
+/** The block with a new background; `null` takes it away. */
+export function withSigilBackground(block: BlockInstance, background: unknown): BlockInstance {
+  const { data } = parseSigil(block);
+  const next = { ...data };
+  if (background) next.background = background;
+  else delete next.background;
+  return withBlockData(block, next, block.html);
+}
+
+/** The ID of "Background …" in the block's menu — the view carries it out (`SigilBlock`). */
+export const SIGIL_BACKGROUND_ACTION = 'background';
+
 export function createSigilBlock(): BlockInstance {
   return { id: generateId(), type: SIGIL_BLOCK_TYPE, html: '', attrs: {} };
 }

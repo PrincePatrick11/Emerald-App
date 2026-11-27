@@ -59,7 +59,7 @@ export default function ShortcutOverview({ painting, features, paintFeatures, ty
           row(['[', ']'], k('brushSize')),
           paintFeatures.picker && row([altKey()], k('pickWhileHeld')),
           row([with_(shiftKey(), 'drag')], k('straight')),
-          paintFeatures.shapes && row([with_(altKey(), 'drag')], k('fromCentre')),
+          (paintFeatures.shapes || paintFeatures.line) && row([with_(altKey(), 'drag')], k('fromCentre')),
           ...history,
         ].filter((r): r is Row => !!r),
       },

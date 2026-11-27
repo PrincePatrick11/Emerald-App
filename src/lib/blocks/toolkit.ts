@@ -1,4 +1,4 @@
-import { isImageIcon, isTagId, localIsoDay } from '../helpers';
+import { isImageIcon, isRecord, isTagId, localIsoDay } from '../helpers';
 import { decodeHtmlAttr, extractInternalLinks } from '../internalLinkHtml';
 import { storedImageName, storedImageNamesIn } from '../schema';
 import { readBlockJson } from './blockJson';
@@ -254,4 +254,14 @@ export function withDataVersion(block: BlockInstance, version: number): BlockIns
   if (version > 1) attrs[BLOCK_ATTR.version] = String(version);
   else delete attrs[BLOCK_ATTR.version];
   return { ...block, attrs };
+}
+
+/**
+ * The stored file of a background's picture — the canvas editor's
+ * `CanvasBackground` as a block keeps it (the canvas, the altar, the sigil's
+ * drawing) — or `null` (none, or one of the app's own).
+ */
+export function backgroundFile(background: unknown): string | null {
+  if (!isRecord(background) || !isRecord(background.image)) return null;
+  return storedImageName(typeof background.image.src === 'string' ? background.image.src : null);
 }

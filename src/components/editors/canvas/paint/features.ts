@@ -5,7 +5,9 @@
  * switched off keeps its strokes and draws them.
  */
 export interface PaintFeatures {
-  /** Line, ellipse, rectangle, polygon and star, outlined or filled. */
+  /** The straight line. */
+  line: boolean;
+  /** Ellipse, rectangle, polygon and star, outlined or filled. */
   shapes: boolean;
   /** The paint bucket, filling an area as a vector. */
   fill: boolean;
@@ -20,12 +22,13 @@ export interface PaintFeatures {
   clear: boolean;
   /** Selecting strokes (rectangle, lasso) to move, scale, turn, copy or remove them, and moving a whole layer. */
   select: boolean;
-  /** Taking a colour from the drawing. */
+  /** Taking a colour from the drawing: the picker, and Alt with the pen or the bucket. */
   picker: boolean;
 }
 
 /** Everything. */
 export const FULL_PAINT_FEATURES: PaintFeatures = {
+  line: true,
   shapes: true,
   fill: true,
   symmetry: true,

@@ -276,6 +276,8 @@
     "sigil": {
       "hidden": "Masqué tant que le sigil est chargé",
       "emptyDrawing": "Pas encore de dessin",
+      "background": "Arrière-plan…",
+      "backgroundTitle": "Arrière-plan du dessin",
       "loaded": "Chargé",
       "notLoaded": "Pas encore chargé",
       "revealedSince": "révélé depuis le {{date}}",

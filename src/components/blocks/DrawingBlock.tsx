@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  CanvasEditor, layerImageRefs, loadLayerImages, paintOnlyProfile, renderPaintPng,
-  type CanvasElement, type DrawingProps, type LayerImages,
+  backgroundCss, CanvasEditor, drawCanvasBackground, hasBackground, layerImageRefs, loadLayerImages, paintOnlyProfile, renderPaintPng,
+  type CanvasBackground, type CanvasElement, type CanvasProfile, type DrawingProps, type DrawingTypeOptions, type LayerImages,
 } from '../editors/canvas';
-import { canvasImageSrc, imageSrc, saveImage } from '../../lib/images';
+import { canvasImageSrc, imageSrc, loadCanvasImage, saveImage } from '../../lib/images';
 import { parseDrawing, withDrawing } from '../../lib/blocks/paint';
 import { discardRenders } from '../../store/imageStore';
 import { emptyPaintDoc, isPaintDocEmpty, PAINT_HEIGHT, PAINT_WIDTH, type PaintDoc } from '../../lib/paint/document';
+import { BLOCK_BACKGROUND_IMAGES } from './toolkit';
 import type { BlockViewProps } from './blockViews';
 
 // Strokes in quick succession are saved together, once the hand rests.
@@ -39,9 +40,15 @@ interface DrawingTexts {
  *   counts (`seq`), otherwise an older one finishing late would overwrite the newer.
  * - After teardown (other entry, cancel) nothing is written any more.
  */
-export default function DrawingBlock({ block, isEditing, onBlockChange, onPersist, locked = false, palette, startColor, startSize, texts }: Pick<BlockViewProps, 'block' | 'isEditing' | 'onBlockChange' | 'onPersist'> & {
+export default function DrawingBlock({
+  block, isEditing, onBlockChange, onPersist, locked = false, profile = paintOnlyProfile, background = null, palette, startColor, startSize, texts,
+}: Pick<BlockViewProps, 'block' | 'isEditing' | 'onBlockChange' | 'onPersist'> & {
   /** Editing not allowed: the picture, with `texts.locked` above it while editing. */
   locked?: boolean;
+  /** The tools the editor offers (a paint-only profile); all of them unless the place says otherwise. */
+  profile?: (drawing: DrawingTypeOptions) => CanvasProfile;
+  /** What the drawing lies on, in the editor and in the stored picture; none: the paper while painting, transparent in the picture. */
+  background?: CanvasBackground | null;
   palette: readonly string[];
   startColor: string;
   startSize: number;
@@ -127,6 +134,8 @@ export default function DrawingBlock({ block, isEditing, onBlockChange, onPersis
     <div className="space-y-2">
       <DrawingEditor
         block={block}
+        profile={profile}
+        background={hasBackground(background) ? background : null}
         palette={palette}
         startColor={startColor}
         startSize={startSize}
@@ -145,16 +154,21 @@ const DRAWING_ID = 'sigil-drawing';
 /**
  * The adapter between block and canvas editor: a scene of one drawing over
  * the whole artboard, fixed in the paint mode, so the editor is a plain paint
- * editor here (`paintOnlyProfile`). The document the block holds (an old
- * image as its first layer), the palette, and the brush it starts with.
+ * editor here (a paint-only profile: `paintOnlyProfile`, the sigil's
+ * `sigilDrawingProfile`). The document the block holds (an old image as its
+ * first layer), the palette, the brush it starts with, and the background it
+ * lies on — behind the editor and under the stored PNG; changed while
+ * painting, the PNG is made anew.
  *
  * Layer images are loaded as data URLs first (`canvasImageSrc`): the PNG the
  * block stores is rendered from them, and a canvas with an `emerald-img`
  * source could not be read back. If one cannot be loaded the editor is not
  * shown, since its next save would lose that image.
  */
-function DrawingEditor({ block, palette, startColor, startSize, loadFailed, onChange, onClose }: {
+function DrawingEditor({ block, profile: makeProfile, background, palette, startColor, startSize, loadFailed, onChange, onClose }: {
   block: BlockViewProps['block'];
+  profile: (drawing: DrawingTypeOptions) => CanvasProfile;
+  background: CanvasBackground | null;
   palette: readonly string[];
   startColor: string;
   loadFailed: string;
@@ -186,9 +200,64 @@ function DrawingEditor({ block, palette, startColor, startSize, loadFailed, onCh
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // The background as it is now, with its picture loaded for the stored PNG
+  // (as a data URL, like the layer images). `ready` once that picture is in;
+  // a PNG made before (a stroke meanwhile) lacks it and is made anew then.
+  const backgroundKey = background ? JSON.stringify(background) : '';
+  const [backdrop, setBackdrop] = useState<{ key: string; image: HTMLImageElement | null } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const src = background?.image?.src;
+    if (!src) {
+      setBackdrop({ key: backgroundKey, image: null });
+      return;
+    }
+    void loadCanvasImage(src).then((image) => {
+      if (!cancelled) setBackdrop({ key: backgroundKey, image });
+    });
+    return () => { cancelled = true; };
+    // The key stands for the background.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [backgroundKey]);
+  const ready = backdrop?.key === backgroundKey;
+
+  const toPng = useCallback((next: PaintDoc) => renderOn(
+    next,
+    images?.loaded ?? new Map(),
+    background,
+    ready ? backdrop?.image ?? null : null,
+    // The key stands for the background.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  ), [images, backgroundKey, backdrop, ready]);
+
+  // A background changed while painting: the stored picture is made anew,
+  // once its picture is in. The one the editor opened with needs nothing.
+  const renderedWith = useRef(backgroundKey);
+  const latestDoc = useRef(doc);
+  latestDoc.current = doc;
+  useEffect(() => {
+    if (!images || !ready || renderedWith.current === backgroundKey) return;
+    renderedWith.current = backgroundKey;
+    const current = latestDoc.current;
+    onChange(current, () => toPng(current));
+  }, [images, ready, backgroundKey, onChange, toPng]);
+
+  // Closed (Done) before a changed background's picture was in: that render
+  // is finished anyway — the block stays mounted after Done and stores it
+  // through `onPersist`; after Cancel it is torn down and nothing is written.
+  const closing = useRef({ background, backgroundKey, images, onChange });
+  closing.current = { background, backgroundKey, images, onChange };
+  useEffect(() => () => {
+    const { background: bg, backgroundKey: key, images: loaded, onChange: change } = closing.current;
+    if (!loaded || renderedWith.current === key) return;
+    renderedWith.current = key;
+    const current = latestDoc.current;
+    void loadCanvasImage(bg?.image?.src).then((image) => change(current, () => renderOn(current, loaded.loaded, bg, image)));
+  }, []);
+
   const profile = useMemo(
-    () => paintOnlyProfile({ resolveImage: (ref) => images?.urls.get(ref) ?? '' }),
-    [images],
+    () => makeProfile({ resolveImage: (ref) => images?.urls.get(ref) ?? '' }),
+    [makeProfile, images],
   );
   const elements = useMemo<CanvasElement[]>(() => [{
     id: DRAWING_ID, type: 'drawing', x: PAINT_WIDTH / 2, y: PAINT_HEIGHT / 2, width: PAINT_WIDTH, height: PAINT_HEIGHT,
@@ -200,11 +269,12 @@ function DrawingEditor({ block, palette, startColor, startSize, loadFailed, onCh
     if (!drawing) return;
     const nextDoc = (drawing.props as DrawingProps).doc;
     setDoc(nextDoc);
-    onChange(nextDoc, () => renderPaintPng(nextDoc, images?.loaded ?? new Map()));
-  }, [onChange, images]);
+    onChange(nextDoc, () => toPng(nextDoc));
+  }, [onChange, toPng]);
 
   if (failed) return <p className="paint-error">{loadFailed}</p>;
-  if (!images) return null;
+  // The background it opened with is loaded first, so no stroke is stored without it.
+  if (!images || !backdrop) return null;
   return (
     <CanvasEditor
       {...profile}
@@ -219,9 +289,19 @@ function DrawingEditor({ block, palette, startColor, startSize, loadFailed, onCh
       paintElementId={DRAWING_ID}
       historyKey={block.id}
       paint={{ ...profile.paint, palette: [...palette], startColor, startSize }}
-      background={<div className="h-full w-full canvas-paper" />}
+      // Drawn here, not through `canvasBackground`: that would make a change
+      // from the block's menu a step of the editor's history, which this
+      // place could not hand back (it keeps the background, not the editor).
+      background={background
+        ? <div className="h-full w-full" style={{ background: backgroundCss(background, BLOCK_BACKGROUND_IMAGES.resolve) }} />
+        : <div className="h-full w-full canvas-paper" />}
     />
   );
+}
+
+/** The drawing's PNG, on its background if it has one (with that background's picture, loaded). */
+function renderOn(doc: PaintDoc, images: LayerImages, background: CanvasBackground | null, image: HTMLImageElement | null): string {
+  return renderPaintPng(doc, images, background ? (ctx, w, h) => drawCanvasBackground(ctx, background, w, h, image) : undefined);
 }
 
 const NO_SELECTION: string[] = [];
