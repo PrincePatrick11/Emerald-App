@@ -156,14 +156,14 @@
     "chargingTechnique": "Technique de chargement",
     "letterBank": "Jeu de lettres",
     "noLetters": "Aucune lettre préparée pour le moment.",
-    "targetDate": "Date cible",
-    "brushSize": "Pinceau"
+    "targetDate": "Date cible"
   },
   "blocks": {
     "add": "Ajouter un bloc",
     "actions": "Actions du bloc",
     "dragToMove": "Glisser pour déplacer",
     "sidebarTitle": "Blocs",
+    "actionsTitle": "Actions",
     "hide": "Masquer",
     "show": "Afficher",
     "hiddenHint": "Masqué — invisible en mode lecture",
@@ -172,6 +172,10 @@
     "jumpTo": "Aller au bloc",
     "remove": "Supprimer le bloc",
     "unknown": "Bloc inconnu ({{type}})",
+    "unreadable": {
+      "newer": "Ce bloc provient d’une version plus récente d’Emerald. Mettez l’application à jour pour le voir.",
+      "broken": "Ce bloc ne peut pas être lu : ses données sont endommagées. Il reste tel quel."
+    },
     "types": {
       "text": {
         "label": "Texte",
@@ -182,17 +186,16 @@
         "label": "Champs",
         "description": "Valeurs avec libellé : texte, nombre, date, choix, oui/non, liste de contrôle, lien, image, phase lunaire."
       },
-      "sigilCalc": {
-        "label": "Calculateur de sigil",
-        "description": "Réduire une intention à sa banque de lettres et cocher les lettres utilisées dans le dessin."
-      },
-      "sigilCanvas": {
-        "label": "Dessin du sigil",
-        "description": "Dessiner le sigil — enregistré comme image, masqué tant qu'il est chargé."
-      },
-      "sigilCharge": {
-        "label": "Charge",
-        "description": "Date cible, technique de charge et chargement du sigil. Chargé, il masque les calculateurs et dessins choisis et verrouille l'entrée ou seulement ces blocs."
+      "sigil": {
+        "label": "Sigil",
+        "description": "Calculateur, dessin et charge d'un sigil — activez ou désactivez chaque partie dans le menu du bloc. Chargé, il masque le calculateur et le dessin et verrouille l'entrée ou seulement ce sigil.",
+        "noParts": "Toutes les parties sont désactivées — activez-les dans le menu du bloc.",
+        "locksEntry": "Un sigil chargé verrouille cette entrée — déchargez-le d’abord",
+        "parts": {
+          "calc": "Calculateur",
+          "drawing": "Dessin",
+          "charge": "Charge"
+        }
       },
       "canvas": {
         "label": "Toile",
@@ -217,10 +220,7 @@
       "checklist": "Liste de contrôle",
       "link": "Lien",
       "image": "Image",
-      "moon": "Phase lunaire",
-      "sigilCalc": "Calculateur de sigil",
-      "sigilCanvas": "Dessin du sigil",
-      "sigilCharge": "Charge"
+      "moon": "Phase lunaire"
     },
     "fields": {
       "yes": "Oui",
@@ -238,7 +238,17 @@
       "removeOption": "Supprimer l'option",
       "hideEmpty": "Masquer si vide en mode lecture",
       "readOnly": "Entièrement en lecture seule",
-      "readOnlyHint": "Pas de cochage ni de bascule en mode lecture non plus"
+      "readOnlyHint": "Pas de cochage ni de bascule en mode lecture non plus",
+      "uses": {
+        "label": "Afficher hors du bloc",
+        "info": "Ligne d’information",
+        "infoHint": "Afficher la valeur dans les listes et les tableaux de bord, à côté de la date",
+        "panel": "Barre latérale",
+        "panelHint": "Afficher « Champ : valeur » dans les propriétés de l’entrée",
+        "values": "Filtrer et trier",
+        "valuesHint": "Proposer la valeur aux tableaux de bord pour filtrer et trier",
+        "unavailable": "impossible pour ce type de champ"
+      }
     },
     "library": {
       "defaultName": "Nouveau bloc",
@@ -255,17 +265,6 @@
       "prefillHint": "Chaque nouvelle copie commence avec cette valeur — les entrées existantes gardent la leur.",
       "linkCategories": "Catégories",
       "linkCategoriesHint": "Seules les entrées et tâches de ces catégories sont proposées, dans chaque nouvelle copie. Un lien déjà posé reste. Sans aucune case cochée, tout est proposé.",
-      "calcMode": "Banque de lettres",
-      "calcModes": {
-        "both": "Automatique et manuel",
-        "auto": "Automatique seulement (depuis l'intention)",
-        "manual": "Manuel seulement"
-      },
-      "brushPreset": "Prérégler le pinceau",
-      "brushPresetHint": "Couleur et taille de pinceau avec lesquelles le dessin commence — modifiables pendant le dessin.",
-      "chargePrefillHint": "Chaque nouvelle copie commence avec ce verrouillage et ces parties couvertes — modifiables dans l'entrée tant qu'elle n'est pas chargée.",
-      "chargeCoversAll": "Tous les sigils de l'entrée",
-      "chargeNoTools": "Ce bloc n'a encore ni calculateur ni dessin.",
       "display": "Affichage",
       "fieldCount": "{{count}} champ",
       "fieldCount_other": "{{count}} champs"
@@ -278,14 +277,12 @@
       "revealedSince": "révélé depuis le {{date}}",
       "hiddenUntilUnloaded": "masqué jusqu'au déchargement",
       "noRevealDate": "Pas de date cible",
-      "loadConfirm": "Charger le sigil ? Les blocs couverts restent masqués jusqu'au {{date}}.",
-      "loadConfirmNoDate": "Charger le sigil ? Les blocs couverts restent masqués jusqu'à ce que vous le déchargiez.",
+      "loadConfirm": "Charger le sigil ? Le calculateur et le dessin restent masqués jusqu'au {{date}}.",
+      "loadConfirmNoDate": "Charger le sigil ? Le calculateur et le dessin restent masqués jusqu'à ce que vous le déchargiez.",
       "unloadConfirm": "Décharger le sigil ? Il redevient modifiable aussitôt.",
       "lockScope": "Chargé, verrouille",
       "lockEntry": "toute l'entrée",
-      "lockSigil": "seulement les blocs couverts",
-      "covers": "Couvre",
-      "noTools": "Pas encore de calculateur ni de dessin dans l'entrée",
+      "lockSigil": "seulement ce sigil",
       "locked": "Verrouillé tant que le sigil est chargé",
       "saveFailed": "Le dessin n'a pas pu être enregistré",
       "loadFailed": "Le dessin n'a pas pu être chargé — fermez puis rouvrez l'entrée"
@@ -296,7 +293,7 @@
       "loadFailed": "Impossible de charger la peinture – fermez puis rouvrez l’entrée"
     },
     "canvas": {
-      "broken": "Cette toile n’a pas pu être lue. Elle reste telle quelle.",
+      "savePicture": "Enregistrer comme image…",
       "empty": "Rien sur la toile pour l’instant.",
       "parts": "Proposé",
       "part": {
@@ -313,7 +310,7 @@
     "cancel": "Annuler",
     "delete": "Supprimer",
     "edit": "Modifier",
-    "lockedBySigil": "Un sigil chargé verrouille cette entrée — déchargez-le d’abord",
+    "lockedByBlock": "Un bloc verrouille cette entrée",
     "editing": "en cours de modification…",
     "confirm": "Confirmer",
     "editLink": "Modifier le lien",
@@ -758,7 +755,6 @@
     "zoomIn": "Zoom avant",
     "zoomOut": "Zoom arrière",
     "fit": "Ajuster à la vue",
-    "export": "Enregistrer comme image…",
     "image": "Image",
     "element": "Élément",
     "layers": {
@@ -895,7 +891,10 @@
     "cropArea": "Zone de recadrage",
     "cropZoom": "Zoom",
     "cropHint": "Faites glisser pour déplacer l'image ; la molette ou le curseur règlent le zoom.",
-    "cropApply": "Appliquer"
+    "cropApply": "Appliquer",
+    "fromBlock": "Du bloc « {{name}} »",
+    "fromBlockUnnamed": "D’un bloc",
+    "fromBlockFixed": "Défini par le bloc « {{name}} » – non modifiable ici"
   },
   "filters": {
     "all": "Toutes",
@@ -1575,7 +1574,11 @@
       "print": "Imprimer",
       "toggleTheme": "Clair / sombre",
       "toggleSidebar": "Barre latérale",
-      "exportedOn": "Exporté depuis {{app}} le {{date}}"
+      "exportedOn": "Exporté depuis {{app}} le {{date}}",
+      "concealedUntil": "Masqué jusqu'au {{date}}",
+      "concealed": "Masqué",
+      "reveal": "Découvrir",
+      "conceal": "Couvrir"
     }
   },
   "emeraldKey": {
@@ -1592,6 +1595,10 @@
     "newEntry": "Nouvelle entrée",
     "settings": "Réglages du tableau de bord",
     "name": "Nom",
+    "infoLine": "Ligne d’informations",
+    "infoLineHint": "Ce que les blocs ajoutent aux lignes et aux cartes, comme la date cible d’un sigil. La liste de gauche l’affiche toujours en bref.",
+    "infoShort": "Bref",
+    "infoLong": "Détaillé",
     "allHasNoFilter": "« Toutes les entrées » montre chaque entrée et n’a pas de filtre.",
     "filterCategories": "Catégories",
     "filterCategoriesHint": "Montre les entrées des catégories cochées. « Toutes » montre chaque catégorie.",

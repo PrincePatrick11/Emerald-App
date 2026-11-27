@@ -5,9 +5,10 @@ import { categoryLabel, lookupCategory } from '../lib/categories';
 import { entryDateOf } from '../lib/dashboards';
 import { entryIcon } from '../lib/entryIcon';
 import { displayTitle } from '../lib/entryTitle';
-import { formatEntryDate, formatIsoDate, formatIsoDateShort } from '../lib/formatDate';
+import { formatEntryDate } from '../lib/formatDate';
+import { blockValueText } from '../lib/blockValueText';
 import { entryBlockSummary } from '../lib/blocks/entrySummary';
-import type { ShownListInfoPart } from '../lib/blocks/listInfo';
+import type { InfoForm, ShownListInfoPart } from '../lib/blocks/listInfo';
 import { setDragItem } from '../lib/dragState';
 import { useCategoryStore } from '../store/categoryStore';
 import { useEntryStore } from '../store/entryStore';
@@ -20,7 +21,9 @@ import DashboardItem, { CardContent, ItemGlyph, RENAME_INPUT_CLASS, RowContent }
 import RenameField from '../components/ui/RenameField';
 import { useOpenInNewTabAction } from './useOpenInNewTabAction';
 import { useSaveAsTemplateAction } from './useSaveAsTemplateAction';
+import { useLinkTitle } from './useLinkItems';
 import type { ActiveView, Entry } from '../types';
+import { valueLabel } from '../lib/blocks/blockType';
 
 interface EntryRowOptions {
   /** The dashboard the entries open in; without one, "All entries". */
@@ -36,12 +39,19 @@ export interface EntryRows {
   title: (entry: Entry) => string;
   /** What renaming starts with: the stored title, without "Untitled …". */
   editTitle: (entry: Entry) => string;
-  /** Category · date, then what the entry's blocks add (`ListInfoPart`), written out. */
+  /** Category · date. */
   meta: (entry: Entry) => string;
-  /** The narrow left list: category · date only, without what the blocks add… */
-  shortMeta: (entry: Entry) => string;
-  /** …and what the blocks add as icon and short value, the long form as tooltip — `null` without any. */
-  shortInfo: (entry: Entry) => ReactNode;
+  /**
+   * The narrow left list: the date — with the category only while the
+   * blocks add nothing, so that both dates are seen whole (#173).
+   */
+  narrowMeta: (entry: Entry) => string;
+  /**
+   * What the entry's blocks add to the info line (`ListInfoPart`), one node
+   * per part, never cut: short as icon and short value (the long form as
+   * tooltip), long as "Label: value". Empty without any.
+   */
+  info: (entry: Entry, form: InfoForm) => ReactNode[];
   /** The date the row shows, for sorting by the same. */
   date: (entry: Entry) => string;
   view: (entry: Entry) => ActiveView;
@@ -51,9 +61,10 @@ export interface EntryRows {
   actions: (entry: Entry, startRename: () => void) => ContextMenuAction[];
 }
 
-/** The value of a part, its date in the given form. */
-function infoValue(part: ShownListInfoPart, formatDate: (iso: string) => string): string {
-  return part.value.kind === 'date' ? formatDate(part.value.iso) : part.value.text;
+/** A part of the info line in its short form: its icon (if it has one) and short value. */
+function ShortInfo({ part, text }: { part: ShownListInfoPart; text: string }) {
+  const Icon = part.icon;
+  return <>{Icon && <Icon size={12} className="flex-shrink-0" aria-hidden />}{text}</>;
 }
 
 /**
@@ -70,15 +81,19 @@ export function useEntryRows({ dashboardId, dateField }: EntryRowOptions): Entry
   const categories = useCategoryStore((s) => s.categories);
   const showMoonPhase = useSettingsStore((s) => s.settings.journal.moonPhase);
 
+  // A link field shows its target's current title, not the one stored with it.
+  const linkTitle = useLinkTitle();
+
   const catById = Object.fromEntries(categories.map((c) => [c.id, c]));
   const view = (e: Entry) => entryView(e.id, dashboardId);
   const date = (e: Entry) => entryDateOf(e, dateField);
 
-  const info = (e: Entry) => entryBlockSummary(e.id, e.content).listInfo;
+  const parts = (e: Entry, form: InfoForm) => entryBlockSummary(e).info[form];
   // No fallback to the raw category_id: for a deleted category the label is omitted.
-  const baseMeta = (e: Entry) => [categoryLabel(t, lookupCategory(catById, e.category_id)), formatEntryDate(date(e))];
+  const category = (e: Entry) => categoryLabel(t, lookupCategory(catById, e.category_id));
+  const meta = (e: Entry) => [category(e), formatEntryDate(date(e))].filter(Boolean).join(' · ');
   // "Label: value" as a key: French puts a space before the colon.
-  const longInfo = (part: ShownListInfoPart) => t('common.labelValue', { label: t(part.labelKey), value: infoValue(part, formatIsoDate) });
+  const longInfo = (part: ShownListInfoPart) => t('common.labelValue', { label: valueLabel(part, t), value: blockValueText(t, part.value, { titleOf: linkTitle }) });
 
   const duplicate = async (e: Entry) => {
     const copy = await duplicateEntry(e.id);
@@ -89,18 +104,20 @@ export function useEntryRows({ dashboardId, dateField }: EntryRowOptions): Entry
     icon: (e) => entryIcon(e, lookupCategory(catById, e.category_id), showMoonPhase),
     title: (e) => displayTitle(t, 'entry', e.title),
     editTitle: (e) => e.title,
-    meta: (e) => [...baseMeta(e), ...info(e).map(longInfo)].filter(Boolean).join(' · '),
-    shortMeta: (e) => baseMeta(e).filter(Boolean).join(' · '),
-    shortInfo: (e) => {
-      const parts = info(e);
-      if (parts.length === 0) return null;
-      return parts.map((part) => (
-        <span key={part.key} className="entry-list-info" title={longInfo(part)}>
-          <part.icon size={12} className="flex-shrink-0" aria-hidden />
-          {infoValue(part, formatIsoDateShort)}
-        </span>
-      ));
-    },
+    meta,
+    // #173: while the blocks add something, the date alone — so both dates fit.
+    narrowMeta: (e) => (parts(e, 'short').length ? formatEntryDate(date(e)) : meta(e)),
+    info: (e, form) => parts(e, form).map((part) => {
+      // A typed text or a link's name may be cut; values of a known width (dates, numbers) never are.
+      const className = `entry-list-info${part.value.kind === 'text' || part.value.kind === 'link' ? ' entry-list-info--free' : ''}`;
+      return form === 'short'
+        ? (
+          <span key={part.key} className={className} title={longInfo(part)}>
+            <ShortInfo part={part} text={blockValueText(t, part.value, { form: 'short', titleOf: linkTitle })} />
+          </span>
+        )
+        : <span key={part.key} className={className} title={longInfo(part)}>{longInfo(part)}</span>;
+    }),
     date,
     view,
     rename: async (e, title) => {
@@ -125,8 +142,9 @@ export function useEntryRows({ dashboardId, dateField }: EntryRowOptions): Entry
  * The entry rows of the main area — a dashboard, the entries under a tag: each
  * a `DashboardItem` as row or card, renamed in place, with the shared context
  * menu. `menu` goes into the view once (a `Dashboard`'s `contextMenuSlot`).
+ * `form` is the info line's (`InfoForm`): a dashboard's setting, long elsewhere.
  */
-export function useEntryItems(rows: EntryRows, entries: readonly Entry[]) {
+export function useEntryItems(rows: EntryRows, entries: readonly Entry[], form: InfoForm = 'long') {
   // Keyed by the row (`place`), not the entry: under tags one entry can stand
   // in several rows, and only the one clicked opens its menu or renames.
   const [ctxMenu, setCtxMenu] = useState<{ id: string; place: string; x: number; y: number } | null>(null);
@@ -160,8 +178,8 @@ export function useEntryItems(rows: EntryRows, entries: readonly Entry[]) {
         onContextMenu={(ev) => { ev.preventDefault(); setCtxMenu({ id: e.id, place, x: ev.clientX, y: ev.clientY }); }}
       >
         {layout === 'card'
-          ? <CardContent icon={<ItemGlyph icon={rows.icon(e)} large />} title={title} meta={rows.meta(e)}>{below}</CardContent>
-          : <RowContent icon={<ItemGlyph icon={rows.icon(e)} />} title={title} meta={rows.meta(e)} />}
+          ? <CardContent icon={<ItemGlyph icon={rows.icon(e)} large />} title={title} meta={rows.meta(e)} info={rows.info(e, form)}>{below}</CardContent>
+          : <RowContent icon={<ItemGlyph icon={rows.icon(e)} />} title={title} meta={rows.meta(e)} info={rows.info(e, form)} />}
       </DashboardItem>
     );
   };

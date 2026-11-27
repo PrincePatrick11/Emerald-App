@@ -34,9 +34,9 @@ function RightSidebarActionBar() {
   const setActiveView = useUIStore((s) => s.setActiveView);
   const editActions = useUIStore((s) => s.editActions);
   const editLocked = useUIStore((s) => s.editLocked);
-  // The content of the open entry — for the lock of a loaded sigil.
+  // The open entry — for a lock one of its blocks sets.
   const entryView = activeView.type === 'entry';
-  const content = useEntryStore((s) => (entryView && activeView.id ? findEntry(s.entries, activeView.id)?.content : undefined));
+  const entry = useEntryStore((s) => (entryView && activeView.id ? findEntry(s.entries, activeView.id) : undefined));
 
   if (!activeView.id) return null;
   const isEditing = activeView.mode === 'edit';
@@ -58,15 +58,14 @@ function RightSidebarActionBar() {
     );
   }
 
-  // A loaded sigil with the "whole entry" lock cannot be edited — the
-  // charge decides, in every entry. The button stays
-  // and says why it does nothing.
-  const locked = content !== undefined && !!entryBlockSummary(activeView.id, content).sigil?.lockEntry;
+  // An entry a block locks (interface 6) cannot be edited. The button stays
+  // and says why it does nothing, in the words of the block that locks it.
+  const effects = entry ? entryBlockSummary(entry).effects : null;
 
   return (
     <EditModeBar
       onEdit={() => setActiveView({ ...activeView, mode: 'edit' })}
-      lockedTitle={locked ? t('editor.lockedBySigil') : undefined}
+      lockedTitle={effects?.lockEntry ? t(effects.lockReasonKey ?? 'editor.lockedByBlock') : undefined}
     />
   );
 }

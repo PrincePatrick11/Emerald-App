@@ -394,13 +394,38 @@ html[data-editor-font='merriweather'] { --font-editor: var(--font-merriweather);
     color: var(--text-subtle);
   }
 
-  /* What a block adds to the left list's date line (a sigil's target date): icon and short value, never cut. */
+  /* The mark of a value in the properties panel that comes from a block (`FromBlockMark`). */
+  .from-block-mark {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    color: var(--text-subtle);
+  }
+
+  /* What a block adds to an entry's info line (a sigil's target date) in lists and cards: never cut, except a free-length value (below). */
   .entry-list-info {
     display: inline-flex;
     align-items: center;
     gap: 3px;
     flex-shrink: 0;
     white-space: nowrap;
+  }
+
+  /* In a card a part may wrap inside itself when the card is narrower than it — still never cut. */
+  .card-info .entry-list-info {
+    white-space: normal;
+    flex-shrink: 1;
+    min-width: 0;
+  }
+
+  /* A free-length value (a typed text, a link's name) has no width to rely on: in a row it is cut at the end when room runs out; in a card it wraps. */
+  .entry-list-info--free {
+    display: block;
+    /* Gives way long before the date does, so the date stays whole while there is any room. */
+    flex-shrink: 1000;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   /* Next to the rail, the list on the left needs little margin of its own — the rail
@@ -3798,8 +3823,21 @@ html[data-theme] .prop-segment--active {
   color: var(--text-subtle);
 }
 
-/* Sigil blocks: the drawing in read mode, the quiet "hidden until …" row
-   and the charge status. The toolbar uses the existing .sigil-* classes. */
+/* The sigil block: its parts one below the other, each under its small
+   heading; the drawing in read mode, the quiet "hidden until …" row and the
+   charge status. */
+.block-sigil {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.block-sigil-part {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
 .block-sigil-image {
   display: block;
   width: 100%;
@@ -4277,13 +4315,17 @@ html[data-theme] .block-manager-row--idle,
   color: var(--text-subtle);
 }
 
-.block-unknown {
-  font-family: var(--font-editor);
+/* A block the app cannot read: only the notice, never its content (`UnreadableBlock`). */
+.block-unreadable {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
   color: var(--text-muted);
-  /* Second layer behind the sanitize allowlist in UnknownBlock: whatever
-     slips through stays inside the block's box — even `position: fixed`. */
-  contain: paint;
-  overflow: hidden;
+}
+
+.block-unreadable svg {
+  flex-shrink: 0;
 }
 
 /* ── Light Mode Tailwind bridge ───────────────────────────────────────────── */
@@ -4461,17 +4503,6 @@ html[data-theme] .tasks-category-trigger:hover {
   color: var(--text-primary);
   background: var(--field-bg-hover);
   border-color: var(--field-border-hover);
-}
-
-.sigil-brush-controls {
-  background-color: var(--well-tint);
-  border: 1px solid var(--edge);
-  border-radius: 0.5rem;
-  padding: 0.35rem 0.55rem;
-}
-
-.sigil-brush-slider {
-  width: 8.5rem;
 }
 
 /* The attribute selector outranks the `bg-well-*` and `border-edge` utilities in the callers. */
@@ -4920,12 +4951,6 @@ html[data-theme='emerald-noctis'] .tasks-linked-entry:hover {
   background: rgba(0, 122, 77, 0.34);
 }
 
-html[data-theme='emerald-noctis'] .sigil-brush-controls {
-  background: rgba(45, 36, 31, 0.84);
-  border-color: rgba(113, 94, 77, 0.48);
-  color: #d8c8b8;
-}
-
 /* Light mode redesign: stronger structure and readability */
 html[data-theme='emerald-parchment'] .window-control:focus-visible,
 html[data-theme='emerald-parchment'] .rail-button:focus-visible,
@@ -5162,16 +5187,6 @@ html[data-theme='emerald-parchment'] .tasks-linked-entry {
 html[data-theme='emerald-parchment'] .tasks-linked-entry:hover {
   color: #07593b;
   background: #c6e7d7;
-}
-
-html[data-theme='emerald-parchment'] .sigil-brush-controls {
-  background: #eadcc6;
-  border-color: rgba(145, 108, 70, 0.36);
-  color: #5b432d;
-}
-
-html[data-theme='emerald-parchment'] .sigil-brush-slider {
-  accent-color: #159165;
 }
 
 html[data-theme='emerald-parchment'] .input-field[type="date"] {

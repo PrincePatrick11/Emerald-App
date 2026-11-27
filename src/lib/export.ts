@@ -11,9 +11,11 @@ import DOMPurify from 'dompurify';
 import type { ExportData } from './exportData';
 import { exportDefaultPath } from './vaultManager';
 import { useEntryStore } from '../store/entryStore';
-import { useTaskStore } from '../store/taskStore';
 import { useCategoryStore } from '../store/categoryStore';
-import { DEFAULT_ENTRY_ICON, DEFAULT_TASK_ICON, entryIcon } from './entryIcon';
+import { DEFAULT_ENTRY_ICON, entryIcon } from './entryIcon';
+import { linkItemKey, linkItemsByKey } from './linkItems';
+import { linkItemsSnapshot } from './linkItemsSnapshot';
+import { linkTargetKindOf } from './internalLinkHtml';
 import { portableIcon } from './icons';
 import { typographyCss, type ExportTypography } from './exportFonts';
 import type { ExportOrder } from './exportMenu';
@@ -84,16 +86,18 @@ async function resolveInternalLinkIcons(html: string): Promise<string> {
   const links = doc.querySelectorAll<HTMLElement>('span[data-type="internalLink"]');
   if (!links.length) return html;
 
+  // Live or gone, and a task's icon: from the same list the app's chips and
+  // the export's titles read (`linkItemsSnapshot`).
+  const byKey = linkItemsByKey(linkItemsSnapshot());
   const { entries } = useEntryStore.getState();
-  const { tasks } = useTaskStore.getState();
   const { categories } = useCategoryStore.getState();
 
   for (const el of links) {
     const id        = el.getAttribute('data-id');
-    const targetKind = el.getAttribute('data-target-kind');
+    const targetKind = linkTargetKindOf(el.getAttribute('data-target-kind'));
     if (!id) continue;
-    const exists = targetKind === 'task' ? tasks.some((t) => t.id === id) : entries.some((e) => e.id === id);
-    if (!exists) {
+    const item = byKey.get(linkItemKey({ id, targetKind }));
+    if (!item) {
       el.setAttribute('data-gone', '');
       continue;
     }
@@ -102,14 +106,14 @@ async function resolveInternalLinkIcons(html: string): Promise<string> {
 
     let icon = '';
     if (targetKind === 'entry') {
-      // The same icon as in the app; the moon phase is left out, as the chip shows it live only.
+      // The same icon as in the app, but without the moon phase, which the
+      // chip shows live only — so not the list's icon, which may carry it.
       const entry = entries.find(e => e.id === id);
       if (entry) icon = entryIcon(entry, categories.find(c => c.id === entry.category_id), false);
-    } else if (targetKind === 'task') {
+    } else {
       // Task chips from sidebar drags carry no data-icon — as in the
-      // editor's live lookup: category emoji, otherwise the chip fallback.
-      const task = tasks.find(t => t.id === id);
-      if (task) icon = categories.find(c => c.id === task.category_id)?.emoji ?? DEFAULT_TASK_ICON;
+      // editor's live lookup: the list's icon (category emoji, else the fallback).
+      icon = item.icon ?? '';
     }
     icon = await portableIcon(icon);
     if (icon) el.setAttribute('data-icon', icon);
@@ -288,7 +292,7 @@ const PRINT_CSS = `
     background: #e8e8e8; border-radius: 12px; padding: 2px 10px; color: #444;
   }
   /* Content */
-  .entry-content h1, .entry-content h2, .entry-content h3 { margin-top: 1.3em; margin-bottom: 0.4em; }
+  .entry-content h1, .entry-content h2, .entry-content h3, .entry-content h4 { margin-top: 1.3em; margin-bottom: 0.4em; }
   .entry-content p  { margin-bottom: 0.8em; }
   .entry-content dl { margin-bottom: 0.8em; }
   .entry-content dt { font-size: 0.85em; font-weight: 600; color: #666; margin-top: 0.4em; }

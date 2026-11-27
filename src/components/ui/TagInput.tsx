@@ -2,6 +2,8 @@ import { useState, useRef } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { Tag, X } from 'lucide-react';
+import { chipStyle } from './CardTags';
+import FromBlockMark from './FromBlockMark';
 import { randomTagColor, useTagMap, useTagStore } from '../../store/tagStore';
 import { generateId } from '../../lib/helpers';
 import { tagNameKey } from '../../lib/tagRefs';
@@ -27,6 +29,14 @@ interface TagInputProps {
   /** A filter rather than a field to tag with (the export menu): only existing tags,
    *  a new name neither becomes one nor points at the Tags dashboard. */
   existingOnly?: boolean;
+  /** Tags the entry's blocks give (`Entry.block_tags`): after the user's, marked as the block's, never removable here. */
+  blockTags?: readonly BlockTagChip[];
+}
+
+/** A tag a block gives, with the name of the block (or blocks) giving it. */
+export interface BlockTagChip {
+  id: string;
+  blockName: string;
 }
 
 export type DraftTag = Pick<TagRow, 'id' | 'name' | 'color'>;
@@ -46,7 +56,7 @@ export async function commitDraftTags(tags: string[], drafts: DraftTag[]): Promi
   return [...new Set(result)];
 }
 
-export default function TagInput({ tags, onChange, readOnly = false, chipSize = 'default', flush = false, drafts, onDraftsChange, existingOnly = false }: TagInputProps) {
+export default function TagInput({ tags, onChange, readOnly = false, chipSize = 'default', flush = false, drafts, onDraftsChange, existingOnly = false, blockTags = [] }: TagInputProps) {
   const { t } = useTranslation();
   const { tags: allTags, ensureTag, getByName } = useTagStore(
     useShallow((s) => ({ tags: s.tags, ensureTag: s.ensureTag, getByName: s.getByName }))
@@ -57,6 +67,21 @@ export default function TagInput({ tags, onChange, readOnly = false, chipSize = 
   const shown = tags
     .map((id) => tagMap.get(id) ?? activeDrafts.find((d) => d.id === id))
     .filter((tag): tag is DraftTag => !!tag);
+  // The blocks' tags: the chip's look with a dashed edge, the block's mark (with its tooltip) instead of the "×".
+  const blockChips = blockTags.flatMap(({ id, blockName }) => {
+    const tag = tagMap.get(id);
+    if (!tag) return [];
+    return [(
+      <span
+        key={tag.id}
+        className="h-6 inline-flex items-center gap-1 px-2.5 rounded-full text-xs font-medium max-w-full border"
+        style={chipStyle(tag.color, true)}
+      >
+        <span className="min-w-0 truncate">{tag.name}</span>
+        <FromBlockMark name={blockName} className="text-current opacity-70" />
+      </span>
+    )];
+  });
   const createInline = useSettingsStore((s) => s.settings.tags.createInline);
   const setActiveView = useUIStore((s) => s.setActiveView);
   const [input, setInput] = useState('');
@@ -124,18 +149,19 @@ export default function TagInput({ tags, onChange, readOnly = false, chipSize = 
   useOutsideClick(open, () => setOpen(false), { refs: [wrapperRef] });
 
   if (readOnly) {
-    if (shown.length === 0) return null;
+    if (shown.length === 0 && blockChips.length === 0) return null;
     return (
       <div className="flex flex-wrap gap-1.5">
         {shown.map((tag) => (
           <span
             key={tag.id}
-            className={`px-2 rounded-full text-xs font-medium ${chipSize === 'row' ? 'h-6 inline-flex items-center' : 'py-0.5'}`}
-            style={{ backgroundColor: `${tag.color}20`, color: tag.color, border: `1px solid ${tag.color}40` }}
+            className={`px-2 rounded-full text-xs font-medium border ${chipSize === 'row' ? 'h-6 inline-flex items-center' : 'py-0.5'}`}
+            style={chipStyle(tag.color)}
           >
             {tag.name}
           </span>
         ))}
+        {blockChips}
       </div>
     );
   }
@@ -177,13 +203,13 @@ export default function TagInput({ tags, onChange, readOnly = false, chipSize = 
   // with a round "×") stand on their own, with the field "Add tag …" below.
   return (
     <div ref={wrapperRef} className="relative flex flex-col gap-1">
-      {shown.length > 0 && (
+      {(shown.length > 0 || blockChips.length > 0) && (
         <div className={`flex flex-wrap gap-1.5 pt-0.5 pb-1 ${flush ? '' : 'pl-2.5 pr-3'}`}>
           {shown.map((tag) => (
             <span
               key={tag.id}
-              className="h-6 inline-flex items-center gap-0.5 pl-2.5 pr-1 rounded-full text-xs font-medium max-w-full"
-              style={{ backgroundColor: `${tag.color}20`, color: tag.color, border: `1px solid ${tag.color}40` }}
+              className="h-6 inline-flex items-center gap-0.5 pl-2.5 pr-1 rounded-full text-xs font-medium max-w-full border"
+              style={chipStyle(tag.color)}
             >
               <span className="min-w-0 truncate">{tag.name}</span>
               <button
@@ -197,6 +223,7 @@ export default function TagInput({ tags, onChange, readOnly = false, chipSize = 
               </button>
             </span>
           ))}
+          {blockChips}
         </div>
       )}
       {/* Indented like the sidebar's rows, not like its headings. */}

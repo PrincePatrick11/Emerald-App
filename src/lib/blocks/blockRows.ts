@@ -1,8 +1,5 @@
-import { isRecord } from '../helpers';
-import { htmlTags } from '../htmlTags';
-import { decodeHtmlAttr } from '../internalLinkHtml';
-import { isCanvasBlockType } from './canvas';
-import { isDrawingBlockType } from './paint';
+import { isRecord, localIsoDay } from '../helpers';
+import { blockSearchText } from './blockTypes';
 import { BLOCK_ATTR, type BlockInstance } from './types';
 
 /**
@@ -34,7 +31,7 @@ export interface BlockRowValues {
   /** JSON object of the remaining `data-*` attributes, in their order. */
   attrs: string;
   html: string;
-  /** Plain text for the search (`blockPlainText`). */
+  /** Plain text for the search (`blockSearchText`). */
   text: string;
 }
 
@@ -54,7 +51,8 @@ export function toBlockRow(block: BlockInstance): BlockRowValues {
     data: null,
     attrs: '{}',
     html: block.html,
-    text: blockPlainText(block),
+    // Everything, concealed or not: the row outlives the day it is written on.
+    text: blockSearchText(block, { today: localIsoDay(), revealAll: true }),
   };
   for (const [name, value] of Object.entries(block.attrs)) {
     if (name === BLOCK_ATTR.version && VERSION_RE.test(value)) row.version = Number(value);
@@ -109,60 +107,4 @@ export function fromBlockRow(row: StoredBlockRow): BlockInstance {
   if (row.config != null) attrs[BLOCK_ATTR.config] = row.config;
   if (row.data != null) attrs[BLOCK_ATTR.data] = row.data;
   return { id: row.id, type: row.type, html: row.html ?? '', attrs: { ...attrs, ...restAttrs(row.attrs) } };
-}
-
-/* ---------------- Plain text ---------------- */
-
-/** Elements whose edges are word boundaries — the same list as `searchText.ts`, plus the fields block's `<dl>`. */
-const SEPARATED_TAG_RE = /^(address|blockquote|br|div|dd|dl|dt|h[1-6]|hr|li|ol|p|pre|section|table|td|th|tr|ul|img)$/i;
-/** Elements whose content is no text: their source would read as if it were the entry's prose. */
-const DROPPED_TAGS: ReadonlySet<string> = new Set(['script', 'style', 'noscript']);
-const CHIP_ATTR_RE = /\bdata-type=["']internalLink["']/i;
-
-/**
- * The plain text of a block's markup, without a DOM: tags gone, block
- * elements and link chips as word boundaries, entities decoded. A canvas and a
- * drawing have no text (their markup only lists pictures).
- */
-export function blockPlainText(block: BlockInstance): string {
-  if (isCanvasBlockType(block.type) || isDrawingBlockType(block.type)) return '';
-  return htmlPlainText(block.html);
-}
-
-export function htmlPlainText(html: string): string {
-  if (!html) return '';
-  const lower = html.toLowerCase();
-  const parts: string[] = [];
-  let textFrom = 0;
-  /** Up to where the content of a dropped element runs. */
-  let skipTo = 0;
-  /** Per open `<span>`: is it a link chip? A chip is one word of its own, like in `searchText.ts`. */
-  const spans: boolean[] = [];
-  const unclosedDropped = new Set<string>();
-  for (const tag of htmlTags(html)) {
-    if (tag.index < skipTo) continue;
-    parts.push(html.slice(textFrom, tag.index));
-    textFrom = tag.index + tag.length;
-    const name = tag.name.toLowerCase();
-    if (!tag.close && DROPPED_TAGS.has(name) && !unclosedDropped.has(name)) {
-      const end = lower.indexOf(`</${name}`, textFrom);
-      const gt = end === -1 ? -1 : html.indexOf('>', end);
-      if (gt !== -1) {
-        parts.push(' ');
-        skipTo = gt + 1;
-        textFrom = skipTo;
-        continue;
-      }
-      unclosedDropped.add(name);
-    }
-    if (name === 'span') {
-      const chip = tag.close ? spans.pop() ?? false : CHIP_ATTR_RE.test(tag.attrs);
-      if (!tag.close) spans.push(chip);
-      parts.push(chip ? ' ' : '');
-      continue;
-    }
-    parts.push(!name || SEPARATED_TAG_RE.test(name) ? ' ' : '');
-  }
-  parts.push(html.slice(textFrom));
-  return decodeHtmlAttr(parts.join('')).replace(/\s+/g, ' ').trim();
 }

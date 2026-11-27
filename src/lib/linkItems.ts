@@ -6,6 +6,7 @@ import { categoryLabel, lookupCategory } from './categories';
 import { isImageIcon } from './helpers';
 import { linkTargetKindOf } from './internalLinkHtml';
 import type { Category, Entry, LinkTargetKind, Task } from '../types';
+import type { LinkTitleOf } from './blocks/blockValue';
 
 /**
  * A linkable entry, as seen by the `[[` autocomplete, the
@@ -147,6 +148,16 @@ export function resolveLink(
   if (item) return { item, gone: false };
   const targetKind = linkTargetKindOf(link.targetKind);
   return { item: { id: link.id, targetKind, label: link.label || displayTitle(t, targetKind, '') }, gone: true };
+}
+
+/**
+ * The current title of a link target in `items`, `undefined` once it is gone
+ * (trash, deleted for good) — the one lookup behind every value that names a
+ * link (`linkValueTitle`): lists, the properties panel and the export alike.
+ */
+export function linkTitleIn(items: readonly SuggestionItem[]): LinkTitleOf {
+  const byKey = linkItemsByKey(items);
+  return (link) => byKey.get(linkItemKey(link))?.label;
 }
 
 const byKeyCache = new WeakMap<readonly SuggestionItem[], Map<string, SuggestionItem>>();

@@ -60,7 +60,7 @@ src/
 │   │   └── titlebar/                           custom title bar, menus, SearchModal
 │   ├── editors/
 │   │   └── text/     TextEditor, its host (toolbar, link picker, drops), TipTap extensions
-│   ├── blocks/       BlockStack, block views, fields/sigil/canvas/painting blocks, block editor
+│   ├── blocks/       BlockStack, block views, fields, sigil, canvas and painting blocks, block editor
 │   ├── images/       picture tile, picker, add and edit dialogs, the strip below a canvas
 │   ├── views/        one view per module and aux view (Dashboard … Trash)
 │   ├── sidebar/
@@ -116,7 +116,7 @@ src/
 │   ├── serialize.ts             per-entity write serialization
 │   ├── modules.ts               module registry
 │   ├── blocks/                  block format, types, fields, sigils, canvas, painting, definitions, templates;
-│   │                            a block as a row (`blockRows.ts`), its references (`blockRefs.ts`), positions (`position.ts`), field values by SQL (`blockQuery.ts`), an imported block pointed at this vault (`blockRemap.ts`)
+│   │                            a block as a row (`blockRows.ts`), its references (`blockRefs.ts`, asked of each type: the interfaces in `blockType.ts`, the types in `kinds/`, the registry in `blockTypes.ts`, the toolkit in `toolkit.ts`), positions (`position.ts`), an imported block pointed at this vault (`blockRemap.ts`), the values blocks deliver (`blockValue.ts`)
 │   ├── blockStore.ts            blocks as rows: loading, writing only what changed, replacing a whole stack
 │   ├── entryTitle.ts, dashboards.ts, moonPhase.ts
 │   ├── categories.ts
@@ -197,13 +197,13 @@ Stores are the single source of truth for in-memory state. Components never quer
 
 `src/lib/row.ts` sits on both edges of that flow and is the only place that translates between SQLite rows and the types in `src/types`. SQLite has neither booleans nor arrays — booleans arrive as `0`/`1`, arrays as JSON text — and converting per store lets the same field hold a number in one code path and a boolean in another.
 
-The schema itself lives in `src/lib/schema.ts`, not in `db.ts`: fresh vaults execute that DDL directly; a vault from before the fresh start of the schema (or from a newer app) is refused unchanged, and later schema changes reach existing vaults through the steps of `MIGRATIONS`. `npm run check:schema` checks the fresh vault and the refusals. See [`database.md`](database.md) for the details.
+The schema itself lives in `src/lib/schema.ts`, not in `db.ts`: fresh vaults execute that DDL directly; a vault from before the fresh start of the schema (or from a newer app) is refused unchanged, and later schema changes reach existing vaults through the steps of `MIGRATIONS`. `npm run check:schema` checks the fresh vault, the refusals and each step against a vault of the version before. See [`database.md`](database.md) for the details.
 
 ### Startup loading and lazy data
 
 `AppShell` calls `reloadAllStores()` (`src/store/moduleWiring.ts`) on mount and again on every vault switch — see [Module Registry](architecture/modules.md#module-registry) for the sequence. Views do **not** refetch on mount; a view that mounts before the startup fetch resolves renders its empty state until the store fills.
 
-One detail of what the stores load: **sigil drawings are files, not columns.** A drawing's rendered image is a file referenced from the sigil drawing's (a paint block's) or drawing part's `<img src>`, next to its vector strokes as block data (see [Editors](architecture/editors.md#canvas-editor)), so the entry rows stay small. `entryBlockSummary(...).sigil` gives the sigil's state for the lock; what the info line of lists shows comes from the blocks themselves (`listInfo`, see [Blocks](architecture/blocks.md#registry)) — for a sigil, its target date.
+One detail of what the stores load: **sigil drawings are files, not columns.** A drawing's rendered image is a file referenced from the `<img src>` of a paint block or of the sigil's drawing part, next to its vector strokes as block data (see [Editors](architecture/editors.md#canvas-editor)), so the entry rows stay small. `entryBlockSummary(...).effects` gives what the blocks do to the entry (the lock of a loaded sigil); what the info line of lists shows comes from the blocks themselves (`listInfo`, see [Blocks](architecture/blocks.md#registry-and-interfaces)) — for a sigil, its target date.
 
 ### Store write serialization
 

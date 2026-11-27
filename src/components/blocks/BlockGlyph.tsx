@@ -1,4 +1,4 @@
-import type { GlyphSource } from '../../lib/blocks/presets';
+import type { BlockGlyph as GlyphSource } from '../../lib/blocks/blockType';
 import { isImageIcon } from '../../lib/helpers';
 import { iconSrc } from '../../lib/icons';
 

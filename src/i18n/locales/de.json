@@ -156,14 +156,14 @@
     "chargingTechnique": "Ladetechnik",
     "letterBank": "Buchstabensatz",
     "noLetters": "Noch keine Buchstaben vorbereitet.",
-    "targetDate": "Zieldatum",
-    "brushSize": "Pinsel"
+    "targetDate": "Zieldatum"
   },
   "blocks": {
     "add": "Block hinzufügen",
     "actions": "Block-Aktionen",
     "dragToMove": "Ziehen zum Verschieben",
     "sidebarTitle": "Blöcke",
+    "actionsTitle": "Aktionen",
     "hide": "Ausblenden",
     "show": "Anzeigen",
     "hiddenHint": "Ausgeblendet — im Lesemodus nicht sichtbar",
@@ -172,6 +172,10 @@
     "jumpTo": "Zum Block springen",
     "remove": "Block entfernen",
     "unknown": "Unbekannter Block ({{type}})",
+    "unreadable": {
+      "newer": "Dieser Block stammt aus einer neueren Version von Emerald. Aktualisiere die App, um ihn zu sehen.",
+      "broken": "Dieser Block kann nicht gelesen werden: Seine Daten sind beschädigt. Er bleibt, wie er ist."
+    },
     "types": {
       "text": {
         "label": "Text",
@@ -182,17 +186,16 @@
         "label": "Felder",
         "description": "Beschriftete Werte: Text, Zahl, Datum, Auswahl, Ja/Nein, Checkliste, Verknüpfung, Bild, Mondphase."
       },
-      "sigilCalc": {
-        "label": "Sigillen-Rechner",
-        "description": "Die Absicht auf ihre Buchstabenbank kürzen und abhaken, welche Buchstaben in der Zeichnung stecken."
-      },
-      "sigilCanvas": {
-        "label": "Sigillen-Zeichnung",
-        "description": "Die Sigille zeichnen — gespeichert als Bild, verborgen, solange sie geladen ist."
-      },
-      "sigilCharge": {
-        "label": "Ladung",
-        "description": "Zieldatum, Ladetechnik und das Laden der Sigille. Geladen verbirgt sie die gewählten Rechner und Zeichnungen und sperrt den Eintrag oder nur diese Blöcke."
+      "sigil": {
+        "label": "Sigille",
+        "description": "Rechner, Zeichnung und Ladung einer Sigille — jeden Teil im Menü des Blocks ein- oder ausschalten. Geladen verbirgt sie Rechner und Zeichnung und sperrt den Eintrag oder nur diese Sigille.",
+        "noParts": "Alle Teile sind ausgeschaltet — schalte sie im Menü des Blocks ein.",
+        "locksEntry": "Eine geladene Sigille sperrt diesen Eintrag — erst entladen",
+        "parts": {
+          "calc": "Rechner",
+          "drawing": "Zeichnung",
+          "charge": "Ladung"
+        }
       },
       "canvas": {
         "label": "Leinwand",
@@ -217,10 +220,7 @@
       "checklist": "Checkliste",
       "link": "Verknüpfung",
       "image": "Bild",
-      "moon": "Mondphase",
-      "sigilCalc": "Sigillen-Rechner",
-      "sigilCanvas": "Sigillen-Zeichnung",
-      "sigilCharge": "Ladung"
+      "moon": "Mondphase"
     },
     "fields": {
       "yes": "Ja",
@@ -238,7 +238,17 @@
       "removeOption": "Option entfernen",
       "hideEmpty": "Leer im Lesemodus ausblenden",
       "readOnly": "Komplett schreibgeschützt",
-      "readOnlyHint": "Auch im Lesemodus nichts abhaken oder umschalten"
+      "readOnlyHint": "Auch im Lesemodus nichts abhaken oder umschalten",
+      "uses": {
+        "label": "Außerhalb des Blocks zeigen",
+        "info": "Infozeile",
+        "infoHint": "Wert in Listen und Dashboards neben dem Datum zeigen",
+        "panel": "Seitenleiste",
+        "panelHint": "„Feldname: Wert“ in den Eigenschaften des Eintrags zeigen",
+        "values": "Filtern und sortieren",
+        "valuesHint": "Wert Dashboards zum Filtern und Sortieren anbieten",
+        "unavailable": "bei dieser Feldart nicht möglich"
+      }
     },
     "library": {
       "defaultName": "Neuer Block",
@@ -255,17 +265,6 @@
       "prefillHint": "Jede neue Kopie startet mit diesem Wert — bestehende Einträge behalten ihren.",
       "linkCategories": "Kategorien",
       "linkCategoriesHint": "Nur Einträge und Aufgaben dieser Kategorien werden angeboten, in jeder neuen Kopie. Ein bereits gesetzter Link bleibt stehen. Ohne Auswahl werden alle angeboten.",
-      "calcMode": "Buchstabenbank",
-      "calcModes": {
-        "both": "Automatisch und manuell",
-        "auto": "Nur automatisch (aus der Absicht)",
-        "manual": "Nur manuell"
-      },
-      "brushPreset": "Pinsel voreinstellen",
-      "brushPresetHint": "Farbe und Pinselgröße, mit denen das Zeichnen beginnt — beim Zeichnen lässt sich weiter umstellen.",
-      "chargePrefillHint": "Jede neue Kopie startet mit dieser Sperre und diesen verdeckten Teilen — im Eintrag lässt sich beides ändern, solange nicht geladen ist.",
-      "chargeCoversAll": "Alle Sigillen im Eintrag",
-      "chargeNoTools": "Dieser Block hat noch keinen Rechner und keine Zeichnung.",
       "display": "Anzeige",
       "fieldCount": "{{count}} Feld",
       "fieldCount_other": "{{count}} Felder"
@@ -278,14 +277,12 @@
       "revealedSince": "enthüllt seit {{date}}",
       "hiddenUntilUnloaded": "verborgen bis zum Entladen",
       "noRevealDate": "Kein Zieldatum",
-      "loadConfirm": "Sigille laden? Die verdeckten Blöcke bleiben bis {{date}} verborgen.",
-      "loadConfirmNoDate": "Sigille laden? Die verdeckten Blöcke bleiben verborgen, bis du sie entlädst.",
+      "loadConfirm": "Sigille laden? Rechner und Zeichnung bleiben bis {{date}} verborgen.",
+      "loadConfirmNoDate": "Sigille laden? Rechner und Zeichnung bleiben verborgen, bis du sie entlädst.",
       "unloadConfirm": "Sigille entladen? Sie lässt sich danach sofort wieder bearbeiten.",
       "lockScope": "Geladen sperrt",
       "lockEntry": "den ganzen Eintrag",
-      "lockSigil": "nur die verdeckten Blöcke",
-      "covers": "Verdeckt",
-      "noTools": "Noch kein Rechner und keine Zeichnung im Eintrag",
+      "lockSigil": "nur diese Sigille",
       "locked": "Gesperrt, solange die Sigille geladen ist",
       "saveFailed": "Die Zeichnung ließ sich nicht speichern",
       "loadFailed": "Die Zeichnung ließ sich nicht laden — den Eintrag schließen und neu öffnen"
@@ -296,7 +293,7 @@
       "loadFailed": "Die Malerei konnte nicht geladen werden – schließ den Eintrag und öffne ihn erneut"
     },
     "canvas": {
-      "broken": "Diese Leinwand ließ sich nicht lesen. Sie bleibt, wie sie ist.",
+      "savePicture": "Als Bild speichern …",
       "empty": "Noch nichts auf der Leinwand.",
       "parts": "Verfügbar",
       "part": {
@@ -313,7 +310,7 @@
     "cancel": "Abbrechen",
     "delete": "Löschen",
     "edit": "Bearbeiten",
-    "lockedBySigil": "Eine geladene Sigille sperrt diesen Eintrag — erst entladen",
+    "lockedByBlock": "Ein Block sperrt diesen Eintrag",
     "editing": "wird bearbeitet…",
     "confirm": "Bestätigen",
     "editLink": "Link bearbeiten",
@@ -758,7 +755,6 @@
     "zoomIn": "Vergrößern",
     "zoomOut": "Verkleinern",
     "fit": "Einpassen",
-    "export": "Als Bild speichern …",
     "image": "Bild",
     "element": "Element",
     "layers": {
@@ -895,7 +891,10 @@
     "cropArea": "Bildausschnitt",
     "cropZoom": "Zoom",
     "cropHint": "Ziehen verschiebt das Bild, Mausrad oder Regler zoomen.",
-    "cropApply": "Übernehmen"
+    "cropApply": "Übernehmen",
+    "fromBlock": "Vom Block „{{name}}“",
+    "fromBlockUnnamed": "Von einem Block",
+    "fromBlockFixed": "Vom Block „{{name}}“ festgelegt – hier nicht änderbar"
   },
   "filters": {
     "all": "Alle",
@@ -1575,7 +1574,11 @@
       "print": "Drucken",
       "toggleTheme": "Hell / Dunkel",
       "toggleSidebar": "Seitenleiste",
-      "exportedOn": "Exportiert aus {{app}} am {{date}}"
+      "exportedOn": "Exportiert aus {{app}} am {{date}}",
+      "concealedUntil": "Verborgen bis {{date}}",
+      "concealed": "Verborgen",
+      "reveal": "Aufdecken",
+      "conceal": "Zudecken"
     }
   },
   "emeraldKey": {
@@ -1592,6 +1595,10 @@
     "newEntry": "Neuer Eintrag",
     "settings": "Dashboard-Einstellungen",
     "name": "Name",
+    "infoLine": "Infozeile",
+    "infoLineHint": "Was Blöcke zu Zeilen und Karten beitragen, etwa das Zieldatum einer Sigille. Die linke Liste zeigt es immer knapp.",
+    "infoShort": "Knapp",
+    "infoLong": "Ausführlich",
     "allHasNoFilter": "„Alle Einträge“ zeigt jeden Eintrag und hat keinen Filter.",
     "filterCategories": "Kategorien",
     "filterCategoriesHint": "Zeigt Einträge der angehakten Kategorien. „Alle“ zeigt jede Kategorie.",

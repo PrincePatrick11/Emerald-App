@@ -156,14 +156,14 @@
     "chargingTechnique": "Técnica de carga",
     "letterBank": "Banco de letras",
     "noLetters": "Aún no hay letras preparadas.",
-    "targetDate": "Fecha objetivo",
-    "brushSize": "Pincel"
+    "targetDate": "Fecha objetivo"
   },
   "blocks": {
     "add": "Añadir bloque",
     "actions": "Acciones del bloque",
     "dragToMove": "Arrastra para mover",
     "sidebarTitle": "Bloques",
+    "actionsTitle": "Acciones",
     "hide": "Ocultar",
     "show": "Mostrar",
     "hiddenHint": "Oculto — no se muestra en modo lectura",
@@ -172,6 +172,10 @@
     "jumpTo": "Ir al bloque",
     "remove": "Eliminar bloque",
     "unknown": "Bloque desconocido ({{type}})",
+    "unreadable": {
+      "newer": "Este bloque proviene de una versión más reciente de Emerald. Actualiza la aplicación para verlo.",
+      "broken": "Este bloque no se puede leer: sus datos están dañados. Se queda como está."
+    },
     "types": {
       "text": {
         "label": "Texto",
@@ -182,17 +186,16 @@
         "label": "Campos",
         "description": "Valores con etiqueta: texto, número, fecha, selección, sí/no, lista de verificación, enlace, imagen, fase lunar."
       },
-      "sigilCalc": {
-        "label": "Calculadora de sigilo",
-        "description": "Reduce una intención a su banco de letras y marca las letras usadas en el dibujo."
-      },
-      "sigilCanvas": {
-        "label": "Dibujo del sigilo",
-        "description": "Dibuja el sigilo — se guarda como imagen y se oculta mientras está cargado."
-      },
-      "sigilCharge": {
-        "label": "Carga",
-        "description": "Fecha objetivo, técnica de carga y la carga del sigilo. Cargado oculta las calculadoras y dibujos elegidos y bloquea la entrada o solo esos bloques."
+      "sigil": {
+        "label": "Sigilo",
+        "description": "Calculadora, dibujo y carga de un sigilo — activa o desactiva cada parte en el menú del bloque. Cargado oculta la calculadora y el dibujo y bloquea la entrada o solo este sigilo.",
+        "noParts": "Todas las partes están desactivadas — actívalas en el menú del bloque.",
+        "locksEntry": "Un sigilo cargado bloquea esta entrada: descárgalo primero",
+        "parts": {
+          "calc": "Calculadora",
+          "drawing": "Dibujo",
+          "charge": "Carga"
+        }
       },
       "canvas": {
         "label": "Lienzo",
@@ -217,10 +220,7 @@
       "checklist": "Lista de verificación",
       "link": "Enlace",
       "image": "Imagen",
-      "moon": "Fase lunar",
-      "sigilCalc": "Calculadora de sigilo",
-      "sigilCanvas": "Dibujo del sigilo",
-      "sigilCharge": "Carga"
+      "moon": "Fase lunar"
     },
     "fields": {
       "yes": "Sí",
@@ -238,7 +238,17 @@
       "removeOption": "Eliminar opción",
       "hideEmpty": "Ocultar vacío en modo lectura",
       "readOnly": "Totalmente de solo lectura",
-      "readOnlyHint": "Tampoco marcar ni alternar en modo lectura"
+      "readOnlyHint": "Tampoco marcar ni alternar en modo lectura",
+      "uses": {
+        "label": "Mostrar fuera del bloque",
+        "info": "Línea de información",
+        "infoHint": "Mostrar el valor en listas y paneles junto a la fecha",
+        "panel": "Barra lateral",
+        "panelHint": "Mostrar «Campo: valor» en las propiedades de la entrada",
+        "values": "Filtrar y ordenar",
+        "valuesHint": "Ofrecer el valor a los paneles para filtrar y ordenar",
+        "unavailable": "no es posible con este tipo de campo"
+      }
     },
     "library": {
       "defaultName": "Nuevo bloque",
@@ -255,17 +265,6 @@
       "prefillHint": "Cada copia nueva empieza con este valor; las entradas existentes conservan el suyo.",
       "linkCategories": "Categorías",
       "linkCategoriesHint": "Solo se ofrecen entradas y tareas de estas categorías, en cada copia nueva. Un enlace ya puesto se mantiene. Sin ninguna marcada, se ofrece todo.",
-      "calcMode": "Banco de letras",
-      "calcModes": {
-        "both": "Automático y manual",
-        "auto": "Solo automático (desde la intención)",
-        "manual": "Solo manual"
-      },
-      "brushPreset": "Preajustar el pincel",
-      "brushPresetHint": "Color y tamaño de pincel con los que empieza el dibujo; al dibujar se pueden cambiar.",
-      "chargePrefillHint": "Cada copia nueva empieza con este bloqueo y estas partes cubiertas; en la entrada se pueden cambiar mientras no esté cargado.",
-      "chargeCoversAll": "Todos los sigilos de la entrada",
-      "chargeNoTools": "Este bloque todavía no tiene calculadora ni dibujo.",
       "display": "Visualización",
       "fieldCount": "{{count}} campo",
       "fieldCount_other": "{{count}} campos"
@@ -278,14 +277,12 @@
       "revealedSince": "revelado desde {{date}}",
       "hiddenUntilUnloaded": "oculto hasta descargarlo",
       "noRevealDate": "Sin fecha objetivo",
-      "loadConfirm": "¿Cargar el sigilo? Los bloques cubiertos quedan ocultos hasta el {{date}}.",
-      "loadConfirmNoDate": "¿Cargar el sigilo? Los bloques cubiertos quedan ocultos hasta que lo descargues.",
+      "loadConfirm": "¿Cargar el sigilo? La calculadora y el dibujo quedan ocultos hasta el {{date}}.",
+      "loadConfirmNoDate": "¿Cargar el sigilo? La calculadora y el dibujo quedan ocultos hasta que lo descargues.",
       "unloadConfirm": "¿Descargar el sigilo? Se podrá editar de nuevo enseguida.",
       "lockScope": "Cargado bloquea",
       "lockEntry": "toda la entrada",
-      "lockSigil": "solo los bloques cubiertos",
-      "covers": "Cubre",
-      "noTools": "Todavía no hay calculadora ni dibujo en la entrada",
+      "lockSigil": "solo este sigilo",
       "locked": "Bloqueado mientras el sigilo está cargado",
       "saveFailed": "No se pudo guardar el dibujo",
       "loadFailed": "No se pudo cargar el dibujo — cierra y vuelve a abrir la entrada"
@@ -296,7 +293,7 @@
       "loadFailed": "No se pudo cargar la pintura: cierra y vuelve a abrir la entrada"
     },
     "canvas": {
-      "broken": "Este lienzo no se pudo leer. Se queda como está.",
+      "savePicture": "Guardar como imagen…",
       "empty": "Todavía no hay nada en el lienzo.",
       "parts": "Disponible",
       "part": {
@@ -313,7 +310,7 @@
     "cancel": "Cancelar",
     "delete": "Eliminar",
     "edit": "Editar",
-    "lockedBySigil": "Un sigilo cargado bloquea esta entrada: descárgalo primero",
+    "lockedByBlock": "Un bloque bloquea esta entrada",
     "editing": "editando…",
     "confirm": "Confirmar",
     "editLink": "Editar enlace",
@@ -758,7 +755,6 @@
     "zoomIn": "Acercar",
     "zoomOut": "Alejar",
     "fit": "Ajustar a la vista",
-    "export": "Guardar como imagen…",
     "image": "Imagen",
     "element": "Elemento",
     "layers": {
@@ -895,7 +891,10 @@
     "cropArea": "Área de recorte",
     "cropZoom": "Zoom",
     "cropHint": "Arrastra para mover la imagen; usa la rueda del ratón o el control para hacer zoom.",
-    "cropApply": "Aplicar"
+    "cropApply": "Aplicar",
+    "fromBlock": "Del bloque «{{name}}»",
+    "fromBlockUnnamed": "De un bloque",
+    "fromBlockFixed": "Fijado por el bloque «{{name}}»: no se puede cambiar aquí"
   },
   "filters": {
     "all": "Todas",
@@ -1575,7 +1574,11 @@
       "print": "Imprimir",
       "toggleTheme": "Claro / oscuro",
       "toggleSidebar": "Barra lateral",
-      "exportedOn": "Exportado desde {{app}} el {{date}}"
+      "exportedOn": "Exportado desde {{app}} el {{date}}",
+      "concealedUntil": "Oculto hasta {{date}}",
+      "concealed": "Oculto",
+      "reveal": "Descubrir",
+      "conceal": "Cubrir"
     }
   },
   "emeraldKey": {
@@ -1592,6 +1595,10 @@
     "newEntry": "Nueva entrada",
     "settings": "Ajustes del panel",
     "name": "Nombre",
+    "infoLine": "Línea de información",
+    "infoLineHint": "Lo que los bloques añaden a filas y tarjetas, como la fecha objetivo de un sigilo. La lista de la izquierda siempre lo muestra breve.",
+    "infoShort": "Breve",
+    "infoLong": "Detallada",
     "allHasNoFilter": "«Todas las entradas» muestra cada entrada y no tiene filtro.",
     "filterCategories": "Categorías",
     "filterCategoriesHint": "Muestra entradas de las categorías marcadas. «Todas» muestra todas las categorías.",

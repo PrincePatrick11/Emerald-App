@@ -1,7 +1,8 @@
 import { parseBlocks, serializeBlocks } from '../blocks/blockHtml';
-import { asString, isRecord, ITEM_ID_RE, LEGACY_MERGE_PREFIX, UUID_PATTERN } from '../helpers';
+import { asString, isRecord, isTagId, ITEM_ID_RE, LEGACY_MERGE_PREFIX, UUID_PATTERN } from '../helpers';
 import { fromBlockRow, toBlockRow, type BlockRowValues } from '../blocks/blockRows';
 import { FIELDS_BLOCK_TYPE, parseFields } from '../blocks/fields';
+import { blockTagsOf } from '../blocks/blockRefs';
 
 /**
  * The manifest of a `.emerald` file (`manifest.json` in the archive that
@@ -14,13 +15,14 @@ import { FIELDS_BLOCK_TYPE, parseFields } from '../blocks/fields';
  */
 
 /**
- * '7' is the archive behind a header that names its kind and protection, the
+ * '8' is the archive behind a header that names its kind and protection, the
  * manifest deflated, starter categories with their ID, custom blocks along,
- * and the vault's content as a kind of its own. Every version before ('6',
- * the bare archive; '1' to '5', one JSON file) is refused before a manifest is
- * read (`EMERALD_OLD_FORMAT`) — 0.2.0 reads only what it writes.
+ * the vault's content as a kind of its own, and the names of the tags the
+ * items' blocks give (`blockTags`). Every version before ('7' without those
+ * names, '6' the bare archive, '1' to '5' one JSON file) is refused — 0.2.0
+ * reads only what it writes.
  */
-export const EMERALD_FORMAT_VERSION = 7;
+export const EMERALD_FORMAT_VERSION = 8;
 
 /**
  * What a file holds, said in its header and again in the manifest: entries
@@ -99,6 +101,16 @@ export interface ManifestTemplate {
 
 export type ManifestItem = ManifestEntry | ManifestTemplate;
 
+/**
+ * A tag the items' blocks give (`block_refs` kind `tag`): its ID as the blocks
+ * name it, and its name — what the import finds or makes the tag here by, as
+ * it does an item's own tags; the blocks are then pointed at it (`retagContent`).
+ */
+export interface ManifestBlockTag {
+  id: string;
+  name: string;
+}
+
 /** A link target of the content: what the import looks for when the ID is not in this vault and not in the file. */
 export interface ManifestLink {
   id: string;
@@ -131,6 +143,8 @@ export interface EmeraldManifest {
   blockDefinitions: ManifestBlockDefinition[];
   /** The details of the file's pictures that are in "Images" here — not of left-out ones. */
   images: ManifestImage[];
+  /** The tags the items' blocks give, by ID and name. */
+  blockTags: ManifestBlockTag[];
 }
 
 /**
@@ -204,6 +218,18 @@ export function usedDefinitionIds(contents: readonly string[]): string[] {
   return [...ids];
 }
 
+/**
+ * The tags the blocks of the contents give, with their names (`nameOf`; a tag
+ * without one — in the trash, deleted — stays out: the import could not place it).
+ */
+export function manifestBlockTags(contents: readonly string[], nameOf: (id: string) => string | undefined): ManifestBlockTag[] {
+  const ids = new Set(contents.flatMap((content) => blockTagsOf(parseBlocks(content))));
+  return [...ids].flatMap((id) => {
+    const name = nameOf(id);
+    return name ? [{ id, name }] : [];
+  });
+}
+
 /* ---------------- Reading a foreign manifest ---------------- */
 
 /** Why a manifest is not read: from an older or a newer app, or no manifest at all. */
@@ -218,7 +244,7 @@ export type ManifestProblem = 'oldVersion' | 'newVersion' | 'unsupported' | 'too
 // `images`, `imageTags`, `imageTagName`: a picture's details — how many, how
 // many tags each, how long a tag name (as the backup's `TAG_NAME_MAX`, but a
 // longer one is dropped, not cut). `items` is mirrored in Rust (`check:schema`).
-export const MANIFEST_LIMITS = { items: 1000, blocks: 50_000, links: 50_000, images: 50_000, imageTags: 100, imageTagName: 100 } as const;
+export const MANIFEST_LIMITS = { items: 1000, blocks: 50_000, links: 50_000, images: 50_000, imageTags: 100, imageTagName: 100, blockTags: 1000 } as const;
 
 /**
  * An entry's ID in a file must be a UUID, perhaps with the prefix an older
@@ -345,6 +371,15 @@ export function parseManifest(json: string): EmeraldManifest | ManifestProblem {
     ? raw.blockDefinitions.filter((d): d is ManifestBlockDefinition => isRecord(d) && isRowId(d.id))
     : [];
   const images = Array.isArray(raw.images) ? raw.images.flatMap(readImage) : [];
+  // As a picture's tags: names trimmed, overlong ones dropped, each ID once.
+  const tagIds = new Set<string>();
+  const blockTags = (Array.isArray(raw.blockTags) ? raw.blockTags : []).slice(0, MANIFEST_LIMITS.blockTags).flatMap((t): ManifestBlockTag[] => {
+    if (!isRecord(t) || !isTagId(t.id) || tagIds.has(t.id)) return [];
+    const name = text(t.name).trim();
+    if (!name || name.length > MANIFEST_LIMITS.imageTagName) return [];
+    tagIds.add(t.id);
+    return [{ id: t.id, name }];
+  });
   return {
     format: 'emerald',
     version: EMERALD_FORMAT_VERSION,
@@ -355,6 +390,7 @@ export function parseManifest(json: string): EmeraldManifest | ManifestProblem {
     omittedImages: strings(raw.omittedImages),
     blockDefinitions,
     images,
+    blockTags,
   };
 }
 

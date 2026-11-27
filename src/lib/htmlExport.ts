@@ -1,7 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { save } from '@tauri-apps/plugin-dialog';
 import i18n from '../i18n';
-import { extractInternalLinks } from './internalLinkHtml';
 import { TEXT_COLORS, TEXT_COLOR_SHADES } from './textColors';
 import { useCategoryStore } from '../store/categoryStore';
 import { groupByCategory } from './groupBy';
@@ -23,8 +22,11 @@ import { exportDefaultPath } from './vaultManager';
 // on inline scripts does not apply; the file carries its own CSP instead,
 // which blocks loading anything from the network and submitting forms. Entry
 // content is DOMPurify-sanitised (`exportArticle`), so it cannot add scripts
-// of its own. The blocks are rendered as for the PDF (`exportRender.ts`):
-// what read mode hides — also a sigil's concealed parts — is not in the file.
+// of its own; the buttons it holds (a cover's switch) get their behaviour from
+// the file's script. The blocks are asked for their HTML (`exportRender.ts`):
+// what read mode hides with the eye is not in the file, and what a block
+// conceals (a loaded sigil's parts) is in it, covered, with a switch to
+// uncover it.
 
 /** Where "Emerald App" in the export's footer links to. */
 const EMERALD_URL = 'https://the-emerald-app.com/';
@@ -56,9 +58,9 @@ function navIcon(data: ExportData): string {
   return icon.image ? `<img src="${icon.image}" class="nav-icon-img" alt="">` : htmlEscape(icon.emoji);
 }
 
-/** IDs of the entries `data` links to. */
+/** The entries and tasks `data` links to (`ExportData.linkedIds`), itself left out; only entries of the file are shown. */
 function outgoingIds(data: ExportData): Set<string> {
-  const ids = new Set(extractInternalLinks(data.content).filter((l) => l.targetKind === 'entry').map((l) => l.id));
+  const ids = new Set(data.linkedIds);
   ids.delete(data.id);
   return ids;
 }
@@ -305,7 +307,7 @@ h1.entry-title {
   font-family: var(--doc-font, Georgia, "Times New Roman", serif); font-size: var(--doc-size, 17px);
   line-height: 1.75; overflow-wrap: break-word;
 }
-.entry-content h1, .entry-content h2, .entry-content h3 { line-height: 1.3; margin: 1.5em 0 .5em; scroll-margin-top: 72px; }
+.entry-content h1, .entry-content h2, .entry-content h3, .entry-content h4 { line-height: 1.3; margin: 1.5em 0 .5em; scroll-margin-top: 72px; }
 .entry-content p { margin: 0 0 .9em; }
 .entry-content dl { margin: 0 0 .9em; }
 .entry-content dt { font-size: .85em; font-weight: 600; color: var(--muted); margin-top: .4em; }
@@ -325,6 +327,21 @@ h1.entry-title {
 .entry-content hr { border: none; border-top: 1px solid var(--border); margin: 2em 0; }
 .entry-content details { margin: .6em 0; padding: .3em .6em; border: 1px solid var(--border); border-radius: 6px; }
 .entry-content summary { font-weight: 600; cursor: pointer; }
+/* Covered content (a concealed sigil part): the cover with its switch; the content shows once uncovered. */
+.export-concealed { margin: .6em 0; }
+.export-concealed-cover {
+  display: flex; align-items: center; gap: .75em; flex-wrap: wrap; margin: 0;
+  padding: .6em .8em; border: 1px dashed var(--border); border-radius: 8px;
+  font-family: system-ui, sans-serif; font-size: .8em; color: var(--muted);
+}
+.export-concealed-toggle {
+  margin-left: auto; font: inherit; color: var(--muted); background: transparent;
+  border: 1px solid var(--border); border-radius: 6px; padding: 1px 8px; cursor: pointer;
+}
+.export-concealed-toggle:hover { color: var(--text); background: var(--chip); }
+.export-concealed-toggle:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.export-concealed-body { display: none; padding-top: .6em; }
+.export-concealed.revealed .export-concealed-body { display: block; }
 ${TEXT_COLORS.map((c) => `.entry-content span[data-color="${c}"] { color: var(--color-${c}); }`).join('\n')}
 .entry-content [data-type="internalLink"] {
   display: inline-flex; align-items: center; gap: 4px; font-family: system-ui, sans-serif; font-size: .8em;
@@ -379,6 +396,7 @@ mark.hit { background: var(--mark); color: inherit; border-radius: 2px; padding:
   .entry-article { border: none; box-shadow: none; padding: 0; border-radius: 0; background: #fff; }
   .entry-article + .entry-article { break-before: page; }
   mark.hit { background: none; }
+  .export-concealed-toggle, .export-concealed.revealed .export-concealed-cover { display: none; }
 }
 `;
 
@@ -424,6 +442,35 @@ const HTML_JS = `
     a.setAttribute('rel', 'noopener noreferrer');
   });
 
+  var refreshSearch = null; // set by the sidebar search, if the file has one
+
+  // ── Covered content: the switch uncovers and covers again; the search sees only what is uncovered ──
+  function isCovered(node) {
+    var el = node.nodeType === 1 ? node : node.parentNode;
+    // The switch's own label is not content.
+    if (el && el.closest('.export-concealed-toggle')) return true;
+    // Covered if any box around it is (a covered part inside a covered block).
+    for (var body = el && el.closest('.export-concealed-body'); body; body = body.parentNode.closest('.export-concealed-body')) {
+      if (!body.parentNode.classList.contains('revealed')) return true;
+    }
+    return false;
+  }
+  function searchableText(el) {
+    var walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    var out = '';
+    while (walker.nextNode()) if (!isCovered(walker.currentNode)) out += walker.currentNode.nodeValue;
+    return out.toLowerCase();
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('.export-concealed-toggle'), function (button) {
+    button.addEventListener('click', function () {
+      var box = button.closest('.export-concealed');
+      var open = box.classList.toggle('revealed');
+      button.textContent = button.getAttribute(open ? 'data-conceal' : 'data-reveal');
+      button.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (refreshSearch) refreshSearch(box.closest('.entry-article'));
+    });
+  });
+
   // From the attribute, not the heading: search highlighting splits the heading's text nodes.
   function titleOf(article) { return article.getAttribute('data-title') || ''; }
 
@@ -440,7 +487,7 @@ const HTML_JS = `
     if (!q) return null;
     var walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
     var nodes = [];
-    while (walker.nextNode()) nodes.push(walker.currentNode);
+    while (walker.nextNode()) if (!isCovered(walker.currentNode)) nodes.push(walker.currentNode);
     var first = null;
     nodes.forEach(function (node) {
       var text = node.nodeValue;
@@ -552,8 +599,15 @@ const HTML_JS = `
   // ── Sidebar search over titles and full text ──
   if (search) {
     var texts = {};
-    articles.forEach(function (a) { texts[a.id] = a.textContent.toLowerCase(); });
+    articles.forEach(function (a) { texts[a.id] = searchableText(a); });
     var noResults = document.getElementById('no-results');
+    // Uncovering or covering changes what there is to find in that entry.
+    refreshSearch = function (article) {
+      if (!article) return;
+      clearMarks(article);
+      texts[article.id] = searchableText(article);
+      if (query) search.dispatchEvent(new Event('input'));
+    };
     search.addEventListener('input', function () {
       query = search.value.trim().toLowerCase();
       var visible = 0;

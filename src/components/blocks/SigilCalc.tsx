@@ -2,35 +2,29 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Button from '../ui/Button';
 import {
-  extractUniqueLetters, implementedIn, parseSigilCalc, serializeSigilCalc, type SigilCalc,
-} from '../../lib/blocks/sigil';
+  extractUniqueLetters, implementedIn, parseSigilCalc, serializeSigilCalc, type SigilCalc as CalcValue, type SigilCalcData,
+} from '../../lib/blocks/sigilCalc';
+import type { BlockInstance } from '../../lib/blocks/types';
 import { OP_PROP_SELECT_CLASSES } from '../../lib/styleClasses';
-import UnknownBlock from './UnknownBlock';
-import SigilConcealed from './SigilConcealed';
-import type { CalcMode } from '../../lib/blocks/fields';
-import type { BlockViewProps } from './blockViews';
 
 /**
- * The sigil calculator: from the intent the letter bank (each letter
- * once), and which of them are already in the drawing. As long as a
- * charge that conceals it is loaded, read-only; hidden until its
- * target date, also when editing, otherwise "Edit"
- * (lock "sigil only") would show it prematurely.
+ * The sigil calculator as a building block: from the intention the letter
+ * bank (each letter once), and which of them are already in the drawing.
+ * It reads and writes a block-shaped value (`lib/blocks/sigilCalc.ts`) and
+ * knows nothing of the block that carries it — the sigil block today, a
+ * calculator of its own later. Whoever carries it decides whether it is
+ * locked or concealed.
  */
-export default function SigilCalcBlock({ block, isEditing, onBlockChange, sigil, part }: BlockViewProps) {
-  const calc = parseSigilCalc(block);
-  if (calc.broken) return <UnknownBlock block={block} />;
-  if (sigil.concealed.has(block.id)) return <SigilConcealed revealDate={sigil.concealed.get(block.id) ?? null} />;
-  if (isEditing && !sigil.locked.has(block.id)) {
-    return (
-      <CalcEditor
-        calc={calc}
-        mode={part?.calcMode ?? 'both'}
-        onChange={(next) => onBlockChange(serializeSigilCalc(block, next))}
-      />
-    );
-  }
-  return <CalcReader calc={calc} locked={isEditing} />;
+export default function SigilCalc({ value, isEditing, locked, onChange }: {
+  value: BlockInstance;
+  isEditing: boolean;
+  /** Read-only even while editing (a loaded sigil). */
+  locked: boolean;
+  onChange: (next: BlockInstance) => void;
+}) {
+  const calc = parseSigilCalc(value);
+  if (isEditing && !locked) return <CalcEditor calc={calc} onChange={(next) => onChange(serializeSigilCalc(value, next))} />;
+  return <CalcReader calc={calc} locked={isEditing && locked} />;
 }
 
 /**
@@ -38,7 +32,7 @@ export default function SigilCalcBlock({ block, isEditing, onBlockChange, sigil,
  * letter that switches between "open" and "applied" is a
  * toggle in the content, not an action; colours via `.block-sigil-letter`.
  */
-function LetterBank({ calc, onToggle }: { calc: SigilCalc; onToggle?: (letter: string) => void }) {
+function LetterBank({ calc, onToggle }: { calc: CalcValue; onToggle?: (letter: string) => void }) {
   const { t } = useTranslation();
   if (calc.letters.length === 0) return <p className="block-field-hint">{t('creation.noLetters')}</p>;
   const done = new Set(calc.implemented);
@@ -60,7 +54,7 @@ function LetterBank({ calc, onToggle }: { calc: SigilCalc; onToggle?: (letter: s
   );
 }
 
-function CalcReader({ calc, locked }: { calc: SigilCalc; locked: boolean }) {
+function CalcReader({ calc, locked }: { calc: CalcValue; locked: boolean }) {
   const { t } = useTranslation();
   return (
     <div className="space-y-3">
@@ -71,14 +65,8 @@ function CalcReader({ calc, locked }: { calc: SigilCalc; locked: boolean }) {
   );
 }
 
-type CalcData = Omit<SigilCalc, 'broken'>;
-
-/**
- * `mode` determines which ways to the letter bank exist. A custom block
- * can fix the calculator to "automatic only" (from the intent) or "manual only"
- * (letters by hand); the block on its own offers both.
- */
-function CalcEditor({ calc, mode, onChange }: { calc: CalcData; mode: CalcMode; onChange: (next: CalcData) => void }) {
+/** Both ways to the letter bank: from the intention, or letters by hand. */
+function CalcEditor({ calc, onChange }: { calc: SigilCalcData; onChange: (next: SigilCalcData) => void }) {
   const { t } = useTranslation();
   const [manual, setManual] = useState('');
 
@@ -99,7 +87,7 @@ function CalcEditor({ calc, mode, onChange }: { calc: CalcData; mode: CalcMode; 
   const areaCls = `${OP_PROP_SELECT_CLASSES} min-h-24 resize-y selectable`;
   return (
     <div className="space-y-4">
-      <div className={mode === 'auto' ? 'space-y-2' : 'grid gap-4 lg:grid-cols-2'}>
+      <div className="grid gap-4 lg:grid-cols-2">
         <div className="space-y-2">
           <p className="label-xs">{t('creation.intention')}</p>
           <textarea
@@ -109,23 +97,19 @@ function CalcEditor({ calc, mode, onChange }: { calc: CalcData; mode: CalcMode; 
             className={areaCls}
           />
         </div>
-        {mode !== 'auto' && (
-          <div className="space-y-2">
-            <p className="label-xs">{t('creation.shortenSigil')}</p>
-            <textarea
-              value={manual}
-              onChange={(e) => setManual(e.target.value.toUpperCase())}
-              placeholder={t('creation.manualLetterPlaceholder')}
-              className={areaCls}
-            />
-          </div>
-        )}
+        <div className="space-y-2">
+          <p className="label-xs">{t('creation.shortenSigil')}</p>
+          <textarea
+            value={manual}
+            onChange={(e) => setManual(e.target.value.toUpperCase())}
+            placeholder={t('creation.manualLetterPlaceholder')}
+            className={areaCls}
+          />
+        </div>
       </div>
       <div className="flex flex-wrap gap-2">
-        {mode !== 'auto' && <Button tone="neutral" small onClick={reduceManual}>{t('creation.addLetter')}</Button>}
-        {mode !== 'manual' && (
-          <Button tone="jade" small onClick={() => setLetters(extractUniqueLetters(calc.intention))}>{t('creation.prepareLetters')}</Button>
-        )}
+        <Button tone="neutral" small onClick={reduceManual}>{t('creation.addLetter')}</Button>
+        <Button tone="jade" small onClick={() => setLetters(extractUniqueLetters(calc.intention))}>{t('creation.prepareLetters')}</Button>
       </div>
       <div className="space-y-2">
         <p className="label-xs">{t('creation.letterBank')}</p>

@@ -141,7 +141,7 @@ export function parseBlocks(html: string): BlockInstance[] {
  * from a row or from the stack, a block comes out as the same string.
  */
 const ATTR_ORDER: readonly string[] = [
-  BLOCK_ATTR.version, BLOCK_ATTR.hidden, BLOCK_ATTR.title, BLOCK_ATTR.showTitle, BLOCK_ATTR.config, BLOCK_ATTR.data,
+  BLOCK_ATTR.version, BLOCK_ATTR.hidden, BLOCK_ATTR.title, BLOCK_ATTR.showTitle, BLOCK_ATTR.config, BLOCK_ATTR.data, BLOCK_ATTR.settings,
 ];
 
 /** The attributes of a block in the order they are written (`ATTR_ORDER`, then the rest). */
@@ -161,7 +161,8 @@ export function blockSectionHtml(block: BlockInstance): string {
   return `<section ${attrs.map(([k, v]) => `${k}="${escapeHtml(v)}"`).join(' ')}>${block.html}</section>`;
 }
 
-function isPlainTextBlock(block: BlockInstance): boolean {
+/** A text block without attributes — written without a wrapper (rule 2). */
+export function isPlainTextBlock(block: BlockInstance): boolean {
   return block.type === TEXT_BLOCK_TYPE && Object.keys(block.attrs).length === 0;
 }
 

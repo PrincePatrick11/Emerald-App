@@ -13,23 +13,22 @@ import {
   APPEND_ENTRY_LINK_EVENT, REMOVE_ENTRY_LINK_EVENT, REVEAL_ENTRY_LINK_EVENT, subscribeEntryLinkRequest,
   type EntryLinkRequest,
 } from '../../lib/links';
-import { extractInternalLinks, internalLinkBlockHtml, linkTargetKindOf, remapInternalLinks, toInternalLinkChip } from '../../lib/internalLinkHtml';
+import { internalLinkBlockHtml, toInternalLinkChip } from '../../lib/internalLinkHtml';
 import { generateId, localIsoDay } from '../../lib/helpers';
 import { editorSavesSuspended } from '../../lib/editorLock';
-import { activeElements, FIELDS_BLOCK_TYPE, linkFromSlot, parseFields, serializeFields } from '../../lib/blocks/fields';
-import { useFieldFallbackText } from './useFieldFallbackText';
 import { REORDER_SPRING } from '../../lib/motion';
 import { flashReveal, scrollIntoViewCentered } from '../../lib/reveal';
 import { createTextBlock, neutralizeSectionTags, parseBlocks, serializeBlocks } from '../../lib/blocks/blockHtml';
-import { resolveBlockType, type BlockTypeMeta } from '../../lib/blocks/blockTypes';
-import { blockIcon, createFromPreset } from '../../lib/blocks/presets';
-import { useBlockDefinitionStore } from '../../store/blockDefinitionStore';
 import {
-  SIGIL_CHARGE_KIND, withChargesCoveringOnly, sigilState, sigilUnits, withChargesCoveringCopy, withoutConcealedParts,
-  withRenamedPartTargets,
-} from '../../lib/blocks/sigil';
-import { blockLabel, hiddenAttrValue, isBlockHidden, showsTitleInRead, withBlockAttr } from '../../lib/blocks/blockAttrs';
-import { BLOCK_ATTR, TEXT_BLOCK_TYPE, type BlockAttrName, type BlockInstance } from '../../lib/blocks/types';
+  blockCountsLinks, blockReadState, blockTextEditors, blockWithoutLink, entryEffects, resolveBlockType, upgradeBlock, withDuplicatedBlock, type BlockTypeDef,
+} from '../../lib/blocks/blockTypes';
+import { blockLinksTo } from '../../lib/blocks/blockRefs';
+import { blockContext, textEditorKey } from '../../lib/blocks/toolkit';
+import { findEntry, useEntryStore } from '../../store/entryStore';
+import { createFromPreset } from '../../lib/blocks/presets';
+import { useBlockDefinitionStore } from '../../store/blockDefinitionStore';
+import { blockIcon, blockLabel, hiddenAttrValue, isBlockHidden, showsTitleInRead, withBlockAttr } from '../../lib/blocks/blockAttrs';
+import { BLOCK_ATTR, type BlockAttrName, type BlockInstance } from '../../lib/blocks/types';
 import { useBlockSessionStore, type BlockStackApi } from '../../store/blockSessionStore';
 import { useTemplateNoticeStore } from '../../store/templateStore';
 import { useUIStore } from '../../store/uiStore';
@@ -38,10 +37,10 @@ import { applyTemplateFields, undoTemplateFields } from '../../store/templateApp
 import { areBlocksEmpty, instantiateTemplateBlocks, isTextBlockEmpty, type Template } from '../../lib/blocks/templates';
 import TemplateInsertion, { type TemplateTarget } from '../templates/TemplateInsertion';
 import { BLOCK_VIEWS } from './blockViews';
-import { BlockStackContext, type BlockStackContextValue } from './blockStackContext';
-import { addBlockActions, commonBlockActions } from './blockActions';
+import { BlockStackContext, type BlockActionHandler, type BlockStackContextValue } from './blockStackContext';
+import { addBlockActions, commonBlockActions, typeBlockActions } from './blockActions';
 import BlockFrame from './BlockFrame';
-import UnknownBlock from './UnknownBlock';
+import UnreadableBlock from './UnreadableBlock';
 import BlockErrorBoundary from './BlockErrorBoundary';
 
 interface BlockStackProps {
@@ -147,8 +146,8 @@ export default function BlockStack({
 
   const resetEpoch = useExternalContentReset(initialContent, isEditing, blocksRef, setBlocks, onChangeRef);
 
-  // Locked and concealed come from the sigil's charges; all blocks see the same state.
-  const sigil = useMemo(() => sigilState(blocks, localIsoDay()), [blocks]);
+  // What the blocks do to the entry (a loaded sigil: locked, concealed); all blocks see the same state.
+  const effects = useMemo(() => entryEffects(blocks, { today: localIsoDay() }), [blocks]);
 
   const definitions = useBlockDefinitionStore((s) => s.definitions);
 
@@ -159,16 +158,43 @@ export default function BlockStack({
   });
   const { orderedEditors, targetEditor, focusOnMount } = textHost;
 
-  const context = useMemo<BlockStackContextValue>(() => ({
-    // Only the first text block carries the page's placeholder ("Begin your
-    // record…"); further text blocks get a neutral one.
+  // Where the blocks are: the entry and its date (none on a template's page).
+  const createdAt = useEntryStore((s) => findEntry(s.entries, entryId)?.created_at);
+  const blockCtx = useMemo(
+    () => blockContext(createdAt ? { id: entryId, created_at: createdAt } : null),
+    [entryId, createdAt],
+  );
+
+  // How the mounted views carry out their types' actions (`useBlockAction`), by block and action.
+  const actionHandlers = useRef(new Map<string, BlockActionHandler>());
+  const runAction = (blockId: string, actionId: string) => actionHandlers.current.get(actionKey(blockId, actionId))?.();
+
+  const stackContext = useMemo<BlockStackContextValue>(() => ({
+    // Only the first block that is an editor itself (a text block) carries the
+    // page's placeholder ("Begin your record…"); further ones get a neutral one.
     placeholderFor: (blockId) =>
-      blocksRef.current.find((b) => b.type === TEXT_BLOCK_TYPE)?.id === blockId
+      blocksRef.current.find((b) => blockTextEditors(b).includes(''))?.id === blockId
         ? placeholder
         : t('blocks.types.text.placeholder'),
+    registerAction: (blockId, actionId, handler) => {
+      const key = actionKey(blockId, actionId);
+      actionHandlers.current.set(key, handler);
+      return () => {
+        if (actionHandlers.current.get(key) === handler) actionHandlers.current.delete(key);
+      };
+    },
   }), [placeholder, t]);
 
   /* ---------------- Link requests from the sidebar ---------------- */
+
+  // "Linked entries" lists only the links of blocks that count them (a hidden
+  // block only where its type says so, `blockCountsLinks`); adding, removing
+  // and jumping act on the same blocks, never on one the list passes over.
+  const linkingEditor = useCallback((): ((key: string) => boolean) => {
+    const keys = new Set(textEditorKeys(blocksRef.current.filter(blockCountsLinks)));
+    return (key) => keys.has(key);
+  }, []);
+  const linkingEditors = useCallback(() => orderedEditors(linkingEditor()), [orderedEditors, linkingEditor]);
 
   /**
    * Append a link, unless it is already somewhere in the entry. The target is
@@ -176,8 +202,8 @@ export default function BlockStack({
    * created with the link as its content.
    */
   const appendLinkOnce = useCallback((item: EntryLinkRequest) => {
-    if (orderedEditors().some((ed) => findEntryLinkPos(ed.state.doc, item) !== null)) return;
-    const target = targetEditor();
+    if (linkingEditors().some((ed) => findEntryLinkPos(ed.state.doc, item) !== null)) return;
+    const target = targetEditor(linkingEditor());
     if (target && editorHas(target, 'internalLink')) {
       appendEntryLink(target, item);
       return;
@@ -185,44 +211,26 @@ export default function BlockStack({
     commit([...blocksRef.current, createTextBlock(
       internalLinkBlockHtml(toInternalLinkChip(item), item.categoryLabel ?? '', { separator: false }),
     )]);
-  }, [orderedEditors, targetEditor, commit]);
+  }, [linkingEditors, linkingEditor, targetEditor, commit]);
 
   /**
-   * The field block whose link field points to `target`,
-   * along with the block without that reference. The sidebar's links field
-   * also lists these links (it reads the whole content), so
-   * jumping to and removing must find them too.
+   * Links outside a mounted text editor (a link field) — by the blocks'
+   * references, as "Linked entries" lists them (`blockLinksTo`). Jumping goes
+   * to the first block that links to `target`; removing takes the link out of
+   * the first block whose type can (`withoutLink`) — a block linking without
+   * one (a sigil's charge, a block this app cannot read) is passed over.
    */
-  const fieldText = useFieldFallbackText();
-  const fieldTextRef = useRef(fieldText);
-  fieldTextRef.current = fieldText;
-  const findBlockLink = useCallback((target: { id: string; targetKind: string }) => {
-    const matches = (link: { id: string; targetKind: string } | null) =>
-      link?.id === target.id && linkTargetKindOf(link.targetKind) === linkTargetKindOf(target.targetKind);
-    for (const block of blocksRef.current) {
-      if (resolveBlockType(block)?.id !== FIELDS_BLOCK_TYPE) continue;
-      const model = parseFields(block);
-      if (model.broken) continue;
-      // The raw chip: the sidebar lists every link in the content.
-      const element = model.elements.find((el) =>
-        el.kind === 'link' && matches(linkFromSlot(model.slots[el.id])));
-      // A text element without a mounted editor (removed, but with content): there
-      // only the chip goes away, not the whole text; its word stays.
-      const text = element ? undefined : model.elements.find((el) =>
-        el.kind === 'text' && extractInternalLinks(model.slots[el.id] ?? '').some(matches));
-      if (!element && !text) continue;
-      return {
-        block,
-        withoutLink: () => {
-          const slots = { ...model.slots };
-          if (element) delete slots[element.id];
-          else slots[text!.id] = remapInternalLinks(slots[text!.id], (link) => (matches(link) ? null : { id: link.id }));
-          return serializeFields(block, { ...model, slots }, fieldTextRef.current);
-        },
-      };
+  const findBlockLink = useCallback((target: { id: string }) =>
+    blocksRef.current.find((b) => blockCountsLinks(b) && blockLinksTo(b, target.id)) ?? null, []);
+  const removeBlockLink = useCallback((target: { id: string }) => {
+    for (const block of blocksRef.current.filter(blockCountsLinks)) {
+      const next = blockWithoutLink(block, target.id, t);
+      if (next === block) continue;
+      apiRef.current.update(block.id, next);
+      return true;
     }
-    return null;
-  }, []);
+    return false;
+  }, [t]);
 
   // Appending and removing from the links field, edit mode only. If
   // the acknowledgement is missing, the field knows its click went nowhere.
@@ -234,29 +242,26 @@ export default function BlockStack({
         return true;
       }),
       subscribeEntryLinkRequest(REMOVE_ENTRY_LINK_EVENT, (target) => {
-        if (orderedEditors().some((ed) => removeEntryLink(ed, target))) return true;
-        const hit = findBlockLink(target);
-        if (!hit) return false;
-        apiRef.current.update(hit.block.id, hit.withoutLink());
-        return true;
+        if (linkingEditors().some((ed) => removeEntryLink(ed, target))) return true;
+        return removeBlockLink(target);
       }),
     ];
     return () => off.forEach((fn) => fn());
-  }, [isEditing, orderedEditors, appendLinkOnce, findBlockLink]);
+  }, [isEditing, linkingEditors, appendLinkOnce, removeBlockLink]);
 
   // Click on a chip in the links field → jump to the spot. Also in
-  // read mode, where it is the normal case. The first text block with the link
-  // wins; if it only appears in a link field, it jumps there.
+  // read mode, where it is the normal case. The first text editor with the
+  // link wins; else the first block that links to it.
   useEffect(() => subscribeEntryLinkRequest(
     REVEAL_ENTRY_LINK_EVENT,
     (target) => {
-      if (orderedEditors().some((ed) => revealEntryLink(ed, target))) return true;
+      if (linkingEditors().some((ed) => revealEntryLink(ed, target))) return true;
       const hit = findBlockLink(target);
       if (!hit) return false;
-      apiRef.current.reveal(hit.block.id);
+      apiRef.current.reveal(hit.id);
       return true;
     },
-  ), [orderedEditors, findBlockLink]);
+  ), [linkingEditors, findBlockLink]);
 
   /* ---------------- Structural changes ---------------- */
 
@@ -283,9 +288,9 @@ export default function BlockStack({
   }, [blocks]);
 
   const insertAt = (index: number, presetId: string) => {
-    const block = createFromPreset(presetId, definitions, fieldTextRef.current);
+    const block = createFromPreset(presetId, definitions, t);
     if (!block) return;
-    if (block.type === TEXT_BLOCK_TYPE) focusOnMount(block.id);
+    if (blockTextEditors(block).includes('')) focusOnMount(block.id);
     const next = [...blocksRef.current];
     next.splice(index, 0, block);
     commit(next);
@@ -293,16 +298,10 @@ export default function BlockStack({
   };
 
   const duplicate = (id: string) => {
-    const index = blocksRef.current.findIndex((b) => b.id === id);
-    if (index < 0) return;
-    const source = blocksRef.current[index];
+    if (!blocksRef.current.some((b) => b.id === id)) return;
     const id2 = generateId();
-    // A charged sigil stays charged: charge parts of the copy target
-    // the parts of the copy, and any charge elsewhere that conceals the original
-    // also conceals the copy. The sidebar passes through here as well.
-    const next = blocksRef.current.map((b) => (b.id === source.id ? b : withChargesCoveringCopy(b, source.id, id2)));
-    next.splice(index + 1, 0, withRenamedPartTargets({ ...source, id: id2, attrs: { ...source.attrs } }, source.id, id2));
-    commit(next);
+    // Each type says how it copies (a charged sigil stays charged). The sidebar passes through here as well.
+    commit(withDuplicatedBlock(blocksRef.current, id, id2));
     selectNew(id2);
   };
 
@@ -374,16 +373,15 @@ export default function BlockStack({
   const applyTemplate = (template: Template) => {
     if (!templateTarget || !isEditing) return;
     const added = instantiateTemplateBlocks(template);
-    // Appended, its sigil conceals only its own calculators and drawings.
-    const next = areBlocksEmpty(blocksRef.current) ? added : [...blocksRef.current, ...withChargesCoveringOnly(added)];
+    const next = areBlocksEmpty(blocksRef.current) ? added : [...blocksRef.current, ...added];
     commit(next.length > 0 ? next : [createTextBlock()]);
     const { flush } = templateTarget;
     // Save the deferred input first: title and tags are checked against the store.
     void flush()
       .then(() => applyTemplateFields(entryId, template))
       .then(() => {
-        // A loaded sigil that locks the entry ends the edit: the entry can only be read until it is unloaded.
-        if (!sigilState(blocksRef.current, localIsoDay()).lockEntry) return;
+        // A block that locks the entry (a loaded sigil) ends the edit: the entry can only be read until it is lifted.
+        if (!entryEffects(blocksRef.current, { today: localIsoDay() }).lockEntry) return;
         const { activeView, setActiveView } = useUIStore.getState();
         if (activeView.id === entryId) setActiveView({ ...activeView, mode: 'view', isNew: undefined });
       })
@@ -423,7 +421,7 @@ export default function BlockStack({
   // arrive via `onChange` in the entry that is now open.
   const apiRef = useRef<BlockStackApi>(null!);
   apiRef.current = {
-    insert: insertAt, duplicate, remove, reorder, setAttr, update: updateBlock, reveal,
+    insert: insertAt, duplicate, remove, reorder, setAttr, update: updateBlock, reveal, runAction,
     liveBlocks: () => blocksRef.current,
     openTemplatePicker: () => setTemplatePickerOpen(true),
   };
@@ -438,6 +436,7 @@ export default function BlockStack({
       setAttr: (id, name, value) => live()?.setAttr(id, name, value),
       update: (id, next) => live()?.update(id, next),
       reveal: (id) => live()?.reveal(id),
+      runAction: (id, actionId) => live()?.runAction(id, actionId),
       liveBlocks: () => live()?.liveBlocks() ?? [],
       openTemplatePicker: () => live()?.openTemplatePicker(),
     };
@@ -464,7 +463,7 @@ export default function BlockStack({
     actions: addBlockActions(t, (presetId) => insertAt(index, presetId), definitions),
   });
 
-  const openBlockMenu = (e: MouseEvent, block: BlockInstance, meta: BlockTypeMeta | undefined) => {
+  const openBlockMenu = (e: MouseEvent, block: BlockInstance, meta: BlockTypeDef | undefined) => {
     const hidden = isBlockHidden(block);
     setMenu({
       x: e.clientX,
@@ -475,6 +474,11 @@ export default function BlockStack({
           icon: hidden ? <Eye size={12} /> : <EyeOff size={12} />,
           onClick: () => setAttr(block.id, BLOCK_ATTR.hidden, hiddenAttrValue(!hidden)),
         },
+        // The live block: a setting must not write back a text block's HTML from the last structural change.
+        ...typeBlockActions(t, blocksRef.current.find((b) => b.id === block.id) ?? block, {
+          run: (actionId) => runAction(block.id, actionId),
+          update: (next) => updateBlock(block.id, next),
+        }),
         ...commonBlockActions(t, meta, {
           duplicate: () => duplicate(block.id),
           remove: () => remove(block.id),
@@ -490,26 +494,26 @@ export default function BlockStack({
     return !!live && isTextBlockEmpty(live);
   };
 
-  const renderBody = (block: BlockInstance, meta: BlockTypeMeta | undefined) => {
+  const renderBody = (block: BlockInstance, meta: BlockTypeDef | undefined) => {
+    // A block another one conceals as a whole is not shown (a block conceals its own parts in its view).
+    if (effects.concealed.has(block.id)) return null;
+    const state = blockReadState(block);
     const View = meta ? BLOCK_VIEWS.get(meta.id) : undefined;
-    // The fallback shows stored HTML, without what a sigil conceals.
-    if (!View) return <UnknownBlock block={withoutConcealedParts(block, sigil.concealed)} />;
+    if (state !== 'readable' || !View) return <UnreadableBlock reason={state === 'broken' ? 'broken' : 'newer'} />;
     return (
       <BlockErrorBoundary block={block}>
         <View
           block={block}
-          blocks={blocks}
           isEditing={isEditing}
           onHtmlChange={(html) => updateHtml(block.id, html)}
           onBlockChange={(next) => updateBlock(block.id, next)}
-          // Locked "whole entry": no change even from read mode;
-          // discharging only works via the charge itself (which never locks itself out).
-          // A custom block with a charge part may write; it then itself
-          // allows only the charge (FieldsBlock).
-          onPersist={!isEditing && onReadModeChange && (!sigil.lockEntry || holdsCharge(block))
+          // A locked entry: no change even from read mode — except by the block
+          // that locks it, so the lock can be lifted where it was set (unloading).
+          onPersist={!isEditing && onReadModeChange && (!effects.lockEntry || effects.lockedBy.has(block.id))
             ? (next) => persistRead(block.id, next)
             : undefined}
-          sigil={sigil}
+          effects={effects}
+          context={blockCtx}
         />
       </BlockErrorBoundary>
     );
@@ -522,7 +526,7 @@ export default function BlockStack({
   ].filter(Boolean).join(' ');
 
   return (
-    <BlockStackContext.Provider value={context}>
+    <BlockStackContext.Provider value={stackContext}>
     <TextEditorHostContext.Provider value={textHost.context}>
       {textHost.toolbar}
 
@@ -548,14 +552,14 @@ export default function BlockStack({
       >
         {blocks.map((block, index) => {
           const meta = resolveBlockType(block);
-          const label = blockLabel(t, block, meta);
+          const label = blockLabel(t, block);
           return (
             <StackItem key={`${block.id}:${resetEpoch}`} id={block.id}>
               {(startDrag) => (
                 <>
                   <BlockFrame
                     isEditing={isEditing}
-                    icon={blockIcon(block, meta) ?? Puzzle}
+                    icon={blockIcon(block) ?? Puzzle}
                     label={label}
                     hidden={isBlockHidden(block) || (!isEditing && isEmptyInRead(block.id))}
                     showReadTitle={showsTitleInRead(block, meta)}
@@ -597,28 +601,23 @@ function isFirstVisibleItem(el: Element): boolean {
   return true;
 }
 
-/** Does the block hold a charge (a charge on its own or the part of a custom block)? */
-function holdsCharge(block: BlockInstance): boolean {
-  return sigilUnits([block]).some((u) => u.block.type === SIGIL_CHARGE_KIND);
+/** The key of a view's action handler. */
+function actionKey(blockId: string, actionId: string): string {
+  return `${blockId}\u0000${actionId}`;
 }
 
 /**
- * The keys of the stack's text editors in block order: a text block under its
- * ID, a custom block's text element under `<block ID>:<element ID>`, at the
- * position of its block.
+ * The keys of the stack's text editors in block order — those each block
+ * holds (`textEditors`): a text block under its ID, a custom block's text
+ * fields under `<block ID>:<key>`.
  */
 function textEditorKeys(blocks: BlockInstance[]): string[] {
-  return blocks.flatMap((block) => [
-    block.id,
-    ...(block.type === FIELDS_BLOCK_TYPE
-      ? activeElements(parseFields(block)).filter((el) => el.kind === 'text').map((el) => `${block.id}:${el.id}`)
-      : []),
-  ]);
+  return blocks.flatMap((block) => blockTextEditors(block).map((key) => textEditorKey(block.id, key)));
 }
 
-/** The blocks of a content; an empty entry gets an empty text block. */
+/** The blocks of a content, each at its type's data version (`upgradeBlock`); an empty entry gets an empty text block. */
 function blocksFromContent(content: string): BlockInstance[] {
-  const parsed = parseBlocks(content);
+  const parsed = parseBlocks(content).map(upgradeBlock);
   return parsed.length > 0 ? parsed : [createTextBlock()];
 }
 

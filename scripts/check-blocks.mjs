@@ -25,27 +25,34 @@ writeFileSync(
   entry,
   `export { parseBlocks, serializeBlocks, createTextBlock, blockSectionHtml, neutralizeSectionTags } from '${root}/src/lib/blocks/blockHtml';
    export { TEXT_BLOCK_TYPE, BLOCK_ATTR } from '${root}/src/lib/blocks/types';
-   export { parseFields, serializeFields, createFieldsBlock, isElementEmpty, isHiddenInRead, linkFromSlot, imageFromSlot } from '${root}/src/lib/blocks/fields';
+   export { parseFields, serializeFields, createFieldsBlock, isElementEmpty, isHiddenInRead } from '${root}/src/lib/blocks/fields';
    export { instantiateDefinition, parseDefinitionElements, parseDefinitionDisplay, remapDefinitionDefaults, definitionImageRefs } from '${root}/src/lib/blocks/definitions';
-   export { entryBlockSummary } from '${root}/src/lib/blocks/entrySummary';
-   export { extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock, createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed, letterList, sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, withChargesCoveringOnly, withRenamedPartTargets } from '${root}/src/lib/blocks/sigil';
+   export { entryBlockSummary, entryBlockValue } from '${root}/src/lib/blocks/entrySummary';
+   export { createSigilBlock, parseSigilCharge, serializeSigilCharge, sigilPartBlock, sigilPartId, withSigilPart, shownSigilParts, isSigilBroken, SIGIL_SETTINGS } from '${root}/src/lib/blocks/sigil';
+   export { extractUniqueLetters, parseSigilCalc, serializeSigilCalc, letterList } from '${root}/src/lib/blocks/sigilCalc';
+   export { contentSearchText } from '${root}/src/lib/searchText';
    export { paintDocFromJson, paintDocToJson, emptyPaintDoc, isPaintDocEmpty, thinPoints, transformStroke, mergeDown, canMergeDown, strokeSamples, inPolygon, symmetricCopies, mirrorStroke, splitStroke } from '${root}/src/lib/paint/document';
    export { symbolFromDrawing } from '${root}/src/components/editors/canvas/symbols/fromDrawing';
    export { readUserSymbol } from '${root}/src/lib/userSymbols';
    export { group, ungroup, withGroups, moveInStack, copiesOf, align } from '${root}/src/components/editors/canvas/canvasActions';
    export { renderBlocksForExport } from '${root}/src/lib/blocks/exportRender';
-   export { createPaintBlock, isDrawingBlockType, PAINT_BLOCK_TYPE, parseDrawing, withDrawing, withDrawingImage, isSigilDrawing, drawingImage } from '${root}/src/lib/blocks/paint';
-   export { resolveBlockType } from '${root}/src/lib/blocks/blockTypes';
+   export { createPaintBlock, PAINT_BLOCK_TYPE, parseDrawing, withDrawing, withDrawingImage, drawingImage } from '${root}/src/lib/blocks/paint';
+   export { resolveBlockType, blockReadState, registeredBlockType, blockWithoutLink, blockTextEditors, registerBlockType, upgradeBlock, blockSearchText, blockStorageTag, blockActionsOf, withDuplicatedBlock, copiedBlock, entryEffects, typesLinkingWhenHidden } from '${root}/src/lib/blocks/blockTypes';
+   export { readBlockSettings, withBlockSetting, RefReporter, linkFromSlot, imageFromSlot } from '${root}/src/lib/blocks/toolkit';
+   export { linkValueTitle, compareBlockValues } from '${root}/src/lib/blocks/blockValue';
+   export { blockSuggestions, resolveProperty } from '${root}/src/lib/blocks/entryProperties';
    export { createCanvasBlock, parseCanvasBlock, withCanvasScene, withCanvasParts, withCanvasStripTag, withoutCanvasFile, CANVAS_BLOCK_TYPE, ALTAR_BLOCK_TYPE } from '${root}/src/lib/blocks/canvas';
    export { resolveStartTemplate, instantiateTemplateBlocks, templateStart, mergeTemplateTags, areBlocksEmpty, fieldsWithTemplate, fieldsWithoutTemplate } from '${root}/src/lib/blocks/templates';
    export { internalLinkChipHtml } from '${root}/src/lib/internalLinkHtml';
-   export { extractInternalLinks } from '${root}/src/lib/internalLinkHtml';
-   export { toBlockRow, fromBlockRow, blockPlainText, htmlPlainText } from '${root}/src/lib/blocks/blockRows';
-   export { blockRefs } from '${root}/src/lib/blocks/blockRefs';
+   export { extractInternalLinks, withCurrentLinkTitles } from '${root}/src/lib/internalLinkHtml';
+   export { toBlockRow, fromBlockRow } from '${root}/src/lib/blocks/blockRows';
+   export { htmlPlainText } from '${root}/src/lib/blocks/plainText';
+   export { blockRefs, blockTagsOf, linkedIdsOf, blockWithoutImage } from '${root}/src/lib/blocks/blockRefs';
    export { withoutImage } from '${root}/src/lib/imageUsage';
    export { keyBetween, evenKeys, positionsFor, isPositionKey } from '${root}/src/lib/blocks/position';
    export { blocksOfContent, planBlockWrite, clearSavedBlocks, contentOf } from '${root}/src/lib/blockStore';
-   export { contentToBlocks, blocksToContent, parseManifest, renameStoredFiles, relinkWithinFile, gentlestImageMode, storedNameStem, EMERALD_FORMAT_VERSION } from '${root}/src/lib/emerald/manifest';`
+   export { contentToBlocks, blocksToContent, parseManifest, renameStoredFiles, relinkWithinFile, gentlestImageMode, storedNameStem, manifestBlockTags, EMERALD_FORMAT_VERSION } from '${root}/src/lib/emerald/manifest';
+   export { remapBlock, retagContent } from '${root}/src/lib/blocks/blockRemap';`
 );
 
 const bundlePath = join(workDir, 'bundle.mjs');
@@ -65,27 +72,28 @@ try {
 }
 
 const {
-  parseBlocks, serializeBlocks, createTextBlock, neutralizeSectionTags, TEXT_BLOCK_TYPE, BLOCK_ATTR, extractInternalLinks,
+  parseBlocks, serializeBlocks, createTextBlock, neutralizeSectionTags, TEXT_BLOCK_TYPE, BLOCK_ATTR, extractInternalLinks, withCurrentLinkTitles,
   parseFields, serializeFields, createFieldsBlock, isElementEmpty, isHiddenInRead, linkFromSlot, imageFromSlot,
   internalLinkChipHtml,
-  instantiateDefinition, parseDefinitionElements, parseDefinitionDisplay, entryBlockSummary,
-  extractUniqueLetters, parseSigilCalc, serializeSigilCalc, createSigilCalcBlock, createSigilCanvasBlock,
-  createSigilChargeBlock, parseSigilCharge, serializeSigilCharge, sigilState, withoutConcealed,
-  drawingImage, withDrawingImage, isSigilDrawing, letterList, renderBlocksForExport, parseDrawing, withDrawing,
+  instantiateDefinition, parseDefinitionElements, parseDefinitionDisplay, entryBlockSummary, entryBlockValue,
+  extractUniqueLetters, parseSigilCalc, serializeSigilCalc, letterList, contentSearchText,
+  createSigilBlock, parseSigilCharge, serializeSigilCharge, sigilPartBlock, sigilPartId, withSigilPart, shownSigilParts, isSigilBroken, SIGIL_SETTINGS,
+  drawingImage, withDrawingImage, renderBlocksForExport, parseDrawing, withDrawing,
   paintDocFromJson, paintDocToJson, emptyPaintDoc, isPaintDocEmpty, thinPoints, transformStroke, mergeDown, canMergeDown, strokeSamples, inPolygon, symmetricCopies, mirrorStroke, splitStroke,
   group, ungroup, withGroups, moveInStack, copiesOf, align,
   symbolFromDrawing, readUserSymbol,
-  sigilUnits, sigilPartBlock, sigilPartId, withSigilPart, withChargesCoveringOnly,
-  remapDefinitionDefaults, definitionImageRefs, withRenamedPartTargets,
+  remapDefinitionDefaults, definitionImageRefs,
   resolveStartTemplate, instantiateTemplateBlocks,
   templateStart, mergeTemplateTags, areBlocksEmpty,
   fieldsWithTemplate, fieldsWithoutTemplate,
   createCanvasBlock, parseCanvasBlock, withCanvasScene, withCanvasParts, withCanvasStripTag, withoutCanvasFile, CANVAS_BLOCK_TYPE, ALTAR_BLOCK_TYPE,
-  createPaintBlock, isDrawingBlockType, PAINT_BLOCK_TYPE, resolveBlockType,
-  toBlockRow, fromBlockRow, blockPlainText, htmlPlainText, blockRefs, withoutImage, keyBetween, evenKeys, positionsFor, isPositionKey,
+  createPaintBlock, PAINT_BLOCK_TYPE, resolveBlockType,
+  registerBlockType, blockReadState, registeredBlockType, blockWithoutLink, blockTextEditors, upgradeBlock, blockSearchText, blockStorageTag, blockActionsOf, withDuplicatedBlock, copiedBlock, entryEffects, typesLinkingWhenHidden,
+  readBlockSettings, withBlockSetting, RefReporter, linkValueTitle, compareBlockValues, blockSuggestions, resolveProperty, blockTagsOf, linkedIdsOf, blockWithoutImage,
+  toBlockRow, fromBlockRow, htmlPlainText, blockRefs, withoutImage, keyBetween, evenKeys, positionsFor, isPositionKey,
   blocksOfContent, planBlockWrite, clearSavedBlocks, contentOf,
   contentToBlocks, blocksToContent, parseManifest, renameStoredFiles, relinkWithinFile, gentlestImageMode, storedNameStem,
-  EMERALD_FORMAT_VERSION,
+  EMERALD_FORMAT_VERSION, manifestBlockTags, remapBlock, retagContent,
 } = bundle;
 
 const failures = [];
@@ -335,6 +343,10 @@ console.log('\n4c. Field block\n');
   const brokenConfig = parseFields({ id: 'b', type: 'core.fields', html: '', attrs: { [BLOCK_ATTR.config]: '{kaputt' } }); // lang-ok
   const brokenData = parseFields({ ...block, attrs: { ...block.attrs, [BLOCK_ATTR.data]: '"nur ein Text"' } }); // lang-ok
   check('unreadable config or data set broken', brokenConfig.broken && brokenData.broken && !model.broken);
+  const unknownKind = parseFields({ id: 'k', type: 'core.fields', html: '', attrs: {
+    [BLOCK_ATTR.config]: JSON.stringify({ elements: [{ id: 'a', kind: 'text', label: '' }, { id: 'b', kind: 'sigilCalc', label: '' }] }),
+  } });
+  check('an element of an unknown kind sets broken instead of being dropped on the next save', unknownKind.broken);
 
   const orphanSlot = serializeFields(block, { ...model, slots: { weg: chip } }, text);
   check('a slot without a known element survives writing',
@@ -375,13 +387,82 @@ console.log('\n4d. Custom blocks: copies\n');
   check('a note of a foreign shape is not read',
     parseFields({ ...copy, attrs: { ...copy.attrs, 'data-block-config': JSON.stringify({ elements: [], definition: '../x y' }) } }).definition === undefined);
   const content = serializeBlocks([createTextBlock('<p>a</p>'), filled, createFieldsBlock('number')]);
-  check('a field archived by an earlier version is gone from the definition',
-    parseDefinitionElements(JSON.stringify([{ id: 'a', kind: 'date', label: 'A', archived: true }, { id: 'b', kind: 'date', label: 'B' }])).map((e) => e.id).join() === 'b');
+  check('an "archived" mark of an earlier 0.2.0 build is no longer read: the field is an ordinary one',
+    parseDefinitionElements(JSON.stringify([{ id: 'a', kind: 'date', label: 'A', archived: true }, { id: 'b', kind: 'date', label: 'B' }])).map((e) => e.id).join() === 'a,b');
   check('a copy from before keeps working with its old markers',
     parseFields({ ...filled, attrs: { ...filled.attrs, 'data-block-origin': 'def-1', 'data-block-rev': '1' } }).values['e-result'] === 'gut');
 
-  const plainSummary = entryBlockSummary('x', content);
-  check('a summary without sigil blocks is empty', plainSummary.sigil === null && plainSummary.listInfo.length === 0);
+  const plainSummary = entryBlockSummary({ id: 'x', content: serializeBlocks([createTextBlock('<p>a</p>'), createFieldsBlock('number')]), created_at: '2026-01-01T12:00:00Z' });
+  check('a summary of text and a single field is empty: a single field starts with every use off',
+    !plainSummary.effects.lockEntry && plainSummary.effects.concealed.size === 0 && plainSummary.info.short.length === 0 && plainSummary.info.long.length === 0
+      && plainSummary.properties.rows.length === 0 && plainSummary.values.length === 0, plainSummary);
+
+  // A use not stored is off: a copy whose fields carry none shows nothing outside its block.
+  const bareSummary = entryBlockSummary({ id: 'x-copy', content, created_at: '2026-01-01T12:00:00Z' });
+  check('a field without stored uses shows nowhere outside its block',
+    bareSummary.properties.rows.length === 0 && bareSummary.info.long.length === 0 && bareSummary.values.length === 0, bareSummary);
+
+  // As the builder writes a new field's start values: panel on, filter for short values, info line off.
+  const startDef = {
+    ...def,
+    elements: def.elements.map((e) => ({ ...e, uses: { info: false, panel: true, values: true } })),
+  };
+  const startCopy = instantiateDefinition(startDef, text);
+  const startContent = serializeBlocks([serializeFields(startCopy, { ...parseFields(startCopy), values: { 'e-date': '2026-09-10', 'e-result': 'gut' } }, text)]);
+  const copySummary = entryBlockSummary({ id: 'x-start', content: startContent, created_at: '2026-01-01T12:00:00Z' });
+  check('a copy’s fields stand in the panel as "name: value", in block order, and are not in the info line',
+    copySummary.properties.rows.map((r) => `${r.label}=${r.value.kind}`).join() === 'Datum=date,Ergebnis=text'
+      && copySummary.info.long.length === 0, copySummary.properties);
+  check('a copy’s short fields offer their values to filter and sort by, keyed by the element',
+    copySummary.values.map((v) => `${v.key}:${v.filter}:${v.sort}`).join() === 'field:e-date:true:true,field:e-result:true:true'
+      && entryBlockValue({ id: 'x-start', content: startContent, created_at: '2026-01-01T12:00:00Z' }, 'field:e-date')?.iso === '2026-09-10', copySummary.values);
+
+  // Two copies of one block in an entry: the filled one speaks, even when the empty one comes first.
+  const infoDef = { ...def, elements: [{ id: 'e-date', kind: 'date', label: 'Datum', uses: { info: true, panel: true, values: true } }] };
+  const emptyCopy = instantiateDefinition(infoDef, text);
+  const fullCopy = serializeFields(instantiateDefinition(infoDef, text), { ...parseFields(emptyCopy), values: { 'e-date': '2026-11-01' } }, text);
+  const twoCopies = { id: 'x-two', content: serializeBlocks([emptyCopy, fullCopy]), created_at: '2026-01-01T12:00:00Z' };
+  check('of two copies, an empty field does not hide the filled one in the info line or the values',
+    entryBlockSummary(twoCopies).info.short.map((p) => p.value.iso).join() === '2026-11-01'
+      && entryBlockValue(twoCopies, 'field:e-date')?.iso === '2026-11-01', entryBlockSummary(twoCopies).info);
+
+  // A long text holding only a rule has no text to show.
+  const ruleDef = { ...def, elements: [{ id: 'e-note', kind: 'text', label: 'Notiz', uses: { info: true, panel: true } }] };
+  const ruleCopy = instantiateDefinition(ruleDef, text);
+  const ruleBlock = serializeFields(ruleCopy, { ...parseFields(ruleCopy), slots: { 'e-note': '<hr>' } }, text);
+  const ruleSummary = entryBlockSummary({ id: 'x-rule', content: serializeBlocks([ruleBlock]), created_at: '2026-01-01T12:00:00Z' });
+  check('a long text with only a rule gives no empty row or info part',
+    ruleSummary.properties.rows.length === 0 && ruleSummary.info.short.length === 0, ruleSummary);
+
+  const usesDef = {
+    ...def,
+    elements: parseDefinitionElements(JSON.stringify([
+      { id: 'u-date', kind: 'date', label: 'Datum', uses: { info: true, panel: false, values: false } },
+      { id: 'u-text', kind: 'text', label: 'Notiz', uses: { info: true, panel: true, values: true } },
+      { id: 'u-pic', kind: 'image', label: 'Bild', uses: { info: true, panel: true, values: true } },
+      { id: 'u-list', kind: 'checklist', label: '', uses: { info: true, panel: 'ja' } },
+      { id: 'u-sel', kind: 'select', label: 'Wahl', options: [{ id: 'o1', label: 'Eins' }], uses: { panel: true, values: true } },
+    ])),
+  };
+  check('stored uses are read per field; a value of a foreign shape is left out',
+    usesDef.elements[0].uses.info === true && usesDef.elements[3].uses.panel === undefined, usesDef.elements);
+  const usesCopy = instantiateDefinition(usesDef, text);
+  check('a copy carries the uses of its definition', parseFields(usesCopy).elements[0].uses?.info === true, usesCopy.attrs);
+  const usesModel = parseFields(usesCopy);
+  const usesFilled = serializeFields(usesCopy, {
+    ...usesModel,
+    values: { 'u-date': '2026-12-21', 'u-list': [{ id: 'i1', text: 'a', checked: true }, { id: 'i2', text: 'b', checked: false }], 'u-sel': 'o1' },
+    slots: { 'u-text': '<p>Ein <strong>langer</strong> Text</p>', 'u-pic': '<img src="x.png">' },
+  }, text);
+  const usesSummary = entryBlockSummary({ id: 'x-uses', content: serializeBlocks([usesFilled]), created_at: '2026-01-01T12:00:00Z' });
+  check('the info line holds the fields switched on, in block order, by value; a picture never',
+    usesSummary.info.short.map((p) => `${p.key}:${p.icon === undefined}`).join() === 'field:u-date:true,field:u-text:true,field:u-list:true'
+      && usesSummary.info.long[1].value.text === 'Ein langer Text' && usesSummary.info.long[2].value.text === '1/2'
+      && usesSummary.info.long[2].labelKey === 'blocks.kinds.checklist', usesSummary.info);
+  check('the panel leaves out a field switched off there, one not stored, and a picture',
+    usesSummary.properties.rows.map((r) => r.key).join() === 'field:u-text,field:u-sel', usesSummary.properties.rows);
+  check('a long text is never offered to filter by, a choice by its option’s name',
+    usesSummary.values.map((v) => v.key).join() === 'field:u-sel' && usesSummary.values[0].value.text === 'Eins', usesSummary.values);
 
   check('definition columns: broken JSON yields the defaults',
     parseDefinitionElements('{kaputt').length === 0 && parseDefinitionDisplay('nope').showTitle === true &&
@@ -416,48 +497,62 @@ console.log('\n4d. Custom blocks: copies\n');
     prefilled.attrs['data-block-config']);
 }
 
-// A sigil is written as the UI writes it: the part as a virtual block, then back into the fields block.
-const sigilFieldText = { label: (e) => e.label || e.kind, yes: 'Ja', no: 'Nein', moonName: (p) => p };
-function setSigilPart(block, elementId, change) {
-  const model = parseFields(block);
-  const element = model.elements.find((e) => e.id === elementId);
-  return serializeFields(block, withSigilPart(model, element, change(sigilPartBlock(block, element, model))), sigilFieldText);
+// A sigil is written as the UI writes it: each part as a block of its own, then back into the sigil block.
+const withPart = (block, part, change) => withSigilPart(block, part, change(sigilPartBlock(block, part)));
+function sigilOf({ calc, drawing, charge } = {}) {
+  let block = createSigilBlock();
+  if (calc) block = withPart(block, 'calc', (p) => serializeSigilCalc(p, calc));
+  if (drawing) block = withPart(block, 'drawing', (p) => withDrawingImage(p, drawing));
+  if (charge) block = withPart(block, 'charge', (p) => serializeSigilCharge(p, charge));
+  return block;
 }
-const calcOf = (data) => setSigilPart(createSigilCalcBlock(), 'calc', (p) => serializeSigilCalc(p, data));
-const chargeOf = (data) => setSigilPart(createSigilChargeBlock(), 'charge', (p) => serializeSigilCharge(p, data));
-/** The unit ID of a calculator on its own. */
-const calcPart = (block) => sigilPartId(block.id, 'calc');
-/** The (first) charge of a block, as its virtual block. */
-const chargeUnit = (block) => sigilUnits([block]).find((u) => u.block.type === 'sigilCharge').block;
-const virtualCharge = (attrs, html = '') => ({ id: 'v', type: 'sigilCharge', html, attrs });
+const effectsOn = (blocks, today) => entryEffects(blocks, { today });
+/** The texts the export is checked with: a key shows as `K:<key>`. */
+const exportText = {
+  title: (b) => `T:${b.type}`, date: (iso) => `D:${iso}`, number: (n) => `N:${n}`, t: (key) => `K:${key}`,
+  yes: 'Ja', no: 'Nein', concealed: (until) => `C:${until}`, reveal: 'R', conceal: 'Z',
+};
+const drawnFile = `${'ab'.repeat(32)}.png`;
+const calcData = { intention: 'Ich <b>bin</b>', letters: ['I', 'C'], implemented: ['I', 'X'] };
+const chargeData = { loaded: true, revealDate: '2030-01-01', lock: 'entry', technique: null };
 
 console.log('\n4f. Sigils\n');
 {
   check('letter bank: each letter once, uppercase, without accents',
     extractUniqueLetters('Äpfel äpfel!').join('') === 'APFEL', extractUniqueLetters('Äpfel äpfel!')); // lang-ok
 
-  const calc = calcOf({ intention: 'Ich <b>bin</b>', letters: ['I', 'C'], implemented: ['I', 'X'] });
-  check('calculator on its own: a fields block with one calculator, shown even when empty',
-    calc.type === 'core.fields' && parseFields(calc).elements.map((e) => `${e.id}:${e.kind}`).join() === 'calc:sigilCalc'
-      && !parseFields(createSigilCalcBlock()).display.readHideEmpty && calc.attrs['data-block-show-title'] === '1', calc);
-  const calcBack = parseSigilCalc(sigilUnits(parseBlocks(serializeBlocks([calc, createTextBlock('<p>x</p>')])))[0].block);
+  const sigil = sigilOf({ calc: calcData, drawing: drawnFile, charge: chargeData });
+  const back = parseBlocks(serializeBlocks([createTextBlock('<p>x</p>'), sigil]))[1];
+  check('a sigil is one block of a type the app knows', sigil.type === 'core.sigil' && !!resolveBlockType(sigil) && !isSigilBroken(sigil), sigil);
+  const calcBack = parseSigilCalc(sigilPartBlock(back, 'calc'));
   check('calculator: round trip, implemented letters only from the bank',
     calcBack.intention === 'Ich <b>bin</b>' && calcBack.letters.join() === 'I,C' && calcBack.implemented.join() === 'I', calcBack);
-  check('calculator: the fallback is escaped', calc.html.includes('&lt;b&gt;') && !calc.html.includes('<b>'), calc.html);
-
-  const canvas = withDrawingImage(createSigilCanvasBlock(), `${'ab'.repeat(32)}.png`);
-  check('drawing: a paint block marked as a sigil drawing, its title shown',
-    canvas.type === PAINT_BLOCK_TYPE && isSigilDrawing(canvas) && !isSigilDrawing(createPaintBlock()) && canvas.attrs['data-block-show-title'] === '1', canvas);
-  check('drawing: the file name is a src in the markup', drawingImage(canvas) === `${'ab'.repeat(32)}.png` && canvas.html.startsWith('<img src="'));
+  check('calculator: the fallback is escaped', back.html.includes('&lt;b&gt;') && !back.html.includes('<b>'), back.html);
+  check('drawing: its picture is a src in the block\'s markup', drawingImage(sigilPartBlock(back, 'drawing')) === drawnFile, back.html);
+  check('charge: round trip', parseSigilCharge(sigilPartBlock(back, 'charge')).revealDate === '2030-01-01');
+  check('parts are named <block>:<part>',
+    sigilPartBlock(back, 'calc').id === sigilPartId(sigil.id, 'calc') && sigilPartId(sigil.id, 'drawing') === `${sigil.id}:drawing`);
+  const [calcSetting, , chargeSetting] = SIGIL_SETTINGS;
+  const shown = shownSigilParts(createSigilBlock());
+  check('settings: a new sigil shows all three parts', shown.calc && shown.drawing && shown.charge, shown);
+  const calcOff = withBlockSetting(sigil, calcSetting, false);
+  check('settings: a part switched off is not shown, but keeps what it holds',
+    !shownSigilParts(calcOff).calc && shownSigilParts(calcOff).drawing && parseSigilCalc(sigilPartBlock(calcOff, 'calc')).intention === 'Ich <b>bin</b>'
+      && readBlockSettings(calcOff, SIGIL_SETTINGS).calc === false, calcOff.attrs);
+  check('settings: a loaded charge stays shown even switched off, an unloaded one does not',
+    shownSigilParts(withBlockSetting(sigil, chargeSetting, false)).charge
+      && !shownSigilParts(withBlockSetting(sigilOf({ charge: { ...chargeData, loaded: false } }), chargeSetting, false)).charge);
 
   // The paint document: vector strokes as data JSON, the rendered image and layer images as src.
   {
+    const canvas = withDrawingImage(createPaintBlock(), drawnFile);
+    check('drawing: the file name is a src in the markup', drawingImage(canvas) === drawnFile && canvas.html.startsWith('<img src="'));
     const old = `${'ab'.repeat(32)}.png`;
     const render = `${'cd'.repeat(32)}.png`;
     const legacy = parseDrawing(canvas);
     check('drawing: an old image becomes the only layer, nothing lost',
       legacy.render === old && legacy.doc?.layers.length === 1 && legacy.doc.layers[0].image === old && legacy.doc.layers[0].strokes.length === 0, legacy);
-    check('drawing: an empty block has neither image nor document', parseDrawing(createSigilCanvasBlock()).doc === null);
+    check('drawing: an empty block has neither image nor document', parseDrawing(createPaintBlock()).doc === null);
 
     const stroke = { id: 's1', tool: 'pen', color: '#EF4444', size: 8, points: [1.234, 2.345, 0.5, 10, 20, 0.777], pressure: true };
     const doc = { layers: [{ ...legacy.doc.layers[0], strokes: [stroke] }, { id: 'top', name: 'Oben', hidden: true, image: null, strokes: [] }] }; // lang-ok
@@ -470,11 +565,7 @@ console.log('\n4f. Sigils\n');
         && back.doc.layers[1].name === 'Oben' && back.doc.layers[1].hidden // lang-ok
         && isDeepStrictEqual(back.doc.layers[0].strokes[0].points, [1.2, 2.3, 0.5, 10, 20, 0.78])
         && back.doc.layers[0].strokes[0].color === '#ef4444' && back.doc.layers[0].strokes[0].pressure, back);
-    const text = {
-      title: (b) => b.type, date: (iso) => iso, number: (n) => `${n}`, targetDate: '', technique: '', loaded: '', notLoaded: '',
-      drawing: 'D', fields: { label: (e) => e.label, yes: '', no: '', moonName: (p) => p },
-    };
-    const exported = renderBlocksForExport(serializeBlocks([saved]), text);
+    const exported = renderBlocksForExport(serializeBlocks([saved]), 'pdf', exportText);
     check('drawing: the export shows only the render', exported.includes(render) && !exported.includes(old), exported);
 
     // Something that knows only the image (an older app) replaced it: the new image counts, as a layer.
@@ -585,70 +676,135 @@ console.log('\n4f. Sigils\n');
       copies.length === 2 && copies[0].group && copies[0].group !== 'g' && copies[0].group === copies[1].group, copies);
   }
 
-  const odd = parseSigilCharge(virtualCharge({ 'data-block-data': JSON.stringify({ loaded: 'ja', revealDate: 'morgen', lock: 'alles' }) }));
+  const odd = parseSigilCharge({ id: 'v', type: 'sigil.charge', html: '', attrs: { 'data-block-data': JSON.stringify({ loaded: 'ja', revealDate: 'morgen', lock: 'alles' }) } });
   check('charge: nonsense falls back to safe values', !odd.loaded && odd.revealDate === null && odd.lock === 'entry', odd);
 
-  const chargeData = { loaded: true, revealDate: '2030-01-01', lock: 'entry', technique: null, targets: null };
-  const charged = chargeOf(chargeData);
-  const blocks = [calc, canvas, charged];
-  const before = sigilState(blocks, '2029-12-31');
-  const after = sigilState(blocks, '2030-01-01');
-  check('loaded before the date: hidden and fully locked',
-    before.concealed.get(calcPart(calc)) === '2030-01-01' && before.concealed.has(canvas.id) && before.lockEntry
-      && before.locked.has(calcPart(calc)) && before.locked.has(canvas.id), before);
-  check('on the reveal day: visible, but still locked', after.concealed.size === 0 && after.lockEntry && after.locked.has(calcPart(calc)), after);
-  const sigilOnly = sigilState([calc, chargeOf({ ...chargeData, lock: 'sigil' })], '2029-01-01');
-  check('lock "sigils only": entry editable, sigil blocks not', !sigilOnly.lockEntry && sigilOnly.locked.has(calcPart(calc)));
-
-  const noDate = sigilState([calc, chargeOf({ ...chargeData, revealDate: null })], '2099-01-01');
-  check('loaded without a target date: hidden until unloaded', noDate.concealed.has(calcPart(calc)) && noDate.concealed.get(calcPart(calc)) === null, noDate);
-
+  const calcId = sigilPartId(sigil.id, 'calc');
+  const drawId = sigilPartId(sigil.id, 'drawing');
   const painting = withDrawingImage(createPaintBlock(), `${'99'.repeat(32)}.png`);
-  const withPainting = sigilState([calc, canvas, painting, charged], '2029-12-31');
-  check('a charge for "all" leaves an unmarked paint block alone',
-    withPainting.concealed.has(canvas.id) && !withPainting.concealed.has(painting.id) && !withPainting.locked.has(painting.id), withPainting);
+  const before = effectsOn([sigil, painting], '2029-12-31');
+  const after = effectsOn([sigil, painting], '2030-01-01');
+  check('loaded before the date: calculator and drawing concealed and locked, the entry locked by the sigil',
+    before.concealed.get(calcId) === '2030-01-01' && before.concealed.has(drawId) && before.lockEntry && before.lockedBy.has(sigil.id)
+      && before.locked.has(calcId) && before.locked.has(drawId), before);
+  check('the charge leaves everything else alone (a painting, the charge itself)',
+    !before.concealed.has(painting.id) && !before.locked.has(painting.id) && !before.concealed.has(sigilPartId(sigil.id, 'charge'))
+      && !before.concealed.has(sigil.id), before);
+  check('on the reveal day: visible, but still locked', after.concealed.size === 0 && after.lockEntry && after.locked.has(calcId), after);
+  const sigilOnly = effectsOn([sigilOf({ calc: calcData, charge: { ...chargeData, lock: 'sigil' } })], '2029-01-01');
+  check('lock "only this sigil": entry editable, calculator and drawing not', !sigilOnly.lockEntry && sigilOnly.locked.size === 2, sigilOnly);
+  const noDate = sigilOf({ calc: calcData, charge: { ...chargeData, revealDate: null } });
+  const noDateFx = effectsOn([noDate], '2099-01-01');
+  check('loaded without a target date: hidden until unloaded',
+    noDateFx.concealed.has(sigilPartId(noDate.id, 'calc')) && noDateFx.concealed.get(sigilPartId(noDate.id, 'calc')) === null, noDateFx);
+  const other = sigilOf({ calc: { ...calcData, intention: 'Offen' } });
+  const twoFx = effectsOn([sigil, other], '2029-12-31');
+  check('a charge conceals only its own sigil\'s parts',
+    !twoFx.concealed.has(sigilPartId(other.id, 'calc')) && !twoFx.locked.has(sigilPartId(other.id, 'calc')), twoFx);
+  const unloaded = withPart(sigil, 'charge', (p) => serializeSigilCharge(p, { ...parseSigilCharge(p), loaded: false }));
+  const unloadedFx = effectsOn([unloaded], '2029-12-31');
+  check('unloading conceals and locks nothing any more',
+    unloadedFx.concealed.size === 0 && unloadedFx.locked.size === 0 && !unloadedFx.lockEntry, unloadedFx);
+  const hiddenSigil = { ...sigil, attrs: { ...sigil.attrs, [BLOCK_ATTR.hidden]: '1' } };
+  check('a hidden sigil (the eye) still conceals and locks', effectsOn([hiddenSigil], '2029-12-31').concealed.has(calcId));
+  const broken = { ...sigil, attrs: { ...sigil.attrs, [BLOCK_ATTR.data]: '{kaputt' } };
+  check('an unreadable sigil does nothing to the entry and is marked as unreadable',
+    isSigilBroken(broken) && effectsOn([broken], '2029-12-31') === effectsOn([], '2029-12-31'));
+  check('switching the loaded charge off does not lift its effect',
+    effectsOn([withBlockSetting(sigil, chargeSetting, false)], '2029-12-31').concealed.has(calcId));
 
-  const onlyCanvas = chargeOf({ ...chargeData, lock: 'sigil', targets: [canvas.id] });
-  const picked = sigilState([calc, canvas, onlyCanvas], '2029-12-31');
-  check('charge with selection: conceals and locks only the chosen drawing',
-    picked.concealed.has(canvas.id) && !picked.concealed.has(calcPart(calc)) && !picked.locked.has(calcPart(calc)) && !picked.lockEntry, picked);
-  const pickedBack = parseSigilCharge(chargeUnit(parseBlocks(serializeBlocks([onlyCanvas]))[0]));
-  check('charge: the selection survives the round trip, without a selection it is missing in the JSON',
-    pickedBack.targets?.join() === canvas.id && parseSigilCharge(chargeUnit(charged)).targets === null
-      && !charged.attrs['data-block-data'].includes('targets'), pickedBack);
-  const oddTargets = parseSigilCharge(virtualCharge({ 'data-block-data': JSON.stringify({ targets: ['ok-1', 'ok-1', '<x>', 3, 'y'.repeat(65)] }) }));
-  check('charge: foreign selection — only harmless, unique IDs', oddTargets.targets?.join() === 'ok-1', oddTargets);
-  const later = sigilState([calc, chargeOf({ ...chargeData, targets: [calcPart(calc)] }),
-    chargeOf({ ...chargeData, revealDate: '2031-06-01', targets: [calcPart(calc)] })], '2029-12-31');
-  check('two charges on the same block: the longer one applies', later.concealed.get(calcPart(calc)) === '2031-06-01', later);
-  const partial = withoutConcealed(serializeBlocks([calc, canvas, onlyCanvas]), '2029-12-31');
-  check('search without the concealed drawing, with the free calculator',
-    partial.includes('Ich &lt;b&gt;bin') && !partial.includes('core.paint') && !partial.includes('abab'), partial);
-
-  const content = serializeBlocks([createTextBlock('<p>Notiz</p>'), ...blocks]);
-  const hiddenContent = withoutConcealed(content, '2029-12-31');
-  check('hidden: search and export do not see calculator and drawing',
-    !hiddenContent.includes('Ich &lt;b') && !hiddenContent.includes('core.paint') && hiddenContent.includes('Notiz'), hiddenContent);
-  check('revealed: everything stays', withoutConcealed(content, '2030-02-01') === content);
+  const content = serializeBlocks([createTextBlock('<p>Notiz</p>'), sigil]);
+  const found = contentSearchText(content, '2029-12-31');
+  check('search: the concealed calculator is not found, the rest of the entry is',
+    found.includes('Notiz') && !found.includes('Ich') && found.includes('2030-01-01'), found);
+  check('search: after the target date the calculator is found',
+    contentSearchText(content, '2030-02-01').includes('Ich <b>bin</b>'), contentSearchText(content, '2030-02-01'));
+  check('search: a calculator switched off is not found',
+    !contentSearchText(serializeBlocks([withBlockSetting(unloaded, calcSetting, false)]), '2029-12-31').includes('Ich'));
+  check('search: the block alone reads alike',
+    !blockSearchText(sigil, { today: '2029-12-31' }).includes('Ich') && blockSearchText(unloaded, { today: '2029-12-31' }).includes('Ich'));
+  const oddlyEncoded = content.replace(/&quot;/g, '&#34;');
+  check('search: differently encoded content conceals all the same', !contentSearchText(oddlyEncoded, '2029-12-31').includes('Ich'));
+  check('a sigil in the journal hides itself the same way',
+    !contentSearchText(serializeBlocks([createTextBlock('<p>Tagebuch</p>'), sigil]), '2029-12-31').includes('Ich'));
 
   const secret = { ...createTextBlock('<p>geheim</p>'), attrs: { 'data-block-hidden': '1' } };
-  const exportText = {
-    title: (b) => `T:${b.type}`, date: (iso) => `D:${iso}`, number: (n) => `N:${n}`, targetDate: 'Ziel', technique: 'Technik',
-    loaded: 'Geladen', notLoaded: 'Offen', drawing: 'Zeichnung',
-    fields: { label: (e) => e.label || e.kind, yes: 'Ja', no: 'Nein', moonName: (p) => p },
-  };
-  const exportedContent = serializeBlocks([createTextBlock('<p>sichtbar</p>'), secret, ...blocks]);
-  const exported = renderBlocksForExport(exportedContent, exportText, '2029-12-31');
-  check('export: hidden blocks and the concealed sigil are missing, the charge stays',
+  const exportedContent = serializeBlocks([createTextBlock('<p>sichtbar</p>'), secret, sigil]);
+  const exported = renderBlocksForExport(exportedContent, 'pdf', exportText, '2029-12-31');
+  check('export: hidden blocks and the concealed parts are missing, the charge stays',
     exported.includes('sichtbar') && !exported.includes('geheim') && !exported.includes('Ich') && !exported.includes('<img')
-      && exported.includes('<dt>Ziel</dt><dd>D:2030-01-01</dd>') && exported.includes('Geladen'), exported);
-  check('export: no sections, title as heading, text without title',
-    !exported.includes('<section') && exported.includes('<h3>T:core.fields</h3><dl><dt>Ziel</dt>') && !exported.includes('<dt>sigilCharge</dt>')
-      && !exported.includes('T:core.text'), exported);
-  const revealed = renderBlocksForExport(exportedContent, exportText, '2030-02-01');
+      && exported.includes('<dt>K:creation.targetDate</dt><dd>D:2030-01-01</dd>') && exported.includes('<p>K:blocks.sigil.loaded</p>'), exported);
+  check('export: no sections, the parts under their headings, no title of its own',
+    !exported.includes('<section') && exported.includes('<h4>K:blocks.types.sigil.parts.charge</h4><dl>')
+      && !exported.includes('<h4>K:blocks.types.sigil.parts.calc</h4>') && !exported.includes('T:core.sigil') && !exported.includes('T:core.text'), exported);
+  const revealed = renderBlocksForExport(exportedContent, 'pdf', exportText, '2030-02-01');
   check('export after the target date: calculator and drawing (with alt text) are included',
-    revealed.includes('Ich &lt;b&gt;bin') && revealed.includes('<h3>T:core.paint</h3>')
-      && revealed.includes(`<img src="${'ab'.repeat(32)}.png" alt="T:core.paint" data-export-placeholder="1">`), revealed);
+    revealed.includes('<h4>K:blocks.types.sigil.parts.calc</h4><p>Ich &lt;b&gt;bin')
+      && revealed.includes(`<img src="${drawnFile}" alt="K:blocks.types.sigil.parts.drawing" data-export-placeholder="1">`), revealed);
+  for (const format of ['pdf', 'markdown']) {
+    const out = renderBlocksForExport(exportedContent, format, exportText, '2029-12-31');
+    check(`export (${format}): a concealed part is missing, with no cover`, out === exported && !out.includes('export-concealed'), out);
+  }
+  const html = renderBlocksForExport(exportedContent, 'html', exportText, '2029-12-31');
+  check('export (HTML): the concealed parts are there, covered under their headings, with a switch',
+    html.includes('<h4>K:blocks.types.sigil.parts.calc</h4><div class="export-concealed"><p class="export-concealed-cover"><span>C:2030-01-01</span><button type="button" class="export-concealed-toggle" data-reveal="R" data-conceal="Z">R</button></p><div class="export-concealed-body"><p>Ich &lt;b&gt;bin')
+      && html.includes(`<div class="export-concealed-body"><img src="${drawnFile}"`)
+      && (html.match(/class="export-concealed"/g) ?? []).length === 2, html);
+  check('export (HTML): hidden blocks stay missing, the charge stays open',
+    !html.includes('geheim') && html.includes('<p>K:blocks.sigil.loaded</p>') && !/export-concealed-body"><h4>K:blocks\.types\.sigil\.parts\.charge/.test(html), html);
+  check('export (HTML): after the target date nothing is covered',
+    renderBlocksForExport(exportedContent, 'html', exportText, '2030-02-01') === revealed, renderBlocksForExport(exportedContent, 'html', exportText, '2030-02-01'));
+  check('export (HTML): a part switched off stays missing even concealed',
+    !renderBlocksForExport(serializeBlocks([withBlockSetting(sigil, calcSetting, false)]), 'html', exportText, '2029-12-31').includes('Ich'));
+  check('export: a part switched off is not exported',
+    !renderBlocksForExport(serializeBlocks([withBlockSetting(unloaded, calcSetting, false)]), 'pdf', exportText, '2029-12-31').includes('Ich'));
+  const brokenOut = renderBlocksForExport(serializeBlocks([broken]), 'html', exportText, '2029-12-31');
+  check('export: an unreadable sigil goes out as the notice, never with what it holds',
+    brokenOut === '<p>K:blocks.unreadable.broken</p>', brokenOut);
+  const brokenCharge = withSigilPart(sigil, 'charge', { ...sigilPartBlock(sigil, 'charge'), attrs: { [BLOCK_ATTR.data]: '"kaputt"' } }); // lang-ok
+  check('a sigil whose charge cannot be read is unreadable as a whole', isSigilBroken(brokenCharge) && blockReadState(brokenCharge) === 'broken');
+  check('the stored row text holds a concealed calculator too: the row outlives the day',
+    toBlockRow(sigil).text.includes('Ich <b>bin</b>'), toBlockRow(sigil).text);
+
+  const sigilEntry = (id, c) => ({ id, content: c, created_at: '2029-12-01T12:00:00Z' });
+  const summary = entryBlockSummary(sigilEntry('sigil-one', content), '2029-12-31');
+  check('the summary knows the sigil\'s effect (locked)', summary.effects.lockEntry && summary.effects.concealed.has(calcId), summary.effects);
+  check('the sigil puts its target date into both forms of the info line',
+    ['short', 'long'].every((form) => summary.info[form].length === 1 && summary.info[form][0].key === 'sigil.targetDate'
+      && summary.info[form][0].value.iso === '2030-01-01'), summary.info);
+  check('one sigil adds one target date row to the properties panel (#188)',
+    summary.properties.rows.length === 1 && summary.properties.rows[0].labelKey === 'creation.targetDate'
+      && summary.properties.rows[0].value.iso === '2030-01-01' && summary.properties.icon === null, summary.properties);
+  check('the sigil offers its target date to filter and sort by',
+    entryBlockValue(sigilEntry('sigil-one', content), 'sigil.targetDate')?.iso === '2030-01-01'
+      && summary.values.length === 1 && summary.values.every((v) => v.filter && v.sort), summary.values);
+  {
+    // Two sigils: an unloaded one first, then a loaded one — the loaded one's date speaks, as in the info line.
+    const unloadedFirst = sigilOf({ charge: { ...chargeData, loaded: false, revealDate: '2031-01-01' } });
+    const loadedSecond = sigilOf({ charge: { ...chargeData, revealDate: '2032-06-01' } });
+    const both = sigilEntry('two-sigils', serializeBlocks([unloadedFirst, loadedSecond]));
+    const twoSummary = entryBlockSummary(both, '2029-12-31');
+    check('of two sigils the loaded one gives the value to sort by, as in the info line',
+      entryBlockValue(both, 'sigil.targetDate')?.iso === '2032-06-01' && twoSummary.info.long[0]?.value.iso === '2032-06-01',
+      { values: twoSummary.values, info: twoSummary.info.long });
+  }
+  const hiddenSummary = entryBlockSummary(sigilEntry('sigil-hidden', serializeBlocks([hiddenSigil])), '2029-12-31');
+  check('a hidden sigil still shows its target date in lists and still sorts by it, but adds no panel row',
+    hiddenSummary.info.short[0]?.value.iso === '2030-01-01' && hiddenSummary.values[0]?.value?.iso === '2030-01-01'
+      && hiddenSummary.properties.rows.length === 0, hiddenSummary);
+  const noCharge = withBlockSetting(unloaded, chargeSetting, false);
+  const noChargeSummary = entryBlockSummary(sigilEntry('sigil-no-charge', serializeBlocks([noCharge])), '2029-12-31');
+  check('with the charge switched off there is no target date anywhere',
+    noChargeSummary.info.short.length === 0 && noChargeSummary.properties.rows.length === 0 && noChargeSummary.values.length === 0, noChargeSummary);
+
+  {
+    // Duplicating: the copy right after, loaded as well, its charge acting on the copy's parts.
+    const stack = withDuplicatedBlock([createTextBlock('<p>a</p>'), sigil], sigil.id, 'dup-sigil');
+    const dupFx = effectsOn(stack, '2029-12-31');
+    check('a duplicated sigil comes right after its original, loaded, concealing its own parts',
+      stack[2]?.id === 'dup-sigil' && dupFx.concealed.has(sigilPartId('dup-sigil', 'calc')) && dupFx.concealed.has(calcId)
+        && parseSigilCalc(sigilPartBlock(stack[2], 'calc')).intention === 'Ich <b>bin</b>', dupFx);
+  }
 
   const fieldsBlock = {
     id: 'fx', type: 'core.fields', html: '',
@@ -657,28 +813,39 @@ console.log('\n4f. Sigils\n');
         elements: [
           { id: 'e1', kind: 'date', label: 'Datum' },
           { id: 'e2', kind: 'number', label: 'Leer' },
-          { id: 'e3', kind: 'shorttext', label: 'Alt', archived: true },
           { id: 'e4', kind: 'number', label: 'Menge' },
+          { id: 'e5', kind: 'moon', label: '' },
+          { id: 'e6', kind: 'image', label: 'Foto' },
         ],
         display: { readHideEmpty: true },
       }),
-      'data-block-data': JSON.stringify({ values: { e1: '2030-05-01', e3: 'weg', e4: 3 } }),
+      'data-block-data': JSON.stringify({ values: { e1: '2030-05-01', e4: 3, e5: 'full' } }),
     },
+    html: `<dl><dt>Foto</dt><dd data-block-slot="el:e6"><img src="${'ef'.repeat(32)}.png"></dd></dl>`,
   };
   const titled = { ...createTextBlock('<p>mit Titel</p>'), attrs: { 'data-block-show-title': '1' } };
-  const fieldsOut = renderBlocksForExport(serializeBlocks([fieldsBlock, titled]), exportText, '2030-01-01');
-  check('export: fields as in read mode — formatted, without empty and archived ones',
+  const fieldsOut = renderBlocksForExport(serializeBlocks([fieldsBlock, titled]), 'pdf', exportText, '2030-01-01');
+  check('export: fields as in read mode — formatted, without empty ones',
     fieldsOut.includes('<dt>Datum</dt><dd>D:2030-05-01</dd>') && fieldsOut.includes('<dt>Menge</dt><dd>N:3</dd>')
-      && !fieldsOut.includes('Leer') && !fieldsOut.includes('weg'), fieldsOut);
+      && !fieldsOut.includes('Leer'), fieldsOut);
+  check('export: an unnamed field is labelled by its kind, the moon phase worded with its symbol',
+    fieldsOut.includes('<dt>K:blocks.kinds.moon</dt><dd>🌕 K:moonPhase.full</dd>'), fieldsOut);
+  check('export: a picture of an image field is named after its row',
+    fieldsOut.includes(`<dt>Foto</dt><dd><img src="${'ef'.repeat(32)}.png" alt="Foto" data-export-placeholder="1"></dd>`), fieldsOut);
   check('export: a text block with the title switched on carries it', fieldsOut.includes('<h3>T:core.text</h3><p>mit Titel</p>'), fieldsOut);
 
-  const journalSigil = serializeBlocks([createTextBlock('<p>Tagebuch</p>'), ...blocks]);
-  check('a sigil in the journal hides itself the same way', !withoutConcealed(journalSigil, '2029-12-31').includes('Ich &lt;b'));
   check('letter list: at most 500, only short strings',
     letterList([...Array(2000).fill('A'), 'x'.repeat(9), 3]).length === 500 && letterList(['AB', 'x'.repeat(9), 3]).join() === 'AB');
   const t0 = Date.now();
-  parseSigilCharge(virtualCharge({}, '<p '.repeat(50000)));
+  parseSigilCharge({ id: 'v', type: 'sigil.charge', html: '<p '.repeat(50000), attrs: {} });
   check('charge technique regex stays fast on crafted markup', Date.now() - t0 < 500, `${Date.now() - t0} ms`);
+  {
+    // Opening tags without a closing one (an imported file): reading stays linear.
+    const t1 = Date.now();
+    sigilPartBlock({ ...createSigilBlock(), html: '<div data-sigil-part="calc">x'.repeat(40000) }, 'calc');
+    parseSigilCharge({ id: 'v', type: 'sigil.charge', html: '<p data-block-slot="technique">x'.repeat(40000), attrs: {} });
+    check('sigil slots stay fast on unclosed crafted markup', Date.now() - t1 < 500, `${Date.now() - t1} ms`);
+  }
 }
 
 console.log('\n4g. Link and image defaults with markup\n');
@@ -686,9 +853,10 @@ console.log('\n4g. Link and image defaults with markup\n');
   const linkTargetId = 'b1111111-1111-1111-1111-111111111111';
   const img = `${'cd'.repeat(32)}.png`;
   const text = {
-    title: (b) => `T:${b.type}`, date: (iso) => iso, number: String, targetDate: '', technique: '', loaded: '', notLoaded: '',
-    drawing: '', fields: { label: (e) => e.label, yes: 'Ja', no: 'Nein', moonName: (p) => p },
+    title: (b) => `T:${b.type}`, date: (iso) => iso, number: String, t: (key) => key,
+    yes: 'Ja', no: 'Nein', concealed: (until) => `C:${until}`, reveal: 'R', conceal: 'Z',
   };
+  const fallbackText = { label: (e) => e.label, yes: 'Ja', no: 'Nein', moonName: (p) => p };
 
   const elements = parseDefinitionElements(JSON.stringify([
     { id: 'lnk', kind: 'link', label: 'Quelle', defaultValue: { id: linkTargetId, targetKind: 'entry', label: 'Artikel' } },
@@ -709,13 +877,13 @@ console.log('\n4g. Link and image defaults with markup\n');
     created_at: '', updated_at: '', deleted_at: null,
     display: { readHideEmpty: true, readOnly: false, showTitle: true }, elements,
   };
-  const copy = instantiateDefinition(def, text.fields);
+  const copy = instantiateDefinition(def, fallbackText);
   const cm = parseFields(copy);
   check('a new copy carries chip and image in its slots',
     linkFromSlot(cm.slots.lnk)?.id === linkTargetId && imageFromSlot(cm.slots.pic) === img && !cm.slots.lnk2 && !cm.slots.pic2, cm.slots);
   check('the links of the copy are in the content (link table, backlinks)',
     extractInternalLinks(serializeBlocks([copy])).length === 1);
-  check('export: the link field shows its chip', renderBlocksForExport(serializeBlocks([copy]), text).includes('data-target-kind="entry"'));
+  check('export: the link field shows its chip', renderBlocksForExport(serializeBlocks([copy]), 'pdf', text).includes('data-target-kind="entry"'));
 
   const remapped = parseDefinitionElements(remapDefinitionDefaults(
     JSON.stringify(elements), (name) => (name === img ? `${'ef'.repeat(32)}.png` : name),
@@ -734,168 +902,14 @@ console.log('\n4g2. The paint block\n');
   const saved = withDrawing(paint, render, emptyPaintDoc());
   const back = parseDrawing(parseBlocks(serializeBlocks([saved]))[0]);
   check('paint: a type of its own, known to the app, a drawing like the sigil\'s',
-    paint.type === PAINT_BLOCK_TYPE && !!resolveBlockType(paint) && isDrawingBlockType(paint.type) && !isDrawingBlockType('core.canvas'));
+    paint.type === PAINT_BLOCK_TYPE && !!resolveBlockType(paint));
   check('paint: picture and document survive the round trip', back.render === render && !!back.doc, back);
   const text = {
-    title: () => 'Painting', date: (iso) => iso, number: String, targetDate: '', technique: '', loaded: '', notLoaded: '',
-    drawing: '', fields: { label: (e) => e.label, yes: '', no: '', moonName: (p) => p },
+    title: () => 'Painting', date: (iso) => iso, number: String, t: (key) => key,
+    yes: '', no: '', concealed: () => '', reveal: '', conceal: '',
   };
-  check('paint: the export shows the picture', renderBlocksForExport(serializeBlocks([saved]), text).includes(render));
-  check('paint: an empty one exports nothing of it', !renderBlocksForExport(serializeBlocks([paint]), text).includes('<img'));
-}
-
-console.log('\n4h. Sigils as parts of custom blocks\n');
-{
-  const text = { label: (e) => e.label || e.kind, yes: 'Ja', no: 'Nein', moonName: (p) => p };
-  const def = {
-    id: 'def-sigil', name: 'Sigillen-Ritual', icon: '🕯️', sort_order: 0,
-    created_at: '', updated_at: '', deleted_at: null,
-    display: { readHideEmpty: true, readOnly: false, showTitle: true },
-    elements: parseDefinitionElements(JSON.stringify([
-      { id: 'ort', kind: 'shorttext', label: 'Ort' },
-      { id: 'calc', kind: 'sigilCalc', label: 'Rechner', defaultValue: { intention: 'nein' } },
-      { id: 'draw', kind: 'sigilCanvas', label: 'Zeichnung' },
-      { id: 'charge', kind: 'sigilCharge', label: 'Ladung' },
-    ])),
-  };
-  check('sigil parts are field kinds, without a default',
-    def.elements.map((e) => e.kind).join() === 'shorttext,sigilCalc,sigilCanvas,sigilCharge'
-      && def.elements[1].defaultValue === undefined, def.elements);
-
-  // Like the UI: write the part as a virtual block, then back into the model.
-  const setPart = (block, elementId, change) => {
-    const model = parseFields(block);
-    const element = model.elements.find((e) => e.id === elementId);
-    const part = change(sigilPartBlock(block, element, model));
-    return serializeFields(block, withSigilPart(model, element, part), text);
-  };
-  let block = instantiateDefinition(def, text);
-  block = setPart(block, 'calc', (p) => serializeSigilCalc(p, { intention: 'Geheime Absicht', letters: ['G', 'H'], implemented: [] }));
-  block = setPart(block, 'draw', (p) => withDrawingImage(p, `${'ab'.repeat(32)}.png`));
-  block = setPart(block, 'charge', (p) => serializeSigilCharge(p, {
-    loaded: true, revealDate: '2030-01-01', lock: 'entry', technique: null, targets: null,
-  }));
-  const back = parseBlocks(serializeBlocks([createTextBlock('<p>Notiz</p>'), block]));
-  const units = sigilUnits(back);
-  check('the parts survive the round trip and are named <block>:<element>',
-    units.map((u) => u.block.id).join() === ['calc', 'draw', 'charge'].map((e) => sigilPartId(block.id, e)).join()
-      && parseSigilCalc(units[0].block).intention === 'Geheime Absicht' && drawingImage(units[1].block) === `${'ab'.repeat(32)}.png`,
-    units.map((u) => u.block));
-
-  const before = sigilState(back, '2029-12-31');
-  check('a loaded charge as a part hides and locks the parts, locks the entry',
-    before.concealed.has(sigilPartId(block.id, 'calc')) && before.concealed.has(sigilPartId(block.id, 'draw'))
-      && before.lockEntry, before);
-  const content = serializeBlocks(back);
-  const hidden = withoutConcealed(content, '2029-12-31');
-  check('search and .emerald do not see hidden parts — the rest of the block stays',
-    !hidden.includes('Geheime') && !hidden.includes('abab') && hidden.includes('Notiz')
-      && parseBlocks(hidden).length === 2 && sigilUnits(parseBlocks(hidden)).length === 3, hidden);
-  check('after the target date everything is there', withoutConcealed(content, '2030-01-02') === content);
-
-  const exportText = {
-    title: (b) => `T:${b.type}`, date: (iso) => `D:${iso}`, number: String, targetDate: 'Ziel', technique: 'Technik',
-    loaded: 'Geladen', notLoaded: 'Offen', drawing: 'Zeichnung', fields: text,
-  };
-  const out = renderBlocksForExport(content, exportText, '2029-12-31');
-  check('export: hidden parts are missing, the charge is included as a part',
-    !out.includes('Geheime') && !out.includes('<img') && out.includes('<dt>Ladung</dt>') && out.includes('Geladen'), out);
-  const revealed = renderBlocksForExport(content, exportText, '2030-02-01');
-  check('export after the date: calculator and drawing as parts',
-    revealed.includes('Geheime Absicht') && revealed.includes('alt="Zeichnung"'), revealed);
-
-  const unloaded = serializeBlocks([createTextBlock('<p>Notiz</p>'), setPart(block, 'charge', (p) => serializeSigilCharge(p, { ...parseSigilCharge(p), loaded: false }))]);
-  const afterUnload = sigilState(parseBlocks(unloaded), '2029-12-31');
-  check('unloading the part conceals nothing any more', afterUnload.concealed.size === 0 && !afterUnload.lockEntry, afterUnload);
-
-  const standaloneCharge = chargeOf({
-    loaded: true, revealDate: null, lock: 'sigil', technique: null, targets: [sigilPartId(block.id, 'draw')],
-  });
-  const mixed = sigilState([...parseBlocks(unloaded), standaloneCharge], '2029-12-31');
-  check('a charge on its own can conceal a part specifically (target <block>:<element>)',
-    mixed.concealed.has(sigilPartId(block.id, 'draw')) && !mixed.concealed.has(sigilPartId(block.id, 'calc'))
-      && parseSigilCharge(chargeUnit(parseBlocks(serializeBlocks([standaloneCharge]))[0])).targets?.[0] === sigilPartId(block.id, 'draw'), mixed);
-
-  const summary = entryBlockSummary('sigil-part', content, '2029-12-31');
-  check('the summary knows the sigil in the part (lock, target date)',
-    summary.sigil?.lockEntry === true
-      && !('image' in summary.sigil), summary.sigil);
-  check('the charge puts its target date into the info line of lists',
-    summary.listInfo.length === 1 && summary.listInfo[0].key === 'sigil.targetDate'
-      && summary.listInfo[0].value.iso === '2030-01-01', summary.listInfo);
-  const hiddenSigil = serializeBlocks(parseBlocks(content).map((b) => (b.type === 'core.fields' ? { ...b, attrs: { ...b.attrs, [BLOCK_ATTR.hidden]: '1' } } : b)));
-  check('a hidden sigil block still shows its target date in lists',
-    entryBlockSummary('sigil-hidden', hiddenSigil, '2029-12-31').listInfo[0]?.value.iso === '2030-01-01');
-  const dupId = 'dup-block';
-  const targeted = setPart(parseBlocks(unloaded)[1], 'charge', (p) => serializeSigilCharge(p, {
-    ...parseSigilCharge(p), targets: [sigilPartId(block.id, 'calc'), 'fremd-block'],
-  }));
-  const dup = withRenamedPartTargets({ ...targeted, id: dupId }, block.id, dupId);
-  const dupCharge = sigilUnits([dup]).find((u) => u.block.type === 'sigilCharge');
-  check('a duplicated block targets its own parts with its charge',
-    parseSigilCharge(dupCharge.block).targets.join() === `${dupId}:calc,fremd-block`, parseSigilCharge(dupCharge.block));
-
-  const oddlyEncoded = content.replace(/&quot;/g, '&#34;');
-  check('differently encoded content hides its parts all the same',
-    !withoutConcealed(oddlyEncoded, '2029-12-31').includes('Geheime'));
-
-  const emptyDrawing = parseFields(instantiateDefinition(def, text));
-  check('an empty drawing as a part stays in read mode (saving it outlasts "Done")',
-    !isHiddenInRead(emptyDrawing.elements.find((e) => e.id === 'draw'), emptyDrawing));
-
-  const configured = parseDefinitionElements(JSON.stringify([
-    { id: 'c', kind: 'sigilCalc', label: '', calcMode: 'auto', brushColor: '#ef4444' },
-    { id: 'c2', kind: 'sigilCalc', label: '', calcMode: 'alles' },
-    { id: 'd', kind: 'sigilCanvas', label: '', brushColor: '#ef4444', brushSize: 20, calcMode: 'manual' },
-    { id: 'd2', kind: 'sigilCanvas', label: '', brushColor: 'red; x', brushSize: 999 },
-    { id: 'l', kind: 'sigilCharge', label: '', defaultValue: { lock: 'sigil', targets: ['d', 'd', '__proto__', '<x>', 5] } },
-    { id: 'l2', kind: 'sigilCharge', label: '', defaultValue: { lock: 'alles', targets: 'd' } },
-  ]));
-  const cf = Object.fromEntries(configured.map((e) => [e.id, e]));
-  check('settings of the parts: only matching the kind and valid',
-    cf.c.calcMode === 'auto' && cf.c.brushColor === undefined && cf.c2.calcMode === undefined
-      && cf.d.brushColor === '#ef4444' && cf.d.brushSize === 20 && cf.d.calcMode === undefined
-      && cf.d2.brushColor === undefined && cf.d2.brushSize === undefined, configured);
-  check('default of the charge: lock and unique, harmless element IDs — otherwise "all"',
-    cf.l.defaultValue.lock === 'sigil' && cf.l.defaultValue.targets.join() === 'd'
-      && cf.l2.defaultValue.lock === 'entry' && cf.l2.defaultValue.targets === null, [cf.l.defaultValue, cf.l2.defaultValue]);
-
-  const presetDef = { ...def, id: 'def-preset', elements: configured.filter((e) => ['c', 'd', 'l'].includes(e.id)) };
-  const presetCopy = instantiateDefinition(presetDef, text);
-  const presetCharge = sigilUnits([presetCopy]).find((u) => u.block.type === 'sigilCharge');
-  const pc = parseSigilCharge(presetCharge.block);
-  check('a new copy carries the charge unloaded, with lock and targets on its own parts',
-    !pc.loaded && pc.lock === 'sigil' && pc.targets.join() === sigilPartId(presetCopy.id, 'd'), pc);
-  const loadedPreset = setPart(presetCopy, 'l', (p) => serializeSigilCharge(p, { ...parseSigilCharge(p), loaded: true }));
-  const presetState = sigilState([loadedPreset], '2029-12-31');
-  check('when loaded it conceals exactly the given drawing, not the calculator',
-    presetState.concealed.has(sigilPartId(presetCopy.id, 'd')) && !presetState.concealed.has(sigilPartId(presetCopy.id, 'c'))
-      && !presetState.lockEntry, presetState);
-  check('the setup (mode, brush) is carried into the copy, the default is not',
-    parseFields(presetCopy).elements.find((e) => e.id === 'c').calcMode === 'auto'
-      && parseFields(presetCopy).elements.find((e) => e.id === 'd').brushSize === 20
-      && !presetCopy.attrs['data-block-config'].includes('defaultValue'));
-}
-
-console.log('\n4h1. A sigil part on its own shows without a label row — a custom block with one part does not\n');
-{
-  const exportText = {
-    title: (b) => `T:${b.type}`, date: (iso) => `D:${iso}`, number: String, targetDate: 'Ziel', technique: 'Technik',
-    loaded: 'Geladen', notLoaded: 'Offen', drawing: 'Zeichnung', fields: sigilFieldText,
-  };
-  const own = chargeOf({ loaded: false, revealDate: '2030-01-01', lock: 'entry', technique: null, targets: null });
-  const def = {
-    id: 'def-one', name: 'Monatsladung', icon: '', sort_order: 0, created_at: '', updated_at: '', deleted_at: null,
-    display: { readHideEmpty: true, readOnly: false, showTitle: false },
-    elements: parseDefinitionElements(JSON.stringify([{ id: 'charge', kind: 'sigilCharge', label: 'Monatsladung' }])),
-  };
-  const copy = instantiateDefinition(def, sigilFieldText);
-  const ownOut = renderBlocksForExport(serializeBlocks([own]), exportText);
-  const copyOut = renderBlocksForExport(serializeBlocks([copy]), exportText);
-  check('export: a charge on its own is the charge under its title, no label row',
-    ownOut.startsWith('<h3>T:core.fields</h3><dl><dt>Ziel</dt>') && !ownOut.includes('<dt>sigilCharge</dt>'), ownOut);
-  check('export: a custom block with one charge keeps its label row',
-    copyOut.includes('<dt>Monatsladung</dt>'), copyOut);
+  check('paint: the export shows the picture', renderBlocksForExport(serializeBlocks([saved]), 'pdf', text).includes(render));
+  check('paint: an empty one exports nothing of it', !renderBlocksForExport(serializeBlocks([paint]), 'pdf', text).includes('<img'));
 }
 
 console.log('\n5. What is derived from the content sees through the blocks\n');
@@ -928,43 +942,22 @@ console.log('\n6. Templates: start template, insertion\n');
   check('start: neither — none',
     resolveStartTemplate(all, { template_id: null }, null) === null && resolveStartTemplate(all, null, 'gone') === null);
 
-  // Insertion: new IDs, charge targets carried along, everything else as it is.
-  const calc = createSigilCalcBlock();
-  const canvas = withDrawingImage(createSigilCanvasBlock(), `${'ef'.repeat(32)}.png`);
-  const charge = chargeOf({ loaded: true, revealDate: null, lock: 'entry', technique: null, targets: [canvas.id] });
-  const sigilTpl = tpl('sigil-tpl', serializeBlocks([createTextBlock('<p>Absicht</p>'), calc, canvas, charge]));
+  // Insertion: new IDs, everything else as it is — a loaded sigil arrives loaded, acting on its own new parts.
+  const sigilBlock = sigilOf({ drawing: `${'ef'.repeat(32)}.png`, charge: { ...chargeData, revealDate: null } });
+  const sigilTpl = tpl('sigil-tpl', serializeBlocks([createTextBlock('<p>Absicht</p>'), sigilBlock]));
   const first = instantiateTemplateBlocks(sigilTpl);
   const second = instantiateTemplateBlocks(sigilTpl);
-  const firstCharge = parseSigilCharge(chargeUnit(first[3]));
   check('insertion: no block remembers the template', first.every((b) => !b.attrs['data-template-origin']), first.map((b) => b.attrs));
   check('insertion: new block IDs, different ones the second time too',
     first.every((b, i) => b.id !== parseBlocks(sigilTpl.content)[i].id && b.id !== second[i].id));
-  check('insertion: the charge targets the new drawing and stays loaded, the drawing comes along',
-    firstCharge.loaded && firstCharge.targets.join() === first[2].id && drawingImage(first[2]) === `${'ef'.repeat(32)}.png`, firstCharge);
-  const allCharge = chargeOf({ loaded: true, revealDate: null, lock: 'entry', technique: null, targets: null });
-  const appended = withChargesCoveringOnly([calc, allCharge]);
-  const appendedCharge = parseSigilCharge(chargeUnit(appended[1]));
-  check('appended: a charge for "all sigils" covers only the blocks that came with it',
-    appendedCharge.loaded && appendedCharge.targets.join() === calcPart(calc), appendedCharge);
-  const existing = createSigilCanvasBlock();
-  check('appended: the entry\'s own drawing stays visible',
-    !sigilState([existing, ...appended], '2029-12-31').concealed.has(existing.id));
-  // A charge as part of a custom block targets `<block ID>:<element ID>` — that is carried along too.
-  const partText = { label: (el) => el.label || el.kind, yes: 'Ja', no: 'Nein', moonName: (ph) => ph };
-  const partDef = {
-    id: 'part-def', name: 'Teile', icon: '', sort_order: 0,
-    created_at: '', updated_at: '', deleted_at: null,
-    display: { readHideEmpty: true, readOnly: false, showTitle: false },
-    elements: parseDefinitionElements(JSON.stringify([
-      { id: 'draw', kind: 'sigilCanvas', label: '' },
-      { id: 'load', kind: 'sigilCharge', label: '', defaultValue: { lock: 'entry', targets: ['draw'] } },
-    ])),
-  };
-  const partCopy = instantiateDefinition(partDef, partText);
-  const [partBlock] = instantiateTemplateBlocks(tpl('part-tpl', serializeBlocks([partCopy])));
-  const partCharge = parseSigilCharge(sigilUnits([partBlock]).find((u) => u.block.type === 'sigilCharge').block);
-  check('insertion: a charge as a part targets the part in the new block',
-    partBlock.id !== partCopy.id && partCharge.targets.join() === sigilPartId(partBlock.id, 'draw'), partCharge);
+  const insertedFx = effectsOn(first, '2029-12-31');
+  check('insertion: the copy stays loaded and conceals its own new drawing, which came along',
+    insertedFx.concealed.has(sigilPartId(first[1].id, 'drawing')) && !insertedFx.concealed.has(sigilPartId(sigilBlock.id, 'drawing'))
+      && drawingImage(sigilPartBlock(first[1], 'drawing')) === `${'ef'.repeat(32)}.png`, insertedFx);
+  const existing = sigilOf({ drawing: `${'12'.repeat(32)}.png` });
+  check('appended: the entry\'s own sigil stays visible',
+    !effectsOn([existing, ...first], '2029-12-31').concealed.has(sigilPartId(existing.id, 'drawing')));
+  check('the built-in sigil template\'s block shows all its parts', Object.values(shownSigilParts(createSigilBlock())).every(Boolean));
 
   // Title and tags when undoing a template.
   const journalStd = { ...sigilTpl, id: 'journal-std', title: 'Tagebuch', tags: ['tag-j'] };
@@ -989,7 +982,7 @@ console.log('\n6. Templates: start template, insertion\n');
 
   const start = templateStart({ ...sigilTpl, title: '  Ritual ', tags: ['a'] });
   check('start from template: title trimmed, tags copied, content inserted',
-    start.title === 'Ritual' && start.tags.join() === 'a' && parseBlocks(start.content).length === 4, start);
+    start.title === 'Ritual' && start.tags.join() === 'a' && parseBlocks(start.content).length === 2, start);
   check('start without template: empty, the title too',
     JSON.stringify(templateStart(null)) === JSON.stringify({ title: '', content: '', tags: [], templateId: null }));
   check('merge tags without duplicate IDs', mergeTemplateTags(['a', 'b'], ['a', 'c']).join() === 'a,b,c');
@@ -1012,15 +1005,17 @@ console.log('\nCanvas block\n');
   check('a new altar: the same canvas, with "Images" below', altar.parts.images && altar.parts.shapes, altar.parts);
   check('an altar without config still has "Images" below',
     parseCanvasBlock({ id: 'a', type: ALTAR_BLOCK_TYPE, html: '', attrs: {} }).parts.images);
-  check('"Images" below an altar start with the tag "Altar Library", a canvas\'s with all',
-    altar.stripTag === 'altar-library' && parsed.stripTag === '', [altar.stripTag, parsed.stripTag]);
+  check('"Images" below a new altar or canvas have no tag chosen; the altar type keeps its pictures under "Altar Library", a canvas has no storage',
+    altar.stripTag === null && parsed.stripTag === null
+      && blockStorageTag(createCanvasBlock(ALTAR_BLOCK_TYPE))?.id === 'altar-library' && blockStorageTag(fresh) === null,
+    [altar.stripTag, parsed.stripTag]);
   const allTags = withCanvasStripTag(createCanvasBlock(ALTAR_BLOCK_TYPE), '');
   const otherTag = withCanvasParts(withCanvasStripTag(allTags, 'venus'), { ...altar.parts, shapes: false });
   check('the strip\'s tag is kept: cleared stays cleared, another one survives a change of parts',
     parseCanvasBlock(allTags).stripTag === '' && parseCanvasBlock(otherTag).stripTag === 'venus'
       && !parseCanvasBlock(otherTag).parts.shapes, parseCanvasBlock(otherTag));
   check('a foreign tag value counts as none set',
-    parseCanvasBlock({ ...allTags, attrs: { ...allTags.attrs, 'data-block-config': JSON.stringify({ tag: '<x>' }) } }).stripTag === 'altar-library');
+    parseCanvasBlock({ ...allTags, attrs: { ...allTags.attrs, 'data-block-config': JSON.stringify({ tag: '<x>' }) } }).stripTag === null);
 
   const scene = { ...parsed.scene, elements: [image('i1', pic), image('i2', pic)], background: { fill: { kind: 'none' }, image: { src: bg, fit: 'cover' }, tint: null } };
   const full = withCanvasScene(fresh, scene, render);
@@ -1044,7 +1039,7 @@ console.log('\nCanvas block\n');
   check('foreign data: sizes bounded, bad ids left out, numbers filled in',
     read.width === 8192 && read.elements.length === 1 && read.elements[0].x === 0, read);
 
-  const exported = renderBlocksForExport(serializeBlocks([full]), { title: () => 'Canvas' });
+  const exported = renderBlocksForExport(serializeBlocks([full]), 'pdf', { title: () => 'Canvas' });
   check('the export shows the rendered picture', exported.includes(render) && !exported.includes(`src="${pic}"`), exported);
 }
 
@@ -1076,14 +1071,8 @@ console.log('\n7. Blocks as rows (blocks, block_refs)\n');
     ...createFieldsBlock('image'),
     attrs: { [BLOCK_ATTR.config]: JSON.stringify({ elements: [{ id: 'img', kind: 'image', label: 'Bild', defaultValue: def }] }) }, // lang-ok
   };
-  const sigilPart = {
-    id: 'sp', type: 'core.fields',
-    html: `<dl><dt>Zeichnung</dt><dd data-block-slot="el:d"><img src="${render}" alt="" data-paint="render"><img src="${layerPic}" alt="" data-paint="L1"></dd></dl>`, // lang-ok
-    attrs: {
-      [BLOCK_ATTR.config]: JSON.stringify({ elements: [{ id: 'd', kind: 'sigilCanvas', label: '' }] }),
-      [BLOCK_ATTR.data]: JSON.stringify({ values: { d: paintDocToJson({ layers: [{ ...emptyPaintDoc().layers[0], id: 'L1', image: layerPic }] }) } }),
-    },
-  };
+  const sigilPart = withPart(createSigilBlock(), 'drawing',
+    (p) => withDrawing(p, render, { layers: [{ ...emptyPaintDoc().layers[0], id: 'L1', image: layerPic }] }));
   const oddAttrs = {
     id: 'odd', type: 'x.future',
     html: `<p>Neu ${chip}</p>`, // lang-ok
@@ -1094,7 +1083,7 @@ console.log('\n7. Blocks as rows (blocks, block_refs)\n');
     attrs: { [BLOCK_ATTR.showTitle]: '0', [BLOCK_ATTR.title]: 'Mein Text', [BLOCK_ATTR.hidden]: '1', [BLOCK_ATTR.version]: '3' }, // lang-ok
   };
   const samples = [titled, withLink, withImage, paint, canvas, withDefault, sigilPart, oddAttrs, createTextBlock('<p>x</p>'),
-    createSigilCalcBlock(), createSigilChargeBlock()];
+    createSigilBlock()];
 
   const roundTripsAsRow = (b) => {
     const back = fromBlockRow({ ...toBlockRow(b) });
@@ -1118,18 +1107,24 @@ console.log('\n7. Blocks as rows (blocks, block_refs)\n');
   check('a row\'s attrs keep only data-* strings, never the type or the ID', JSON.stringify(foreignRow.attrs) === '{"data-ok":"1"}', foreignRow.attrs);
   check('unreadable attrs JSON loses only itself', Object.keys(fromBlockRow({ id: 'f', type: 'core.text', html: '', attrs: '{nope' }).attrs).length === 0);
 
-  check('plain text: tags gone, words kept apart by block elements, chips their own word, entities decoded',
-    blockPlainText(titled) === 'Kopf einszwei & Ziel', blockPlainText(titled)); // lang-ok
-  check('plain text: a fields block reads as its fallback', blockPlainText(withLink).includes('Ziel'), blockPlainText(withLink)); // lang-ok
-  check('plain text: a canvas and a drawing have none', blockPlainText(canvas) === '' && blockPlainText(paint) === '');
+  const titledCurrent = { ...titled, attrs: {} };
+  check('search text: tags gone, words kept apart by block elements, chips their own word, entities decoded',
+    blockSearchText(titledCurrent) === 'Kopf einszwei & Ziel', blockSearchText(titledCurrent)); // lang-ok
+  check('search text: a block in a newer format finds nothing', blockSearchText(titled) === '');
+  check('search text: a fields block reads as its fallback', blockSearchText(withLink).includes('Ziel'), blockSearchText(withLink)); // lang-ok
+  check('search text: a canvas and a drawing have none', blockSearchText(canvas) === '' && blockSearchText(paint) === '');
+  check('search text: an unknown type finds nothing — its markup may hold what it conceals', blockSearchText({ id: 'u', type: 'x.y', html: '<p>Fremd</p>', attrs: {} }) === ''); // lang-ok
+  check('the row text is the block search text', toBlockRow(titled).text === blockSearchText(titled));
 
+  const withoutVersion = (b) => ({ ...b, attrs: Object.fromEntries(Object.entries(b.attrs).filter(([k]) => k !== 'data-block-v')) });
   const refs = (b) => blockRefs(b).map((r) => `${r.kind}:${r.target === linked ? 'L' : r.target.slice(0, 1)}:${r.role}`).sort().join(' ');
-  check('refs: a text block points at its chip and its picture', refs(titled) === 'entry:L:content image:1:content', refs(titled));
+  check('refs: a text block points at its chip and its picture', refs(withoutVersion(titled)) === 'entry:L:content image:1:content', refs(withoutVersion(titled)));
+  check('refs: the same text block in a newer format (v3) keeps its picture as its own', refs(titled) === 'entry:L:content image:1:default', refs(titled));
   check('refs: link and image fields', refs(withLink) === 'entry:L:content' && refs(withImage) === 'image:1:content', [refs(withLink), refs(withImage)]);
   check('refs: a drawing has its render and its layers', refs(paint) === 'image:2:layer image:3:render', refs(paint));
   check('refs: a canvas has its pictures, its background and its render', refs(canvas) === 'image:1:content image:3:render image:4:background', refs(canvas));
   check('refs: a prefill is a default', refs(withDefault) === 'image:5:default', refs(withDefault));
-  check('refs: a custom block\'s drawing part is a drawing', refs(sigilPart) === 'image:2:layer image:3:render', refs(sigilPart));
+  check('refs: a sigil\'s drawing part is a drawing', refs(sigilPart) === 'image:2:layer image:3:render', refs(sigilPart));
   check('refs: an unknown type shows what its markup shows', refs(oddAttrs) === 'entry:L:content', refs(oddAttrs));
   check('refs: no duplicates', blockRefs({ ...titled, html: titled.html + titled.html }).length === 2);
   {
@@ -1139,7 +1134,7 @@ console.log('\n7. Blocks as rows (blocks, block_refs)\n');
     check('refs: stay fast on a long run of <span without a >', ms < 500, `${ms} ms`);
   }
 
-  // #107: the pictures of a custom block's drawing part are the drawing — "Images" cannot take them out.
+  // #107: the pictures of a sigil's drawing part are the drawing — "Images" cannot take them out.
   const partStack = serializeBlocks([sigilPart, createTextBlock('<p>x</p>')]);
   check('#107: taking the render or a layer out of "Images" leaves a drawing part whole',
     withoutImage(partStack, render) === partStack && withoutImage(partStack, layerPic) === partStack);
@@ -1225,6 +1220,303 @@ console.log('\n7. Blocks as rows (blocks, block_refs)\n');
     htmlPlainText(`ab${chip}cd <b>fe</b>tt`) === 'ab Ziel cd fett', htmlPlainText(`ab${chip}cd <b>fe</b>tt`)); // lang-ok
 }
 
+console.log('\n7b. Block interfaces: registry, toolkit, copies, actions, settings, properties\n');
+
+{
+  let twice = false;
+  try {
+    registerBlockType(resolveBlockType(createTextBlock('')));
+  } catch {
+    twice = true;
+  }
+  check('a type ID registers once', twice);
+
+  // A type of the test's own, as an extension would register one.
+  registerBlockType({
+    id: 'test.tagger', origin: 'plugin', icon: resolveBlockType(createTextBlock('')).icon, labelKey: 'x', descriptionKey: 'x',
+    group: 'text', dataVersion: 2, defaultShowTitle: false,
+    upgrade: (b, from) => ({ ...b, attrs: { ...b.attrs, 'data-block-data': JSON.stringify({ from }) } }),
+    properties: {
+      mayContribute: (c) => c.includes('test.tagger'),
+      tags: () => ['moon-tag', '<bad>'],
+      icon: () => '🌕',
+      cover: () => null,
+      rows: (_b, ctx) => [{ key: 'day', labelKey: 'x', value: { kind: 'date', iso: ctx.entryDate ?? '' } }],
+      overridable: { icon: false, cover: true },
+    },
+    listInfo: {
+      mayContribute: (c) => c.includes('test.tagger'),
+      parts: () => [
+        { key: 'both', rank: 0, icon: resolveBlockType(createTextBlock('')).icon, labelKey: 'x', value: { kind: 'text', text: 'b' } },
+        { key: 'long', rank: 0, icon: resolveBlockType(createTextBlock('')).icon, labelKey: 'x', value: { kind: 'text', text: 'l' }, forms: ['long'] },
+      ],
+    },
+    settings: [
+      { key: 'show', labelKey: 'x', kind: 'toggle', initial: true },
+      { key: 'mode', labelKey: 'x', kind: 'select', options: [{ value: 'a', labelKey: 'a' }, { value: 'b', labelKey: 'b' }], initial: 'a' },
+    ],
+  });
+  const tagger = { id: 'tg', type: 'test.tagger', html: '', attrs: {} };
+
+  // A type that conceals another block as a whole, as an extension might: covered in HTML, missing elsewhere.
+  registerBlockType({
+    id: 'test.veil', origin: 'plugin', icon: resolveBlockType(createTextBlock('')).icon, labelKey: 'x', descriptionKey: 'x',
+    group: 'text', dataVersion: 1, defaultShowTitle: false,
+    entryEffect: { mayContribute: (c) => c.includes('test.veil'), read: () => ({ concealed: new Map([['veiled', '2031-01-01']]) }) },
+  });
+  const veiled = { ...createTextBlock('<p>darunter</p>'), id: 'veiled', attrs: { 'data-block-show-title': '1' } };
+  const veilContent = serializeBlocks([{ id: 'vl', type: 'test.veil', html: '', attrs: {} }, veiled, createTextBlock('<p>offen</p>')]);
+  const veilPdf = renderBlocksForExport(veilContent, 'pdf', exportText, '2030-01-01');
+  const veilHtml = renderBlocksForExport(veilContent, 'html', exportText, '2030-01-01');
+  check('export: a block concealed as a whole is missing in PDF, the rest stays',
+    !veilPdf.includes('darunter') && !veilPdf.includes('T:core.text') && veilPdf.includes('offen'), veilPdf);
+  check('export: a block concealed as a whole is covered in HTML, its title above the cover',
+    veilHtml.includes('<h3>T:core.text</h3><div class="export-concealed"><p class="export-concealed-cover"><span>C:2031-01-01</span>')
+      && veilHtml.includes('<div class="export-concealed-body"><p>darunter</p></div>') && veilHtml.includes('offen'), veilHtml);
+  check('a block\'s tags are references of kind tag; a malformed ID is left out',
+    JSON.stringify(blockRefs(tagger)) === JSON.stringify([{ kind: 'tag', target: 'moon-tag', role: 'tag' }]), blockRefs(tagger));
+  check('the tags of a stack come from its blocks', blockTagsOf([tagger, createTextBlock('<p>x</p>')]).join() === 'moon-tag');
+
+  const up = upgradeBlock(tagger);
+  check('an older block is brought up to its type\'s data version',
+    up.attrs['data-block-v'] === '2' && JSON.parse(up.attrs['data-block-data']).from === 1, up);
+  check('a current block stays as it is', upgradeBlock(up) === up);
+  const newer = { ...tagger, attrs: { 'data-block-v': '3' } };
+  check('a block from a newer version has no type here and is not touched', resolveBlockType(newer) === undefined && upgradeBlock(newer) === newer);
+
+  const defs = resolveBlockType(tagger).settings;
+  const start = readBlockSettings(tagger, defs);
+  check('settings start at their start values', start.show === true && start.mode === 'a', start);
+  const set = withBlockSetting(withBlockSetting(tagger, defs[0], false), defs[1], 'b');
+  const read = readBlockSettings(set, defs);
+  check('a setting is stored with the block and read back', read.show === false && read.mode === 'b', set.attrs);
+  check('values back at their start are not stored',
+    withBlockSetting(withBlockSetting(set, defs[0], true), defs[1], 'a').attrs['data-block-settings'] === undefined);
+  check('a stored value that does not fit its description reads as the start value',
+    readBlockSettings({ ...tagger, attrs: { 'data-block-settings': '{"show":"yes","mode":"z"}' } }, defs).mode === 'a');
+  check('settings travel through a row and the content',
+    fromBlockRow(toBlockRow(set)).attrs['data-block-settings'] === set.attrs['data-block-settings']
+      && parseBlocks(serializeBlocks([set]))[0].attrs['data-block-settings'] === set.attrs['data-block-settings']);
+
+  const ctx = { entryId: 'e', entryDate: '2026-11-25', today: '2026-11-25' };
+  const suggested = blockSuggestions([tagger], ctx);
+  const icon = resolveProperty('🔥', suggested.icon, '📓');
+  check('a block\'s icon that may not be overridden stands before the user\'s',
+    icon?.value === '🌕' && icon.source === 'block' && icon.blockId === 'tg', icon);
+  const overridable = { ...suggested.icon, overridable: true };
+  check('the user\'s value stands before an overridable block value, that before the category\'s',
+    resolveProperty('🔥', overridable, '📓')?.source === 'user' && resolveProperty('', overridable, '📓')?.source === 'block'
+      && resolveProperty(null, blockSuggestions([], ctx).icon, '📓')?.source === 'category');
+  check('a hidden block suggests nothing', blockSuggestions([{ ...tagger, attrs: { 'data-block-hidden': '1' } }], ctx).icon === null);
+  check('a block\'s rows come with its context',
+    suggested.rows.length === 1 && suggested.rows[0].value.iso === '2026-11-25' && suggested.rows[0].blockId === 'tg', suggested.rows);
+  const taggerSummary = entryBlockSummary({ id: 'tagger-entry', content: serializeBlocks([tagger]), created_at: '2026-11-25T12:00:00Z' });
+  check('a part meant for the long form only stays out of the short one',
+    taggerSummary.info.short.map((p) => p.key).join() === 'both' && taggerSummary.info.long.map((p) => p.key).join() === 'both,long',
+    taggerSummary.info);
+  check('the summary carries what the visible blocks suggest', taggerSummary.properties.icon?.value === '🌕', taggerSummary.properties);
+}
+
+{
+  const empty = createCanvasBlock();
+  check('an empty canvas offers nothing to save', blockActionsOf(empty, { reading: false }).length === 0);
+  const filled = withCanvasScene(empty, { ...parseCanvasBlock(empty).scene, background: { fill: { kind: 'solid', color: '#000000' }, image: null, tint: null } }, null);
+  check('a canvas with something on it offers "Save as picture", while reading too',
+    blockActionsOf(filled, { reading: true }).map((a) => a.id).join() === 'savePicture' && blockActionsOf(filled, { reading: false }).length === 1);
+  check('a text block has no actions', blockActionsOf(createTextBlock('<p>x</p>'), { reading: false }).length === 0);
+
+  const target = '44444444-4444-4444-4444-444444444444';
+  const chip = internalLinkChipHtml({ id: target, targetKind: 'entry', label: 'Ziel' }); // lang-ok
+  const content = serializeBlocks([createTextBlock(`<p>${chip}</p>`), createCanvasBlock()]);
+  check('linked entries come from the blocks\' references', [...linkedIdsOf(content)].join() === target);
+
+  // Hidden (the eye), a block counts its links only where its type says so; its references stay.
+  const hiddenText = { ...createTextBlock(`<p>${chip}</p>`), attrs: { [BLOCK_ATTR.hidden]: '1' } };
+  check('a hidden block adds nothing to the linked entries',
+    linkedIdsOf(serializeBlocks([hiddenText, createCanvasBlock()])).size === 0, [...linkedIdsOf(serializeBlocks([hiddenText]))]);
+  check('a hidden block keeps its references (block_refs)',
+    blockRefs(hiddenText).some((r) => r.kind === 'entry' && r.target === target), blockRefs(hiddenText));
+  registerBlockType({
+    id: 'test.linker', origin: 'plugin', icon: resolveBlockType(createTextBlock('')).icon, labelKey: 'x', descriptionKey: 'x',
+    group: 'text', dataVersion: 1, defaultShowTitle: false, linksWhenHidden: true,
+    refs: (b, report) => report.links(b.html),
+  });
+  const hiddenLinker = { id: 'lk', type: 'test.linker', html: `<p>${chip}</p>`, attrs: { [BLOCK_ATTR.hidden]: '1' } };
+  check('a hidden block whose type allows it still counts its links',
+    [...linkedIdsOf(serializeBlocks([hiddenLinker]))].join() === target);
+  check('the same rule for the database: the types whose hidden blocks count',
+    typesLinkingWhenHidden().join() === 'test.linker', typesLinkingWhenHidden());
+
+  // A block this version cannot read counts by what it stores, everywhere alike; hidden, by its registered type.
+  const foreign = { id: 'fx', type: 'plugin.unknown', html: `<p>${chip}</p>`, attrs: {} };
+  check('a block this version cannot read counts its stored links',
+    [...linkedIdsOf(serializeBlocks([foreign]))].join() === target);
+  check('hidden and of no registered type, it adds nothing',
+    linkedIdsOf(serializeBlocks([{ ...foreign, attrs: { [BLOCK_ATTR.hidden]: '1' } }])).size === 0);
+  const newerLinker = { ...hiddenLinker, attrs: { ...hiddenLinker.attrs, 'data-block-v': '2' } };
+  check('hidden and too new to read, a type that allows it still counts — as the database does by the stored type',
+    !resolveBlockType(newerLinker) && [...linkedIdsOf(serializeBlocks([newerLinker]))].join() === target);
+
+  // The export names a link field's target by its current title, as lists and the panel do.
+  {
+    const fieldText = { label: (el) => el.label || el.kind, yes: 'Ja', no: 'Nein', moonName: (p) => p }; // lang-ok
+    const linkBlock = createFieldsBlock('link');
+    const model = parseFields(linkBlock);
+    const linkChip = internalLinkChipHtml({ id: target, targetKind: 'entry', label: 'Alter Titel' }); // lang-ok
+    const textChip = internalLinkChipHtml({ id: target, targetKind: 'entry', label: 'Im Text & alt' }); // lang-ok
+    const linked = serializeBlocks([
+      serializeFields(linkBlock, { ...model, slots: { [model.elements[0].id]: linkChip } }, fieldText),
+      createTextBlock(`<p>vor ${textChip} nach</p>`),
+    ]);
+    const titleOf = (l) => (l.id === target && l.targetKind === 'entry' ? 'Neuer <Titel>' : undefined); // lang-ok
+    // The export path: the blocks' parts, then the chips named as the app names them (`collectExportDataFor`).
+    const renamed = withCurrentLinkTitles(renderBlocksForExport(linked, 'html', { ...exportText, linkTitle: titleOf }), titleOf);
+    check('export: a link field and a chip in a text show their target\'s current title',
+      renamed.split('data-label="Neuer &lt;Titel&gt;">Neuer &lt;Titel&gt;</span>').length === 3
+        && !renamed.includes('Alter Titel') && !renamed.includes('Im Text') && renamed.includes('<p>vor ') && renamed.includes(' nach</p>'), renamed); // lang-ok
+    const goneHtml = renderBlocksForExport(linked, 'markdown', { ...exportText, linkTitle: () => undefined });
+    check('export: a gone target keeps the title stored with the link',
+      withCurrentLinkTitles(goneHtml, () => undefined) === goneHtml && goneHtml.includes('Alter Titel'), goneHtml); // lang-ok
+    check('a link value names its target by the same lookup',
+      linkValueTitle({ id: target, targetKind: 'entry', label: 'Alter Titel' }, titleOf) === 'Neuer <Titel>'); // lang-ok
+  }
+
+  const pic = 'a'.repeat(64) + '.png';
+  const text = createTextBlock(`<p>eins</p><img src="${pic}" alt=""><p>zwei</p>`);
+  const without = blockWithoutImage(text, pic);
+  check('a text block lets a picture go, nothing else',
+    !without.html.includes(pic) && without.html.includes('zwei') && blockWithoutImage(without, pic) === without, without.html);
+  const reporter = new RefReporter();
+  reporter.image('not-a-picture.txt');
+  reporter.icon('🙂');
+  reporter.entry('');
+  check('the reporter drops what is no reference', reporter.refs.length === 0, reporter.refs);
+}
+
+{
+  const empty = createCanvasBlock();
+  const none = withCanvasScene(empty, { ...parseCanvasBlock(empty).scene, background: { fill: { kind: 'none' }, image: null, tint: null } }, null);
+  check('a canvas whose background draws nothing offers nothing to save', blockActionsOf(none, { reading: true }).length === 0);
+
+  // A canvas from a newer app: its render and background stay what they are, and "Images" leaves it alone.
+  const pic = 'b'.repeat(64) + '.png';
+  const render = 'c'.repeat(64) + '.png';
+  const drawn = withCanvasScene(empty, { ...parseCanvasBlock(empty).scene, elements: [] , background: { fill: { kind: 'none' }, image: { src: pic, fit: 'cover' }, tint: null } }, render);
+  const tooNew = { ...drawn, attrs: { ...drawn.attrs, 'data-block-v': '9' } };
+  const roles = blockRefs(tooNew).map((r) => `${r.kind}:${r.role}`).sort().join(' ');
+  check('a known type in a newer format keeps its pictures as its own, not as shown ones', roles === 'image:default image:default', roles);
+  check('"Images" does not take a picture out of a block in a newer format', blockWithoutImage(tooNew, pic) === tooNew);
+  const unknownPic = { id: 'u', type: 'x.y', html: `<img src="${pic}" alt="">`, attrs: {} };
+  check('an unknown type is saved as it is: "Images" leaves its pictures in, and they count as its own',
+    blockWithoutImage(unknownPic, pic) === unknownPic && blockRefs(unknownPic).every((r) => r.role === 'default'));
+
+  // One rule for every block this app cannot read (`blockReadState`), with no knowledge of any type.
+  const fresh = createCanvasBlock();
+  const brokenCanvas = { ...fresh, attrs: { ...fresh.attrs, [BLOCK_ATTR.data]: '{nope' } };
+  const states = [fresh, { ...fresh, attrs: { ...fresh.attrs, 'data-block-v': '9' } }, unknownPic, brokenCanvas,
+    { ...createFieldsBlock('number'), attrs: { [BLOCK_ATTR.config]: '{kaputt' } }, { ...createPaintBlock(), attrs: { [BLOCK_ATTR.data]: '[' } }].map(blockReadState); // lang-ok
+  check('readable, newer (a newer format, an unknown type) and broken (damaged data of canvas, fields, paint)',
+    states.join() === 'readable,newer,newer,broken,broken,broken', states);
+  check('an unreadable block is asked nothing of its type: no actions, no settings, no effect, no search text',
+    resolveBlockType(brokenCanvas) === undefined && blockActionsOf(brokenCanvas, { reading: true }).length === 0
+      && blockSearchText(brokenCanvas) === '' && entryEffects([brokenCanvas], { today: '2030-01-01' }).lockEntry === false);
+  check('its registered type still names it', registeredBlockType(brokenCanvas)?.id === CANVAS_BLOCK_TYPE);
+  const unreadableOut = renderBlocksForExport(serializeBlocks([unknownPic, brokenCanvas]), 'pdf', exportText);
+  check('the export shows the notice of each, never its content',
+    unreadableOut === '<p>K:blocks.unreadable.newer</p><p>K:blocks.unreadable.broken</p>', unreadableOut);
+}
+
+console.log('\n7c. Interfaces that keep the app free of any one type\n');
+{
+  const T = (key) => `K:${key}`;
+  const target = '44444444-4444-4444-8444-444444444444';
+  const otherId = '55555555-5555-4555-8555-555555555555';
+  const chipTo = (id) => internalLinkChipHtml({ id, targetKind: 'entry', label: 'Z' });
+  const custom = {
+    id: 'cf', type: 'core.fields', html: '',
+    attrs: { [BLOCK_ATTR.config]: JSON.stringify({ name: 'Buch', icon: '📚', elements: [ // lang-ok
+      { id: 'l1', kind: 'link', label: 'Quelle' }, { id: 't1', kind: 'text', label: 'Notiz' }, { id: 'l2', kind: 'link', label: 'Andere' }, // lang-ok
+    ] }) },
+  };
+  const model = parseFields(custom);
+  const filled = serializeFields(custom, { ...model, slots: { l1: chipTo(target), t1: `<p>siehe ${chipTo(target)} und ${chipTo(otherId)}</p>`, l2: chipTo(otherId) } }, { label: (e) => e.label, yes: 'J', no: 'N', moonName: (p) => p }); // lang-ok
+  const without = parseFields(blockWithoutLink(filled, target, T));
+  check('removing a link (11): the link field holding it is emptied, a chip in a text field becomes its word, other links stay',
+    !without.slots.l1 && without.slots.l2 === chipTo(otherId) && !without.slots.t1.includes(target) && without.slots.t1.includes(otherId) && without.slots.t1.includes('Z'),
+    without.slots);
+  check('removing a link a block does not hold gives the same block', blockWithoutLink(filled, '66666666-6666-4666-8666-666666666666', T) === filled);
+  check('removing a link from a type without the interface gives the same block', blockWithoutLink(createTextBlock(`<p>${chipTo(target)}</p>`), target, T).html.includes(target));
+  check('text editors (15): a text block is one itself, a custom block holds its text fields, a canvas none',
+    blockTextEditors(createTextBlock('<p>a</p>')).join() === '' && blockTextEditors(createTextBlock('<p>a</p>')).length === 1
+      && blockTextEditors(filled).join() === 't1' && blockTextEditors(createCanvasBlock()).length === 0);
+}
+
+console.log('\n7d. A link field names its target by its current title (#192)\n');
+{
+  const a = '77777777-7777-4777-8777-777777777777';
+  const b = '88888888-8888-4888-8888-888888888888';
+  const linkCopy = (id, target, label) => ({
+    id, type: 'core.fields',
+    html: `<dl><dt>Quelle</dt><dd data-block-slot="el:src">${internalLinkChipHtml({ id: target, targetKind: 'entry', label })}</dd></dl>`, // lang-ok
+    attrs: { 'data-block-config': JSON.stringify({ elements: [{ id: 'src', kind: 'link', label: 'Quelle', uses: { info: true, panel: true, values: true } }] }) }, // lang-ok
+  });
+  const entryWith = (id, block) => ({ id, content: serializeBlocks([block]), created_at: '2026-01-01T12:00:00Z' });
+  const one = entryBlockSummary(entryWith('l1', linkCopy('k1', a, 'Altname'))); // lang-ok
+  const value = one.values.find((v) => v.key === 'field:src')?.value;
+  check('the link value carries the target and its kind, not only the stored name',
+    value?.kind === 'link' && value.id === a && value.targetKind === 'entry' && value.label === 'Altname', value); // lang-ok
+  // The live titles after a rename: `a` is now "Zebra", `b` (stored as "Anton") is gone.
+  const titles = new Map([[`entry:${a}`, 'Zebra']]);
+  const titleOf = (link) => titles.get(`${link.targetKind}:${link.id}`);
+  const panelRow = one.properties.rows[0]?.value;
+  const infoPart = one.info.long[0]?.value;
+  check('after a rename the info line, the panel and the values show the current title',
+    linkValueTitle(value, titleOf) === 'Zebra' && linkValueTitle(panelRow, titleOf) === 'Zebra' && linkValueTitle(infoPart, titleOf) === 'Zebra', { panelRow, infoPart });
+  const gone = entryBlockSummary(entryWith('l2', linkCopy('k2', b, 'Anton'))).values[0].value;
+  check('a target that is gone shows the name stored with the link', linkValueTitle(gone, titleOf) === 'Anton');
+  // Stored "Altname" < "Anton" — by the current titles "Anton" (gone, stored) < "Zebra".
+  const sorted = [value, gone].sort((x, y) => compareBlockValues(x, y, titleOf)).map((v) => linkValueTitle(v, titleOf));
+  check('sorting by the field goes by the current titles', sorted.join() === 'Anton,Zebra', sorted);
+  check('a missing value sorts last', compareBlockValues(null, value, titleOf) > 0 && compareBlockValues(value, null, titleOf) < 0);
+}
+
+console.log('\n7e. Tags a block gives travel by name (#186)\n');
+{
+  // A test type that gives the tags its data names — no built-in block gives any yet.
+  registerBlockType({
+    id: 'test.datatags', origin: 'plugin', icon: () => null, labelKey: 'x', descriptionKey: 'x', group: 'fields', dataVersion: 1, defaultShowTitle: false,
+    properties: {
+      mayContribute: (content) => content.includes('test.datatags'),
+      tags: (block) => { try { return JSON.parse(block.attrs['data-block-data']).tags ?? []; } catch { return []; } },
+      overridable: { icon: true, cover: true },
+    },
+  });
+  const tagger = { id: 'tg', type: 'test.datatags', html: '', attrs: { [BLOCK_ATTR.data]: JSON.stringify({ tags: ['t-file'], note: 't-other' }) } };
+  const content = serializeBlocks([createTextBlock('<p>t-file</p>'), tagger]);
+  check('a block gives its tags (blockTagsOf)', blockTagsOf(parseBlocks(content)).join() === 't-file');
+
+  // Export: the file names the tags the blocks give, by name; one without a name (gone) stays out.
+  const names = new Map([['t-file', 'Ritual']]);
+  const carried = manifestBlockTags([content, serializeBlocks([{ ...tagger, id: 'tg2', attrs: { [BLOCK_ATTR.data]: JSON.stringify({ tags: ['t-gone'] }) } }])], (id) => names.get(id));
+  check('export: the block tags go along by ID and name, a tag without a name stays out', JSON.stringify(carried) === JSON.stringify([{ id: 't-file', name: 'Ritual' }]), carried);
+  const file = {
+    format: 'emerald', version: EMERALD_FORMAT_VERSION, kind: 'items', exportedAt: '', links: [], omittedImages: [], blockDefinitions: [], images: [],
+    items: [{ kind: 'template', id: 'tp', name: 'T', title: '', createdAt: '', updatedAt: '', icon: '', tags: [], blocks: contentToBlocks(content) }],
+    blockTags: [...carried, { id: 'bad id', name: 'x' }, { id: 't-empty', name: '  ' }, { id: 't-file', name: 'twice' }, 'nope'],
+  };
+  const read = parseManifest(JSON.stringify(file));
+  check('the manifest reads the block tags, foreign values dropped, each ID once', JSON.stringify(read.blockTags) === JSON.stringify(carried), read.blockTags);
+
+  // Import: the tag of that name here (`ensureTag` in the app) — the blocks are pointed at it, nothing else that looks like an ID.
+  const here = new Map([['t-file', 't-here'], ['t-other', 't-wrong']]);
+  const imported = retagContent(blocksToContent(read.items[0].blocks), (id) => here.get(id));
+  const back = parseBlocks(imported);
+  check('import: the block gives the tag here; another value of the same shape and the text stay',
+    blockTagsOf(back).join() === 't-here' && JSON.parse(back[1].attrs[BLOCK_ATTR.data]).note === 't-other' && back[0].html.includes('t-file'), imported);
+  check('import: a content whose blocks give no mapped tag stays the same string', retagContent(content, () => undefined) === content);
+  check('remapBlock leaves a type without tags alone', remapBlock(createTextBlock('<p>t-file</p>'), { tags: () => 'x' }).html === '<p>t-file</p>');
+}
+
 console.log('\n8. .emerald manifest (lib/emerald/manifest.ts)\n');
 {
   const idA = '11111111-1111-4111-8111-111111111111';
@@ -1288,6 +1580,17 @@ console.log('\n8. .emerald manifest (lib/emerald/manifest.ts)\n');
 
   check('the gentlest picture setting wins', gentlestImageMode('placeholder', 'none') === 'none'
     && gentlestImageMode('strong', 'balanced') === 'balanced');
+
+  {
+    // A concealed sigil travels whole in .emerald (.vault.emerald copies the rows as they are): it arrives concealed.
+    const concealedContent = serializeBlocks([createTextBlock('<p>Notiz</p>'), sigilOf({ calc: calcData, drawing: drawnFile, charge: chargeData })]);
+    const sigilFile = parseManifest(JSON.stringify({ ...manifest, items: [{ ...manifest.items[0], blocks: contentToBlocks(concealedContent) }] }));
+    const arrived = relinkWithinFile(blocksToContent(sigilFile.items[0].blocks), idMap);
+    const arrivedFx = entryEffects(parseBlocks(arrived), { today: '2029-12-31' });
+    check('.emerald: a concealed sigil goes along whole, byte for byte, and arrives concealed and locked',
+      arrived === concealedContent && arrived.includes('Ich &lt;b&gt;bin') && arrived.includes(drawnFile)
+        && arrivedFx.lockEntry && arrivedFx.concealed.size === 2, arrived);
+  }
 
   check('an older manifest is named as such', parseManifest(JSON.stringify({ ...manifest, version: 6 })) === 'oldVersion');
   check('a newer manifest is named as such', parseManifest(JSON.stringify({ ...manifest, version: EMERALD_FORMAT_VERSION + 1 })) === 'newVersion');

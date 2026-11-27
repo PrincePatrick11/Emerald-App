@@ -23,6 +23,12 @@ export interface Entry {
   updated_at: string;
   /** Tag IDs (`lib/tagRefs.ts`) — those of tags in the trash stay in place, invisible. */
   tags: string[];
+  /**
+   * Tag IDs the entry's blocks give it while they are there (`block_refs`,
+   * kind `tag`, `BlockProperties.tags`) — never in `entry_tags`. Count with
+   * `tags` in dashboard filters and the tags view (`entryTagIds`).
+   */
+  block_tags?: string[];
   deleted_at: string | null;
   /** Running number over all entries, unique. */
   entry_number?: number;
@@ -63,12 +69,16 @@ export interface DashboardSort {
 
 /**
  * How a dashboard draws its entries: the layout (list, cards, wide cards,
- * timeline) and whether they are grouped (by category; the journal groups by
- * moon phase). A fresh vault writes the built-ins' start values into the row.
+ * timeline), whether they are grouped (by category; the journal groups by
+ * moon phase) and in which form its rows and cards show the info line of
+ * the blocks (`InfoForm`: short — icon and short value — or long, "Label:
+ * value"). A fresh vault writes the built-ins' start values into the row;
+ * what a row lacks is `DEFAULT_DISPLAY`'s.
  */
 export interface DashboardDisplay {
   view: 'list' | 'cards' | 'cards_wide' | 'timeline';
   grouping: 'grouped' | 'flat';
+  info: 'short' | 'long';
 }
 
 /** The key of a built-in dashboard — at the same time its fixed ID. */

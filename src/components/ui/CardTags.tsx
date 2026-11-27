@@ -3,8 +3,9 @@ import type { Tag } from '../../types';
 
 const CHIP_CLASS = 'h-6 inline-flex items-center px-2.5 rounded-full text-xs font-medium whitespace-nowrap border';
 
-function chipStyle(color: string) {
-  return { backgroundColor: `${color}20`, color, borderColor: `${color}40` };
+/** A tag chip's colours, from the tag's own colour; `dashed` for a tag a block gives (`TagInput`). Goes with a `border` class. */
+export function chipStyle(color: string, dashed = false) {
+  return { backgroundColor: `${color}20`, color, borderColor: `${color}${dashed ? '60' : '40'}`, ...(dashed && { borderStyle: 'dashed' }) };
 }
 
 /**

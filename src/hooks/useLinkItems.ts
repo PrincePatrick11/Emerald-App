@@ -4,7 +4,8 @@ import { useEntryStore } from '../store/entryStore';
 import { useTaskStore } from '../store/taskStore';
 import { useCategoryStore } from '../store/categoryStore';
 import { useSettingsStore } from '../store/settingsStore';
-import { buildLinkItems, linkItemsByKey, resolveLink, type ResolvedLink } from '../lib/linkItems';
+import { buildLinkItems, linkItemsByKey, linkTitleIn, resolveLink, type ResolvedLink } from '../lib/linkItems';
+import type { LinkTitleOf } from '../lib/blocks/blockValue';
 import type { SuggestionItem } from '../components/editors/text/SuggestionList';
 
 /** The last result together with its inputs — shared across all callers. */
@@ -50,4 +51,13 @@ export function useLinkItems(): SuggestionItem[] {
 export function useLinkTarget(link: { id: string; targetKind: string; label?: string | null }): ResolvedLink {
   const { t } = useTranslation();
   return resolveLink(linkItemsByKey(useLinkItems()), link, t);
+}
+
+/**
+ * The current title of a link target by its ID, `undefined` once it is gone —
+ * for values that name a link (`blockValueText`). Re-renders on a rename.
+ */
+export function useLinkTitle(): LinkTitleOf {
+  const items = useLinkItems();
+  return useMemo(() => linkTitleIn(items), [items]);
 }

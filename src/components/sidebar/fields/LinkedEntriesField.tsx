@@ -10,6 +10,7 @@ import {
   requestEntryLinkAppend, requestEntryLinkRemove, requestEntryLinkReveal,
 } from '../../../lib/links';
 import { extractInternalLinks } from '../../../lib/internalLinkHtml';
+import { linkedIdsOf } from '../../../lib/blocks/blockRefs';
 import { useCategoryStore } from '../../../store/categoryStore';
 import { categoryLabel } from '../../../lib/categories';
 import { MOON_PHASE_ORDER } from '../../../lib/moonPhase';
@@ -57,8 +58,9 @@ const NO_ITEMS: SuggestionItem[] = [];
 const NO_KEYS: string[] = [];
 
 /**
- * The links of an entry, sorted by category: the link chips
- * of its content. `pending`/`removed` bridge the autosave when editing
+ * The links of an entry, sorted by category: what its blocks report as
+ * linked (`linkedIdsOf` — the list `block_refs` holds, from the content
+ * being edited), each shown with what its chip stored (title, kind). `pending`/`removed` bridge the autosave when editing
  * (see `LinkedEntriesField`).
  *
  * A target in the trash or deleted for good keeps its row, with the title the
@@ -78,7 +80,11 @@ function useLinkedEntries(
     const seen = new Set<string>();
     const live: SuggestionItem[] = [];
     const gone: SuggestionItem[] = [];
-    for (const link of [...extractInternalLinks(content), ...pending]) {
+    // Which entries: what the blocks report as shown links (not a prefill, not
+    // a drawing's pictures); the chip supplies title and kind for each.
+    const linked = linkedIdsOf(content);
+    const chips = extractInternalLinks(content).filter((link) => linked.has(link.id));
+    for (const link of [...chips, ...pending]) {
       const key = itemKey(link);
       if (seen.has(key) || dropped.has(key)) continue;
       seen.add(key);

@@ -1,61 +1,48 @@
+import { parseBlocks } from './blocks/blockHtml';
+import { blockSearchText, entryEffects } from './blocks/blockTypes';
+import { localIsoDay } from './helpers';
+
 /**
- * Plain text out of the editor's HTML, for the global search.
+ * Plain text out of an entry's content, for the global search.
  *
  * An entry's content, as `loadAllContent` assembles it from the block rows, is
- * markup, not text. Searching the raw
- * string would match tag names, `data-id` attributes of internal links and the
- * hashed filenames behind `<img src>`, so every one of them is reduced to its
- * text first.
- *
- * `DOMParser` rather than `innerHTML` on a detached `<div>`: the parsed
- * document is inert, so an `<img onerror>` that arrived through an import never
+ * markup, not text. Searching the raw string would match tag names, `data-id`
+ * attributes of internal links and the hashed filenames behind `<img src>`.
+ * So each block says what of it can be found (`searchText` of its type,
+ * `blockSearchText`): a text its words, a fields block its readable fallback,
+ * a canvas or a drawing nothing. What a block's effect conceals today (a
+ * loaded sigil) is not found: a concealed block is left out, a concealed part
+ * its block leaves out itself.
  */
 
-/**
- * Elements whose edges are word boundaries. Without a separator `textContent`
- * returns `<p>Ende</p><p>Anfang</p>` as `Endeanfang` — which both hides the two
- * words from a search and invents a third.
- *
- * The internal-link span rides along although it is inline: it is one discrete
- * chip in the editor, not a run of text, so two of them in a row are two words.
- * `<strong>` and friends deliberately do not, because they mark up *within* a
- * word — `Ein <strong>fett</strong>es Wort` has to stay `fettes`.
- */
-const SEPARATED_ELEMENTS = 'address, blockquote, br, div, dd, dt, h1, h2, h3, h4, h5, h6, hr, li, ol, p, pre, table, td, th, tr, ul, span[data-type="internalLink"]';
-
-/** Parsed once per entry and revision; see `plainTextFor`. */
+/** Read once per entry and revision; see `plainTextFor`. */
 const cache = new Map<string, { stamp: string; text: string }>();
 
-const parser = new DOMParser();
-
-function htmlToText(html: string): string {
-  if (!html) return '';
-  const doc = parser.parseFromString(html, 'text/html');
-  // TipTap emits neither, but imported content can carry both, and
-  // `textContent` — unlike `innerText` — would hand their source back as if it
-  // were the entry's prose.
-  for (const el of doc.body.querySelectorAll('script, style, noscript')) el.remove();
-  // Both sides, not just the trailing one: an `</a><ul>` would otherwise get no
-  // separator, because the `<a>` before it is not one — `Link` and `eins` would
-  // be a single word. The `\s+` collapse below eats the doubled spaces anyway.
-  for (const el of doc.body.querySelectorAll(SEPARATED_ELEMENTS)) {
-    el.before(' ');
-    el.after(' ');
-  }
-  return (doc.body.textContent ?? '').replace(/\s+/g, ' ').trim();
+/** What the search finds in a content today: the blocks' search texts, in order. */
+export function contentSearchText(content: string, today = localIsoDay()): string {
+  const blocks = parseBlocks(content);
+  const { concealed } = entryEffects(blocks, { today });
+  return blocks
+    .filter((block) => !concealed.has(block.id))
+    .map((block) => blockSearchText(block, { today }))
+    .filter(Boolean)
+    .join(' ');
 }
 
 /**
  * The plain text of one entry, parsed at most once per revision.
  *
- * `stamp` is the entry's `updated_at`: the same id with a newer stamp re-parses,
- * the same stamp is served from the cache. That is what keeps a keystroke in the
+ * Re-parsed when the entry's `updated_at` changes, when its content arrives
+ * after startup (`pendingContent`: empty until then, so its length changes),
+ * and on a new day (what is concealed until a day is found from that day on);
+ * otherwise served from the cache. That is what keeps a keystroke in the
  * search field from re-parsing the whole vault.
  */
-export function plainTextFor(id: string, stamp: string, html: string): string {
+export function plainTextFor(id: string, updatedAt: string, content: string, today = localIsoDay()): string {
+  const stamp = `${updatedAt}|${content.length}|${today}`;
   const cached = cache.get(id);
   if (cached?.stamp === stamp) return cached.text;
-  const text = htmlToText(html);
+  const text = contentSearchText(content, today);
   cache.set(id, { stamp, text });
   return text;
 }

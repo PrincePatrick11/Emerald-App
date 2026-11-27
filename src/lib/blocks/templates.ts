@@ -2,7 +2,7 @@ import { generateId } from '../helpers';
 import { hasOwnTitle } from '../entryTitle';
 import { parseBlocks, serializeBlocks } from './blockHtml';
 import { isDefinitionId } from './definitions';
-import { withMappedChargeTargets } from './sigil';
+import { copiedBlock } from './blockTypes';
 import { TEXT_BLOCK_TYPE, type BlockInstance } from './types';
 
 /**
@@ -81,25 +81,16 @@ export function activeTemplate(templates: readonly Template[], id: string | null
   return id ? templates.find((t) => t.id === id) : undefined;
 }
 
-/** A charge target (block ID or `<block ID>:<element ID>`) mapped to the new block ID. */
-function remapTarget(target: string, ids: ReadonlyMap<string, string>): string {
-  const colon = target.indexOf(':');
-  const next = ids.get(colon < 0 ? target : target.slice(0, colon));
-  return next === undefined ? target : next + (colon < 0 ? '' : target.slice(colon));
-}
-
 /**
  * The template's blocks as new blocks for an entry: their own IDs (two
- * applications in the same entry do not interfere), charge targets mapped to
- * the new IDs. Everything else comes as it is — a drawn or loaded sigil too.
+ * applications in the same entry do not interfere), each block copied as its
+ * type says (`copiedBlock`: what it points at among them follows the new IDs).
+ * Everything else comes as it is — a drawn or loaded sigil too.
  */
 export function instantiateTemplateBlocks(template: Pick<Template, 'content'>): BlockInstance[] {
   const blocks = parseBlocks(template.content);
   const ids = new Map(blocks.map((b) => [b.id, generateId()]));
-  return blocks.map((block) => withMappedChargeTargets(
-    { ...block, id: ids.get(block.id)! },
-    (target) => remapTarget(target, ids),
-  ));
+  return blocks.map((block) => copiedBlock({ ...block, id: ids.get(block.id)! }, { ids }));
 }
 
 /** Title, content and tags with which a new entry starts — and the template they came from. */

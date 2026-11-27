@@ -35,6 +35,8 @@ export const BLOCK_ATTR = {
   config: 'data-block-config',
   /** JSON: scalar values of the block. References and images are in the markup (slots). */
   data: 'data-block-data',
+  /** JSON: the block's settings as its type describes them (`BlockTypeDef.settings`); missing = all at their start values. */
+  settings: 'data-block-settings',
 } as const;
 
 /**

@@ -5,7 +5,7 @@ import { BASELINE_VERSION, FRESH_START_VERSION, TABLES, createSchema, purgeCateg
 import { seedAltarTemplate, seedSigilTemplate } from './templateRows';
 import i18n from '../i18n';
 import { useSettingsStore } from '../store/settingsStore';
-import { clearSavedBlocks } from './blockStore';
+import { clearSavedBlocks, dropBlockTagStatements } from './blockStore';
 
 /**
  * A vault from before the fresh start (`FRESH_START_VERSION`): its schema came
@@ -178,12 +178,38 @@ type Migration = {
 
 /**
  * The steps that bring a vault created under an earlier state of this schema
- * up to `schema.ts`. Empty since the fresh start: the old chain is gone, and
+ * up to `schema.ts`. They start at the fresh start: the old chain is gone, and
  * vaults from before it are refused (`VAULT_OUTDATED`). A schema change
  * changes `schema.ts`, appends a step here and raises `BASELINE_VERSION` to
  * its version (see "Rules for Future Schema Changes" in `database.md`).
  */
-const MIGRATIONS: Migration[] = [];
+const MIGRATIONS: Migration[] = [
+  {
+    // `block_refs` also holds the tags a block gives its entry: its two
+    // CHECKs widen, so the table is built anew under its name and the rows
+    // are copied over (nothing points at it). One batch, one transaction.
+    // The DDL is the step's own, as of v103: a released step never follows
+    // later changes of `schema.ts`.
+    version: 103,
+    name: 'block_refs_tags',
+    up: async (db) => {
+      await db.batch([
+        ['ALTER TABLE block_refs RENAME TO block_refs_v102'],
+        [`
+    CREATE TABLE block_refs (
+      block_row INTEGER NOT NULL REFERENCES blocks(row_id) ON DELETE CASCADE,
+      target_kind TEXT NOT NULL CHECK (target_kind IN ('entry', 'image', 'icon', 'tag')),
+      target TEXT NOT NULL,
+      role TEXT NOT NULL CHECK (role IN ('content', 'render', 'layer', 'background', 'default', 'icon', 'tag')),
+      PRIMARY KEY (block_row, target_kind, target, role)
+    )`],
+        ['INSERT INTO block_refs (block_row, target_kind, target, role) SELECT block_row, target_kind, target, role FROM block_refs_v102'],
+        ['DROP TABLE block_refs_v102'],
+        ['CREATE INDEX idx_block_refs_target ON block_refs(target_kind, target)'],
+      ]);
+    },
+  },
+];
 
 /**
  * Where the file stands: `'empty'` (a new vault), `'unfinished'` (a new vault
@@ -340,18 +366,21 @@ async function runPeriodicCleanup(db: Database, retentionDays: number | null): P
   // Permanently delete trash contents older than the configured period — "never" skips this.
   if (retentionDays !== null) {
     const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString();
-    // A tag takes its links with it (CASCADE); the dashboards' filters
-    // name it without a foreign key.
+    // A tag takes its links with it (CASCADE); the dashboards' filters and
+    // the tags blocks give (`block_refs`) name it without a foreign key.
     const expiredTags = await db.select<{ id: string }[]>(
       'SELECT id FROM tags WHERE deleted_at IS NOT NULL AND deleted_at < $1',
       [cutoff]
     );
     await replaceTagsInDashboards(db, expiredTags.map((t) => t.id));
     // One transaction instead of one commit per table — this runs on every open.
-    await db.batch(CLEANUP_TABLES.map((table) => [
-      `DELETE FROM ${table} WHERE deleted_at IS NOT NULL AND deleted_at < $1`,
-      [cutoff],
-    ] as const));
+    await db.batch([
+      ...CLEANUP_TABLES.map((table) => [
+        `DELETE FROM ${table} WHERE deleted_at IS NOT NULL AND deleted_at < $1`,
+        [cutoff],
+      ] as const),
+      ...dropBlockTagStatements(expiredTags.map((t) => t.id)),
+    ]);
     // Categories last, after their contents are uncategorized. The database
     // is enough here: the stores only load after `getDb()`.
     const expired = await db.select<{ id: string }[]>(

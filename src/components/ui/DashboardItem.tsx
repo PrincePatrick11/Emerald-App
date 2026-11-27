@@ -1,4 +1,4 @@
-import type { HTMLAttributes, MouseEvent, ReactNode } from 'react';
+import { Fragment, type HTMLAttributes, type MouseEvent, type ReactNode } from 'react';
 import { useUIStore } from '../../store/uiStore';
 import { isImageIcon } from '../../lib/helpers';
 import { iconSrc } from '../../lib/icons';
@@ -92,22 +92,37 @@ function RowSymbol({ children }: { children: ReactNode }) {
   return <span className="min-w-5 flex items-center justify-center flex-shrink-0 text-base">{children}</span>;
 }
 
-/** Inside a row: symbol and name on the left, metadata on the right. */
-export function RowContent({ icon, title, meta }: { icon?: ReactNode; title: ReactNode; meta?: ReactNode }) {
+/**
+ * Inside a row: symbol and name on the left, metadata on the right. `info`
+ * follows the metadata, each part after a "·" and never cut: when room runs
+ * out, the metadata is shortened first.
+ */
+export function RowContent({ icon, title, meta, info = [] }: { icon?: ReactNode; title: ReactNode; meta?: ReactNode; info?: readonly ReactNode[] }) {
   return (
     <>
       {icon != null && <RowSymbol>{icon}</RowSymbol>}
       <span className="flex-1 min-w-0 truncate text-sm text-soft">{title}</span>
-      {meta != null && <span className="text-xs text-muted max-w-[60%] truncate flex-shrink-0">{meta}</span>}
+      {(meta != null || info.length > 0) && (
+        <span className="text-xs text-muted max-w-[60%] min-w-0 flex-shrink-0 flex items-center gap-1">
+          {meta != null && <span className="min-w-0 truncate">{meta}</span>}
+          {info.map((part, i) => <Fragment key={i}>{(meta != null || i > 0) && <span aria-hidden>·</span>}{part}</Fragment>)}
+        </span>
+      )}
     </>
   );
 }
 
-/** Inside a card: the same three things, stacked. `children` follow below (an entry's tags). */
-export function CardContent({ icon, title, meta, children }: {
+/**
+ * Inside a card: the same three things, stacked. `info` gets a line of its
+ * own below the metadata, wrapping instead of cut — a part too wide for a
+ * narrow card wraps inside itself (`.card-info`); `children` follow below
+ * (an entry's tags).
+ */
+export function CardContent({ icon, title, meta, info = [], children }: {
   icon: ReactNode;
   title: ReactNode;
   meta?: ReactNode;
+  info?: readonly ReactNode[];
   children?: ReactNode;
 }) {
   return (
@@ -115,6 +130,7 @@ export function CardContent({ icon, title, meta, children }: {
       <div className="flex items-center text-xl mb-2 h-7">{icon}</div>
       <div className="text-sm font-medium text-secondary truncate mb-1">{title}</div>
       {meta != null && <div className="text-xs text-muted truncate">{meta}</div>}
+      {info.length > 0 && <div className="card-info text-xs text-muted flex flex-wrap gap-x-2.5 gap-y-0.5 mt-0.5">{info}</div>}
       {children}
     </>
   );

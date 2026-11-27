@@ -22,19 +22,24 @@ export function useTextEditorRegistry(getOrder: () => string[]) {
   const focusOnMountRef = useRef<string | null>(null);
   const [toolbarEditor, setToolbarEditor] = useState<Editor | null>(null);
 
-  /** The registered editors in document order, not in order of registration. */
-  const orderedEditors = useCallback((): Editor[] => {
+  /**
+   * The registered editors in document order, not in order of registration;
+   * with `keep`, only those whose key it lets through (a host passing over
+   * some of its editors for a request).
+   */
+  const orderedEditors = useCallback((keep?: (key: string) => boolean): Editor[] => {
     const editors = editorsRef.current;
     return getOrderRef.current().flatMap((key) => {
-      const entry = editors.get(key);
+      const entry = keep && !keep(key) ? undefined : editors.get(key);
       return entry ? [entry.editor] : [];
     });
   }, []);
 
-  const targetEditor = useCallback((): Editor | null => {
-    const focused = lastFocusedRef.current && editorsRef.current.get(lastFocusedRef.current);
+  const targetEditor = useCallback((keep?: (key: string) => boolean): Editor | null => {
+    const last = lastFocusedRef.current;
+    const focused = last && (!keep || keep(last)) && editorsRef.current.get(last);
     if (focused) return focused.editor;
-    const editors = orderedEditors();
+    const editors = orderedEditors(keep);
     return editors[editors.length - 1] ?? null;
   }, [orderedEditors]);
 

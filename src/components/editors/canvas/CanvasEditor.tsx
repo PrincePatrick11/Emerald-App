@@ -64,6 +64,8 @@ export interface CanvasEditorHandle {
   clientToArtboard: (clientX: number, clientY: number) => { x: number; y: number } | null;
   /** The middle of what is visible of the artboard, for placing new elements. */
   visibleCentre: () => { x: number; y: number };
+  /** Ask format, area, size and background for saving as a picture (`ExportDialog`) — only with `onExport`. */
+  openExport: () => void;
 }
 
 export interface CanvasEditorProps {
@@ -104,9 +106,9 @@ export interface CanvasEditorProps {
   /** Opening an element whose type has no typing in place (double-click or Enter), e.g. in an editor of its own. */
   onEditElement?: (element: CanvasElement) => void;
   /**
-   * Saving as a picture, offered in the toolbar when given and
-   * `features.export` is on: the editor asks format, area, size and
-   * background (`ExportDialog`), the place renders and saves.
+   * Saving as a picture: the place opens the dialog (`openExport`, e.g. from
+   * a block's action), the editor asks format, area, size and background
+   * (`ExportDialog`), the place renders and saves.
    */
   onExport?: (options: CanvasExportOptions) => void;
   /**
@@ -343,7 +345,8 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
       return toArtboard(clientX, clientY);
     },
     visibleCentre,
-  }), [toArtboard, visibleCentre]);
+    openExport: () => { if (onExport) setExportOpen(true); },
+  }), [toArtboard, visibleCentre, onExport]);
 
   // Wheel: pinch or ⌘/Ctrl zooms at the pointer, otherwise it pans.
   useEffect(() => {
@@ -1092,7 +1095,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(function 
     undo: history.undo, redo: history.redo, tool: addTool, setTool: setAddTool, removeSelected, duplicate,
     arrange: doArrange, align: doAlign, distribute: doDistribute, update: updateSelected,
     zoom: view.zoom, zoomIn: () => zoomTo(view.zoom * 1.25), zoomOut: () => zoomTo(view.zoom / 1.25), fit,
-    onExport: onExport ? () => setExportOpen(true) : undefined, insertImage: onInsertImage, rulers: showRulers, canRulers: editable && features.guides && !paintingId,
+    insertImage: onInsertImage, rulers: showRulers, canRulers: editable && features.guides && !paintingId,
     toggleRulers: () => setRulers((v) => { rulersShown = !v; return !v; }), guidesLocked, toggleGuidesLocked,
     background: canvasBackground, setBackground: editable && !paintingId ? onCanvasBackgroundChange : undefined, backgroundImages,
     group: doGroup, ungroup: doUngroup, listOpen, toggleList: () => setListOpen((v) => !v),
@@ -1440,7 +1443,6 @@ export interface CanvasController {
   zoomIn: () => void;
   zoomOut: () => void;
   fit: () => void;
-  onExport?: () => void;
   /** The rulers along the stage, with the guides pulled out of them. */
   rulers: boolean;
   canRulers: boolean;

@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import { useOutsideClick } from '../../hooks/useOutsideClick';
 import { createPortal } from 'react-dom';
 import type { ReactNode } from 'react';
+import { Check } from 'lucide-react';
 
 export interface ContextMenuAction {
   label: string;
@@ -16,6 +17,8 @@ export interface ContextMenuAction {
   separator?: boolean;
   /** The key that does the same, shown at the entry's end, such as `⌘D`. */
   shortcut?: string;
+  /** Makes it a checkmark entry (a setting that is on or off) — the tick takes the icon's place, as in `MenuDropdown`. */
+  checked?: boolean;
 }
 
 interface Props {
@@ -92,13 +95,17 @@ export default function ContextMenu({ x, y, actions, onClose, align = 'left', mi
           // MenuDropdown and TitleBarMenuButton.
           onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
           onClick={() => { action.onClick(); onClose(); }}
+          role={action.checked === undefined ? undefined : 'menuitemcheckbox'}
+          aria-checked={action.checked}
           className={`context-menu-item w-full text-left px-3 py-2 text-xs flex items-center gap-2.5 transition-colors ${
             action.danger
               ? 'context-menu-item-danger text-danger hover:text-danger-raise hover:bg-danger-wash'
               : 'context-menu-item-default text-soft hover:text-primary hover:bg-well-raise'
           }${action.disabled ? ' opacity-45 cursor-default pointer-events-none' : ''}`}
         >
-          {action.icon}
+          {action.checked === undefined
+            ? action.icon
+            : <span className="w-3 flex-shrink-0 inline-flex">{action.checked && <Check size={12} />}</span>}
           {action.label}
           {action.shortcut && <span className="context-menu-shortcut">{action.shortcut}</span>}
         </button>,

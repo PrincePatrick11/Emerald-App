@@ -1,6 +1,7 @@
 import type { LinkTargetKind } from '../types';
 import { ITEM_ID_RE } from './helpers';
 import { htmlTags } from './htmlTags';
+import type { LinkTitleOf } from './blocks/blockValue';
 
 /**
  * Reading and writing the stored HTML of an internal link chip —
@@ -119,6 +120,90 @@ export function rewriteInternalLinkIds(html: string, next: (id: string) => strin
     // The ID comes from a file: never let it close the attribute.
     return tag.replace(DATA_ID_ATTR_RE, () => `data-id="${to.replace(/"/g, '&quot;')}"`);
   });
+}
+
+/**
+ * Replaces whole link chips — the start tag, everything inside (nested spans
+ * counted), the end tag — through the tags, without a DOM; everything else
+ * stays byte for byte. `pick` looks at a chip's start tag and returns what
+ * `render` needs to write in its place, or `undefined` to leave it; a chip
+ * without its end tag stays as it is.
+ */
+function replaceInternalLinkChips<R>(
+  html: string,
+  pick: (startTag: string) => R | undefined,
+  render: (startTag: string, picked: R) => string,
+): string {
+  if (!html || !html.includes('internalLink')) return html;
+  let out = '';
+  let from = 0;
+  let open: { index: number; tag: string; picked: R } | null = null;
+  let depth = 0;
+  for (const t of htmlTags(html)) {
+    if (t.name.toLowerCase() !== 'span') continue;
+    if (open) {
+      if (!t.close) depth++;
+      else if (depth > 0) depth--;
+      else {
+        out += html.slice(from, open.index) + render(open.tag, open.picked);
+        from = t.index + t.length;
+        open = null;
+      }
+      continue;
+    }
+    if (t.close) continue;
+    const tag = html.slice(t.index, t.index + t.length);
+    if (tagAttr(tag, 'data-type') !== 'internalLink') continue;
+    const picked = pick(tag);
+    if (picked === undefined) continue;
+    open = { index: t.index, tag, picked };
+    depth = 0;
+  }
+  return out + html.slice(from);
+}
+
+/** A chip's stored title, from its start tag. */
+function storedLabel(startTag: string): string {
+  return decodeHtmlAttr(tagAttr(startTag, 'data-label') ?? '');
+}
+
+/**
+ * The markup with every chip to `id` replaced by its stored label as text —
+ * a link taken out while its word stays (`replaceInternalLinkChips`).
+ */
+export function withoutInternalLinksTo(html: string, id: string): string {
+  return replaceInternalLinkChips(
+    html,
+    (tag) => (tagAttr(tag, 'data-id') === id ? storedLabel(tag) : undefined),
+    (_tag, label) => escapeHtml(label),
+  );
+}
+
+const DATA_LABEL_ATTR_RE = /\bdata-label=("[^"]*"|'[^']*')/i;
+
+/**
+ * The markup with every chip naming its target's current title (`titleOf`,
+ * the lookup lists and the properties panel use) instead of the one stored
+ * when the link was set — for the exports, which show what the app shows. A
+ * chip whose target `titleOf` does not know (gone) keeps its stored title
+ * (`replaceInternalLinkChips`).
+ */
+export function withCurrentLinkTitles(html: string, titleOf: LinkTitleOf): string {
+  return replaceInternalLinkChips(
+    html,
+    (tag) => {
+      const id = tagAttr(tag, 'data-id');
+      const title = id ? titleOf({ id, targetKind: linkTargetKindOf(tagAttr(tag, 'data-target-kind')) }) : undefined;
+      return title === undefined || title === storedLabel(tag) ? undefined : title;
+    },
+    (tag, title) => {
+      const label = escapeHtml(title);
+      const start = DATA_LABEL_ATTR_RE.test(tag)
+        ? tag.replace(DATA_LABEL_ATTR_RE, () => `data-label="${label}"`)
+        : tag.replace(/>$/, ` data-label="${label}">`);
+      return start + label + '</span>';
+    },
+  );
 }
 
 /**

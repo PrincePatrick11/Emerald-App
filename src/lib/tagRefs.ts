@@ -1,5 +1,6 @@
 import type Database from './sqlite';
 import { jsonArray } from './row';
+import { isTagId } from './helpers';
 
 /**
  * Tags are attached to entries, templates and pictures by **ID**, through the
@@ -24,10 +25,6 @@ export type TagOwner = keyof typeof TAG_LINKS;
 /** Ids bound per query, below SQLite's variable limit. */
 export const SQL_PARAM_CHUNK = 500;
 
-/** A tag ID from a foreign source (backup): only harmless characters, like `isDefinitionId`. */
-export function isTagId(id: unknown): id is string {
-  return typeof id === 'string' && /^[\w-]{1,100}$/.test(id);
-}
 
 /** The tag IDs of a list from a foreign source (a backup row) — duplicates once, foreign values dropped. */
 export function tagIdList(raw: unknown): string[] {

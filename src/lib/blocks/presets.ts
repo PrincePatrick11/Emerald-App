@@ -1,79 +1,17 @@
-import {
-  Brush, Calendar, ChevronsUpDown, Frame, Hash, Image, Link2, ListChecks, Moon, PenTool, Sparkles, TextCursorInput, ToggleLeft, Type, Zap,
-  type LucideIcon,
-} from 'lucide-react';
-import { AltarIcon } from '../altarIcon';
-import { createSigilCalcBlock, createSigilCanvasBlock, createSigilChargeBlock } from './sigil';
-import { createTextBlock } from './blockHtml';
-import { ALTAR_BLOCK_TYPE, createCanvasBlock } from './canvas';
-import { createPaintBlock, isSigilDrawing } from './paint';
-import {
-  activeElements, createFieldsBlock, ELEMENT_KINDS, elementKindLabelKey, FIELDS_BLOCK_TYPE, isSigilKind, parseFields,
-  type ElementKind, type FallbackText,
-} from './fields';
+import { fieldFallbackText } from './fields';
 import { instantiateDefinition, type BlockDefinition } from './definitions';
-import type { BlockGroup, BlockTypeMeta } from './blockTypes';
+import { blockTypePresets } from './blockTypes';
+import type { BlockPreset } from './blockType';
 import type { BlockInstance } from './types';
 
 /**
- * What "Add block" offers. An entry is not the same as a block type: each
- * field kind is its own entry but creates a `core.fields` with one element.
- * Behind them come the custom blocks from the blocks view (`def:<id>`) —
- * the caller reads them from the store and passes them in, because
- * `lib/blocks` knows no stores.
+ * What "Add block" offers: what each type offers of itself (`BlockTypeDef.presets`,
+ * a field per kind for the fields block), in the order the types are
+ * registered. Behind them come the custom blocks from the blocks view
+ * (`def:<id>`) — the caller reads them from the store and passes them in,
+ * because `lib/blocks` knows no stores.
  */
-interface BlockPreset {
-  id: string;
-  labelKey: string;
-  /** Explanation as a tooltip in the overview of the blocks view — only where the label is not enough. */
-  descriptionKey?: string;
-  icon: LucideIcon;
-  group: BlockGroup;
-  create: () => BlockInstance;
-}
-
-/** The glyph of a block: a lucide icon, or the emoji of a custom block. */
-export type GlyphSource = LucideIcon | string;
-
-export const ELEMENT_KIND_ICONS: Record<ElementKind, LucideIcon> = {
-  text: Type,
-  shorttext: TextCursorInput,
-  number: Hash,
-  date: Calendar,
-  select: ChevronsUpDown,
-  toggle: ToggleLeft,
-  checklist: ListChecks,
-  link: Link2,
-  image: Image,
-  moon: Moon,
-  sigilCalc: Sparkles,
-  sigilCanvas: PenTool,
-  sigilCharge: Zap,
-};
-
-const KIND_GROUPS: Partial<Record<ElementKind, BlockGroup>> = { link: 'reference', image: 'media', moon: 'moon' };
-
-// Text and the sigil parts are not offered as fields of their own: one inserts
-// the text block, and the three sigil presets below (calculator and charge as
-// a fields block with that one part, the drawing as a sigil paint block).
-const FIELD_PRESET_KINDS = ELEMENT_KINDS.filter((kind) => kind !== 'text' && !isSigilKind(kind));
-
-export const BLOCK_PRESETS: readonly BlockPreset[] = [
-  { id: 'text', labelKey: 'blocks.types.text.label', descriptionKey: 'blocks.types.text.description', icon: Type, group: 'text', create: () => createTextBlock() },
-  ...FIELD_PRESET_KINDS.map((kind): BlockPreset => ({
-    id: `field.${kind}`,
-    labelKey: elementKindLabelKey(kind),
-    icon: ELEMENT_KIND_ICONS[kind],
-    group: KIND_GROUPS[kind] ?? 'fields',
-    create: () => createFieldsBlock(kind),
-  })),
-  { id: 'canvas', labelKey: 'blocks.types.canvas.label', descriptionKey: 'blocks.types.canvas.description', icon: Frame, group: 'media', create: () => createCanvasBlock() },
-  { id: 'paint', labelKey: 'blocks.types.paint.label', descriptionKey: 'blocks.types.paint.description', icon: Brush, group: 'media', create: createPaintBlock },
-  { id: 'altar', labelKey: 'blocks.types.altar.label', descriptionKey: 'blocks.types.altar.description', icon: AltarIcon, group: 'media', create: () => createCanvasBlock(ALTAR_BLOCK_TYPE) },
-  { id: 'sigil.calc', labelKey: 'blocks.types.sigilCalc.label', descriptionKey: 'blocks.types.sigilCalc.description', icon: Sparkles, group: 'sigil', create: createSigilCalcBlock },
-  { id: 'sigil.canvas', labelKey: 'blocks.types.sigilCanvas.label', descriptionKey: 'blocks.types.sigilCanvas.description', icon: PenTool, group: 'sigil', create: createSigilCanvasBlock },
-  { id: 'sigil.charge', labelKey: 'blocks.types.sigilCharge.label', descriptionKey: 'blocks.types.sigilCharge.description', icon: Zap, group: 'sigil', create: createSigilChargeBlock },
-];
+export const BLOCK_PRESETS: readonly BlockPreset[] = blockTypePresets();
 
 const DEFINITION_PRESET_PREFIX = 'def:';
 
@@ -84,31 +22,16 @@ export function definitionPresetId(defId: string): string {
 
 /**
  * A new block from a preset — `null` if it does not (or no longer) exist.
- * `text` writes the fallback of a custom block's defaults.
+ * `t` words the readable fallback a custom block's copy writes along.
  */
 export function createFromPreset(
   presetId: string,
   definitions: readonly BlockDefinition[],
-  text: FallbackText,
+  t: (key: string) => string,
 ): BlockInstance | null {
   if (presetId.startsWith(DEFINITION_PRESET_PREFIX)) {
     const def = definitions.find((d) => d.id === presetId.slice(DEFINITION_PRESET_PREFIX.length));
-    return def ? instantiateDefinition(def, text) : null;
+    return def ? instantiateDefinition(def, fieldFallbackText(t)) : null;
   }
   return BLOCK_PRESETS.find((p) => p.id === presetId)?.create() ?? null;
-}
-
-/**
- * The glyph of a block: a copy of a custom block carries its emoji,
- * a fields block with exactly one element the icon of its kind.
- */
-export function blockIcon(block: BlockInstance, meta: BlockTypeMeta | undefined): GlyphSource | undefined {
-  if (meta?.id === FIELDS_BLOCK_TYPE) {
-    const model = parseFields(block);
-    if (model.icon) return model.icon;
-    const elements = activeElements(model);
-    if (elements.length === 1) return ELEMENT_KIND_ICONS[elements[0].kind];
-  }
-  if (meta && isSigilDrawing(block)) return ELEMENT_KIND_ICONS.sigilCanvas;
-  return meta?.icon;
 }

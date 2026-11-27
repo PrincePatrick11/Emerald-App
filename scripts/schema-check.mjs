@@ -137,8 +137,8 @@ writeFileSync(
    export { assertPayloadReferencesResolve, collectVaultContent, definitionRows, doMerge, doReplace, FULL_BACKUP_OPTIONS, insertBlockDefinitions, prepareRawDatabase, resolveImportedCategories, vaultContentOf, vaultManifestOf } from '${root}/src/lib/dbBackup';
    export { categoryRowsOf, contentToBlocks, manifestCategoryOf, parseManifest, parseVaultManifest, usedDefinitionIds, EMERALD_FORMAT_VERSION } from '${root}/src/lib/emerald/manifest';
    export { invalidateVaultCache } from '${root}/src/lib/vaultManager';
-   export { clearSavedBlocks, readContents, replaceOwnerBlocks } from '${root}/src/lib/blockStore';
-   export { entriesWithFieldValue } from '${root}/src/lib/blocks/blockQuery';
+   export { clearSavedBlocks, readContents, replaceOwnerBlocks, retagBlocks, dropBlockTagStatements } from '${root}/src/lib/blockStore';
+   export { registerBlockType } from '${root}/src/lib/blocks/blockTypes';
    export { collectImageUses } from '${root}/src/lib/imageUsage';
    export { imageDetailsOf, importImageDetails } from '${root}/src/lib/emerald/imageDetails';`
 );
@@ -180,7 +180,7 @@ const {
   assertPayloadReferencesResolve, collectVaultContent, definitionRows, doMerge, doReplace, insertBlockDefinitions,
   resolveImportedCategories, vaultContentOf, vaultManifestOf, FULL_BACKUP_OPTIONS, prepareRawDatabase,
   categoryRowsOf, contentToBlocks, manifestCategoryOf, parseManifest, parseVaultManifest, usedDefinitionIds, EMERALD_FORMAT_VERSION,
-  invalidateVaultCache, clearSavedBlocks, readContents, replaceOwnerBlocks, entriesWithFieldValue, collectImageUses,
+  invalidateVaultCache, clearSavedBlocks, readContents, replaceOwnerBlocks, retagBlocks, dropBlockTagStatements, registerBlockType, collectImageUses,
   imageDetailsOf, importImageDetails,
 } = await import(pathToFileURL(bundlePath).href);
 
@@ -369,11 +369,11 @@ console.log('\n2. Vaults from another version are refused and stay as they were\
     CREATE TABLE entries (id TEXT PRIMARY KEY, tags TEXT NOT NULL DEFAULT '[]');`);
   check('a vault of v101 (tags as JSON) is refused as outdated, unchanged', await refuses(jsonTags, VAULT_OUTDATED));
 
-  // The mechanism for the steps to come: a vault at the fresh start runs a
+  // The mechanism for the steps to come: a vault at the baseline runs a
   // step above it once, stamps it, and keeps the schema otherwise.
   const db = await freshVault('future-step.db');
   let ran = 0;
-  const step = { version: FRESH_START_VERSION + 1, name: 'harness_step', up: async (d) => { ran++; await d.execute('CREATE TABLE harness_step (id TEXT)'); } };
+  const step = { version: BASELINE_VERSION + 1, name: 'harness_step', up: async (d) => { ran++; await d.execute('CREATE TABLE harness_step (id TEXT)'); } };
   await runMigrations(db, [step], step.version);
   await runMigrations(db, [step], step.version);
   const stamped = (await db.select('SELECT version FROM schema_version ORDER BY version')).map((r) => r.version).join();
@@ -381,6 +381,39 @@ console.log('\n2. Vaults from another version are refused and stay as they were\
     ran === 1 && stamped === `${BASELINE_VERSION},${step.version}`, `${ran} / ${stamped}`);
   check('the runner refuses steps that do not end at the baseline',
     await throwsCode(() => runMigrations(db, [step]), 'BASELINE_VERSION'));
+  db.close();
+}
+
+console.log('\n2b. v102 to v103: block_refs takes the tags a block gives its entry\n');
+
+{
+  // A vault as v102 left it: block_refs with the narrower CHECKs, one row in it.
+  const db = await freshVault('v102.db');
+  db.raw.exec(`
+    DROP TABLE block_refs;
+    CREATE TABLE block_refs (
+      block_row INTEGER NOT NULL REFERENCES blocks(row_id) ON DELETE CASCADE,
+      target_kind TEXT NOT NULL CHECK (target_kind IN ('entry', 'image', 'icon')),
+      target TEXT NOT NULL,
+      role TEXT NOT NULL CHECK (role IN ('content', 'render', 'layer', 'background', 'default', 'icon')),
+      PRIMARY KEY (block_row, target_kind, target, role)
+    );
+    CREATE INDEX idx_block_refs_target ON block_refs(target_kind, target);
+    DELETE FROM schema_version;
+    INSERT INTO schema_version VALUES (102, 'baseline', '2026-11-20');
+    INSERT INTO entries (id, title, created_at, updated_at) VALUES ('e1', 'Eins', '${now}', '${now}');
+    INSERT INTO blocks (id, entry_id, position, type, updated_at) VALUES ('b1', 'e1', 'a0', 'core.text', '${now}');
+    INSERT INTO block_refs SELECT row_id, 'entry', 'e2', 'content' FROM blocks WHERE id = 'b1';`); // lang-ok
+  await runMigrations(db);
+  check('the migrated vault has the schema of a fresh one', JSON.stringify(await readSchema(db)) === JSON.stringify(schemaA));
+  const kept = await db.select('SELECT target_kind, target, role FROM block_refs');
+  check('its references stay', JSON.stringify(kept) === JSON.stringify([{ target_kind: 'entry', target: 'e2', role: 'content' }]), JSON.stringify(kept));
+  await db.execute("INSERT INTO block_refs SELECT row_id, 'tag', 't1', 'tag' FROM blocks WHERE id = 'b1'");
+  check('a tag can be referenced now', (await db.select("SELECT COUNT(*) AS n FROM block_refs WHERE target_kind = 'tag'"))[0].n === 1);
+  const stamps = (await db.select('SELECT version FROM schema_version ORDER BY version')).map((r) => r.version).join();
+  check('stamped with the step', stamps === `102,${BASELINE_VERSION}`, stamps);
+  const violations = await db.select('PRAGMA foreign_key_check');
+  check('foreign_key_check empty after the step', violations.length === 0, JSON.stringify(violations));
   db.close();
 }
 
@@ -637,9 +670,8 @@ console.log('\n7. Seeds: built-in categories, starter set, built-in templates an
     JSON.stringify(starts)
   );
   check(
-    'with calculator, drawing and charge as fields and paint blocks (harness: English name)',
-    t?.name === 'Sigil' && !content.includes('core.sigil.') && content.includes('data-block="core.paint"')
-      && ['sigilCalc', 'sigilCharge'].every((kind) => content.includes(kind)),
+    'with one sigil block (harness: English name)',
+    t?.name === 'Sigil' && (content.match(/data-block="/g) ?? []).length === 1 && content.includes('data-block="core.sigil"'),
     content
   );
   check('the altar template, the start template of "altars"; no other category has one',
@@ -756,7 +788,7 @@ console.log('\n9. Block rows\n');
 {
   const db = await freshVault('blocks.db');
   const [seeded] = await db.select("SELECT COUNT(*) AS n FROM blocks WHERE template_id IN ('core-sigil', 'core-altar')");
-  check('the seeded templates have their block rows', seeded.n >= 4, seeded);
+  check('the seeded templates have their block rows', seeded.n >= 3, JSON.stringify(seeded));
 
   const linked = '44444444-4444-4444-4444-444444444444';
   const chip = `<span data-type="internalLink" class="internal-link" data-id="${linked}" data-target-kind="entry" data-label="Ziel">Ziel</span>`;
@@ -799,7 +831,7 @@ console.log('\n9. Block rows\n');
   db.close();
 }
 
-console.log('\n10. Readers of the block rows: "Images", image cleanup, field values\n');
+console.log('\n10. Readers of the block rows: "Images", image cleanup\n');
 
 {
   const db = await freshVault('readers.db');
@@ -807,10 +839,9 @@ console.log('\n10. Readers of the block rows: "Images", image cleanup, field val
   const name = (c) => `${c.repeat(64)}.png`;
   const [shown, render, layer, tplPic, trashed] = ['1', '2', '3', '4', '5'].map(name);
   const enc = (value) => JSON.stringify(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
-  // A custom block with a drawing part (#107): its render and layer are the drawing.
-  const part = `<section data-block="core.fields" data-block-id="sp" data-block-config="${enc({ elements: [{ id: 'd', kind: 'sigilCanvas', label: '' }] })}"`
-    + ` data-block-data="${enc({ values: { d: { v: 1, layers: [{ id: 'L1', image: true }] } } })}">`
-    + `<dl><dt>Zeichnung</dt><dd data-block-slot="el:d"><img src="${render}" alt="" data-paint="render"><img src="${layer}" alt="" data-paint="L1"></dd></dl></section>`; // lang-ok
+  // A sigil with a drawing part (#107): its render and layer are the drawing.
+  const part = `<section data-block="core.sigil" data-block-id="sp" data-block-data="${enc({ drawing: { v: 1, layers: [{ id: 'L1', image: true }] } })}">`
+    + `<div data-sigil-part="drawing"><img src="${render}" alt="" data-paint="render"><img src="${layer}" alt="" data-paint="L1"></div></section>`;
   const text = `<section data-block="core.text" data-block-id="tx"><p><img src="${shown}"></p></section>`;
   await insertWithStack(db, 'entries', { id: 'u1', title: 'Uses', created_at: now, updated_at: now }, part + text);
   await insertWithStack(db, 'entries', { id: 'u2', title: 'Gone', created_at: now, updated_at: now, deleted_at: now }, `<p><img src="${trashed}"></p>`);
@@ -853,24 +884,6 @@ console.log('\n10. Readers of the block rows: "Images", image cleanup, field val
   check('Images: a cover is a use of its entry, with the role cover',
     ((await collectImageUses(db)).get(name('8')) ?? []).map((u) => `${u.kind}:${u.id}:${u.role}`).join() === 'entry:u1:cover');
   check('image cleanup: a cover is in use', (await collectUsedImageFilenames(db)).has(name('8')));
-
-  // Field values through SQLite's JSON functions (#37).
-  const fields = (id, values) => `<section data-block="core.fields" data-block-id="${id}"`
-    + ` data-block-config="${enc({ elements: [{ id: 'n1', kind: 'number', label: 'N' }, { id: 's1', kind: 'shorttext', label: 'S' }, { id: 'b1', kind: 'toggle', label: 'B' }] })}"`
-    + ` data-block-data="${enc({ values })}"><dl></dl></section>`;
-  await insertWithStack(db, 'entries', { id: 'f1', title: 'F1', created_at: now, updated_at: now }, fields('fa', { n1: 5, s1: 'Hallo Welt', b1: true })); // lang-ok
-  await insertWithStack(db, 'entries', { id: 'f2', title: 'F2', created_at: now, updated_at: now }, fields('fb', { n1: 7, s1: '', b1: false }));
-  await insertWithStack(db, 'entries', { id: 'f3', title: 'F3', created_at: now, updated_at: now, deleted_at: now }, fields('fc', { n1: 5 }));
-  const ids = async (elementId, condition, extra = {}) => (await entriesWithFieldValue(db, { elementId, condition, ...extra })).sort().join();
-  check('field values: equals a number, the trash left out', (await ids('n1', { op: 'equals', value: 5 })) === 'f1');
-  check('field values: the trash on request', (await ids('n1', { op: 'equals', value: 5 }, { includeDeleted: true })) === 'f1,f3');
-  check('field values: contains, regardless of case', (await ids('s1', { op: 'contains', value: 'WELT' })) === 'f1');
-  check('field values: a toggle', (await ids('b1', { op: 'equals', value: false })) === 'f2');
-  check('field values: empty, only in blocks that have the element', (await ids('s1', { op: 'empty' })) === 'f2', await ids('s1', { op: 'empty' }));
-  check('field values: not empty', (await ids('s1', { op: 'notEmpty' })) === 'f1');
-  let refusedId = false;
-  try { await entriesWithFieldValue(db, { elementId: 'x".evil', condition: { op: 'empty' } }); } catch { refusedId = true; }
-  check('field values: an element ID that is no ID is refused', refusedId);
 
   check('readers: schema identical to the fresh vault', JSON.stringify(await readSchema(db)) === JSON.stringify(schemaA));
   db.close();
@@ -931,7 +944,7 @@ console.log('\n11. .vault.emerald: the round trip of a vault content, other vers
   };
   const journalStack =
     `<section data-block="core.text" data-block-id="t1"><p>Link ${chipTo(W)}</p><img src="${pic('1')}"></section>`
-    + `<section data-block="core.paint" data-block-id="p1" data-block-config="${attr({ sigil: true })}" data-block-data="${attr({ v: 1, layers: [{ id: 'L1', image: true, strokes: [] }] })}">`
+    + `<section data-block="core.paint" data-block-id="p1" data-block-data="${attr({ v: 1, layers: [{ id: 'L1', image: true, strokes: [] }] })}">`
     + `<img src="${pic('2')}" alt="" data-paint="render"><img src="${pic('3')}" alt="" data-paint="L1"></section>`
     + `<section data-block="core.canvas" data-block-id="c1" data-block-data="${attr(scene)}"><img src="${pic('4')}" alt="" data-canvas="background"></section>`
     + `<section data-block="core.fields" data-block-id="f1" data-block-config="${attr(fieldsConfig)}"></section>`;
@@ -1278,6 +1291,59 @@ console.log('\n11. .vault.emerald: the round trip of a vault content, other vers
   const strayEntry = { ...manifestJson, data: { ...manifestJson.data, entries: [{ id: 'x', category_id: 'not-in-file' }] } };
   check('an entry is in a category only if the file carries it',
     vaultContentOf(JSON.stringify(strayEntry)).data.entries[0].category_id === null);
+
+  // ── Tags a block gives (block_refs kind `tag`, #186): written only for a tag that exists, carried through every import, moved by a tag merge ──
+  {
+    // A test type that gives the tags its data names — no built-in block gives any yet.
+    registerBlockType({
+      id: 'test.tagger', origin: 'plugin', icon: () => null, labelKey: 'x', descriptionKey: 'x', group: 'fields', dataVersion: 1, defaultShowTitle: false,
+      properties: {
+        mayContribute: (content) => content.includes('test.tagger'),
+        tags: (block) => { try { return JSON.parse(block.attrs['data-block-data']).tags ?? []; } catch { return []; } },
+        overridable: { icon: true, cover: true },
+      },
+    });
+    const tagger = (id, tags) => `<section data-block="test.tagger" data-block-id="${id}" data-block-data="${attr({ tags })}"></section>`;
+    const tagRefs = async (db, id) => (await refRows(db, 'entry', id)).filter((r) => r.target_kind === 'tag').map((r) => r.target).join();
+    const givenIn = async (db, id) => JSON.parse((await db.select("SELECT data FROM blocks WHERE entry_id = $1 AND type = 'test.tagger'", [id]))[0]?.data ?? '{}').tags?.join();
+    const E = '7d000000-0000-4000-8000-000000000001';
+    const src = await freshVault('block-tags-src.db');
+    clearSavedBlocks();
+    await src.execute("INSERT INTO tags (id, name, color) VALUES ('bt-src', 'Ritual', '#00e699')");
+    await insertWithStack(src, 'entries', { id: E, title: 'Tagged', created_at: now, updated_at: now }, '<p>a</p>' + tagger('tb', ['bt-src', 'bt-ghost']));
+    check('block tags: written as references of kind tag — only for a tag that exists', (await tagRefs(src, E)) === 'bt-src', await tagRefs(src, E));
+    check("block tags: never among the entry's own tags", !(await readTagLinks(src, 'entry', [E])).has(E));
+    const collectedTags = await collectVaultContent(src, FULL);
+
+    const dst = await freshVault('block-tags-replace.db');
+    clearSavedBlocks();
+    const replaced = asFile(collectedTags);
+    await doReplace(dst, replaced.content, replaced.files);
+    check('block tags, replace: the tag keeps its ID, the reference is rebuilt from the block', (await tagRefs(dst, E)) === 'bt-src', await tagRefs(dst, E));
+    dst.close();
+
+    const merge = await freshVault('block-tags-merge.db');
+    await merge.execute("INSERT INTO tags (id, name, color) VALUES ('bt-here', 'ritual', '#3b82f6')");
+    clearSavedBlocks();
+    const merged = asFile(collectedTags);
+    await doMerge(merge, merged.content, merged.files);
+    const [copy] = await merge.select("SELECT id FROM entries WHERE title = 'Tagged'");
+    check('block tags, merge: the block names the tag of the same name here, its reference with it; a tag it cannot place gives nothing',
+      (await givenIn(merge, copy?.id)) === 'bt-here,bt-ghost' && (await tagRefs(merge, copy?.id)) === 'bt-here',
+      [await givenIn(merge, copy?.id), await tagRefs(merge, copy?.id)]);
+    check('block tags, merge: no second tag of the same name', (await merge.select("SELECT COUNT(*) AS n FROM tags WHERE lower(name) = 'ritual'"))[0].n === 1);
+
+    await merge.execute("INSERT INTO tags (id, name, color) VALUES ('bt-other', 'Andere', '#f43f5e')"); // lang-ok
+    const owners = await retagBlocks(merge, 'bt-here', 'bt-other');
+    check('tag merge: the blocks that gave the tag give the other one, data and references alike',
+      (await givenIn(merge, copy?.id)) === 'bt-other,bt-ghost' && (await tagRefs(merge, copy?.id)) === 'bt-other'
+        && owners.length === 1 && owners[0].kind === 'entry' && owners[0].id === copy?.id, owners);
+    await merge.batch([['DELETE FROM tags WHERE id = $1', ['bt-other']], ...dropBlockTagStatements(['bt-other'])]);
+    check('a tag deleted for good: the blocks give it no more', (await tagRefs(merge, copy?.id)) === '');
+    check('block tags: schema identical to the fresh vault', JSON.stringify(await readSchema(merge)) === JSON.stringify(schemaA));
+    merge.close();
+    src.close();
+  }
   delete globalThis.harnessIconFiles;
 }
 

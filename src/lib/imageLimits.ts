@@ -157,20 +157,15 @@ async function scaledAndConverted(dataUrl: string, maxEdge: number | null): Prom
  * a JPEG, then everything is brought within the vault's limits — downscaled to
  * the largest edge length, then the file size checked. Downscaling and the
  * change of format happen in one pass, so a photo is compressed only once.
- * `capBytes` is a fixed cap from the caller (old altar backgrounds on import); the smaller limit
- * applies. Backups and sigil drawings do not come through here.
+ * Backups and drawings do not come through here.
  *
  * @throws ImageTooLargeError if it is still too large afterwards — with the limit that applied.
  */
-export async function prepareImageDataUrl(dataUrl: string, options: { capBytes?: number } = {}): Promise<string> {
+export async function prepareImageDataUrl(dataUrl: string): Promise<string> {
   const limits = useSettingsStore.getState().settings.images;
   const scaled = await scaledAndConverted(dataUrl, limits.maxEdge);
-  const candidates = [limits.maxSizeMb === null ? null : limits.maxSizeMb * MIB, options.capBytes ?? null]
-    .filter((bytes): bytes is number => bytes !== null);
-  if (candidates.length) {
-    const maxBytes = Math.min(...candidates);
-    if (dataUrlBytes(scaled) > maxBytes) throw new ImageTooLargeError(maxBytes);
-  }
+  const maxBytes = limits.maxSizeMb === null ? null : limits.maxSizeMb * MIB;
+  if (maxBytes !== null && dataUrlBytes(scaled) > maxBytes) throw new ImageTooLargeError(maxBytes);
   return scaled;
 }
 

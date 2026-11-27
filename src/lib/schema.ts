@@ -22,7 +22,7 @@ export const FRESH_START_VERSION = 102;
  * (`FRESH_START_VERSION` while there is none); `db.ts` checks this at startup
  * so that a new migration step cannot be forgotten.
  */
-export const BASELINE_VERSION = 102;
+export const BASELINE_VERSION = 103;
 
 /**
  * Tables in dependency order: parents before children.
@@ -209,17 +209,19 @@ export const TABLE_DDL: Record<TableName, string> = {
       UNIQUE (template_id, id)
     )`,
 
-  // What a block points at: an entry by ID, a picture or an icon by its
-  // stored file name, with the role it plays there (`lib/blocks/blockRefs.ts`).
+  // What a block points at: an entry or a tag by ID, a picture or an icon by
+  // its stored file name, with the role it plays there (`lib/blocks/blockRefs.ts`;
+  // each block type reports its own). A tag here is one the block gives its
+  // entry while it is there — never in `entry_tags`.
   // Rewritten whenever its block is written; gone with it. Not `WITHOUT ROWID`:
   // re-encrypting a vault renames pictures in every table by `rowid`
   // (`rewrite_database` in `reencrypt.rs`).
   block_refs: `
     CREATE TABLE block_refs (
       block_row INTEGER NOT NULL REFERENCES blocks(row_id) ON DELETE CASCADE,
-      target_kind TEXT NOT NULL CHECK (target_kind IN ('entry', 'image', 'icon')),
+      target_kind TEXT NOT NULL CHECK (target_kind IN ('entry', 'image', 'icon', 'tag')),
       target TEXT NOT NULL,
-      role TEXT NOT NULL CHECK (role IN ('content', 'render', 'layer', 'background', 'default', 'icon')),
+      role TEXT NOT NULL CHECK (role IN ('content', 'render', 'layer', 'background', 'default', 'icon', 'tag')),
       PRIMARY KEY (block_row, target_kind, target, role)
     )`,
 
@@ -376,6 +378,7 @@ const INDEX_DDL: readonly string[] = [
   ...ENTRIES_INDEX_DDL,
   'CREATE INDEX idx_blocks_entry ON blocks(entry_id, position)',
   'CREATE INDEX idx_blocks_template ON blocks(template_id, position)',
+  // What is pointed at, by kind ("Images", linked entries, a block's tags).
   'CREATE INDEX idx_block_refs_target ON block_refs(target_kind, target)',
   // The other side of the tag links: what carries a tag (`TagsView`, a
   // dashboard filter by tag, merging tags).
@@ -404,14 +407,6 @@ export const SIGIL_CATEGORY_ID = 'sigils';
  * entry of this category, not a module of its own.
  */
 export const ALTAR_CATEGORY_ID = 'altars';
-
-/**
- * The tag "Altar Library": what an Altar block's "Images" show at first,
- * created by the block when it needs it. A fixed ID, so that vaults and
- * backups agree on it. An ordinary tag otherwise — renamable, deletable.
- */
-export const ALTAR_LIBRARY_TAG_ID = 'altar-library';
-export const ALTAR_LIBRARY_TAG_NAME = 'Altar Library';
 
 /** [id, name (database only — `categories.builtin.<id>` is displayed), emoji]. */
 const BUILTIN_CATEGORIES: readonly [string, string, string][] = [

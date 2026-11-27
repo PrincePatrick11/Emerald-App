@@ -14,8 +14,6 @@ export interface CanvasFeatures {
   zoom: boolean;
   /** Undo and redo inside the canvas editor. */
   history: boolean;
-  /** Saving the artboard as an image (needs the place's `onExport`). */
-  export: boolean;
   /** The list of the elements beside the stage: picking, stacking, hiding, locking. */
   layers: boolean;
   /** Grouping elements (the place has to store `CanvasElement.group`). */
@@ -28,7 +26,6 @@ export const FULL_CANVAS_FEATURES: CanvasFeatures = {
   guides: true,
   zoom: true,
   history: true,
-  export: true,
   layers: true,
   group: true,
 };

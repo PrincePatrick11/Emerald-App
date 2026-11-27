@@ -37,6 +37,8 @@ Review priorities:
 
 - Error handling clarity and predictable edge-case behavior.
 
+- Block types: general code knows no single block type. Views, lists, stores, export and import ask the block interfaces (`BlockTypeDef`, `Documentation/architecture/blocks.md`, Registry and interfaces); naming a type ID, branching on one or importing a type's own module (`lib/blocks/kinds/*`, `sigil.ts`, `sigilCalc.ts`, `canvas.ts`, `paint.ts`, `fields.ts`, `definitions.ts`, a type's views under `components/blocks/`) outside that type is a `Must fix` — unless the place stands in the list of allowed exceptions in that section of `blocks.md`. A new exception needs a stated reason and the owner's consent; report it as a question, never accept it silently. Do not suggest an interface that only one type would use just to satisfy the rule: name the exception instead. Comments may name a type as an example.
+
 What to avoid:
 
 - Cosmetic churn that does not improve comprehension.

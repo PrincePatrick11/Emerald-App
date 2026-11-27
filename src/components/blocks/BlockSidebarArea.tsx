@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Check, Eye, EyeOff, CopyPlus, GripVertical, MoreHorizontal, Pencil, Plus, Puzzle, Type } from 'lucide-react';
+import { Eye, EyeOff, CopyPlus, GripVertical, MoreHorizontal, Pencil, Plus, Puzzle } from 'lucide-react';
 import ContextMenu, { type ContextMenuAction } from '../ui/ContextMenu';
+import { fromBlockTitle } from '../ui/FromBlockMark';
 import SidebarSection, { SidebarItemRow } from '../sidebar/fields/SidebarSection';
 import { useUIStore } from '../../store/uiStore';
 import { useBlockSessionStore, useSelectedBlockId, type BlockSession } from '../../store/blockSessionStore';
@@ -10,18 +11,18 @@ import { useBlockDefinitionStore } from '../../store/blockDefinitionStore';
 import BlockGlyph from './BlockGlyph';
 import { usePointerReorder } from '../../hooks/usePointerReorder';
 import { sidebarRowStateClasses } from '../../lib/styleClasses';
-import { resolveBlockType, type BlockTypeMeta } from '../../lib/blocks/blockTypes';
+import { blockActionsOf, resolveBlockType, type BlockTypeDef } from '../../lib/blocks/blockTypes';
 import {
-  blockLabel, blockTypeLabel, customBlockTitle, hiddenAttrValue, isBlockHidden, showsTitleInRead, showTitleAttrValue,
+  blockIcon, blockLabel, blockTypeLabel, customBlockTitle, hiddenAttrValue, isBlockHidden, showsTitleInRead, showTitleAttrValue,
 } from '../../lib/blocks/blockAttrs';
 import { BLOCK_ATTR, type BlockInstance } from '../../lib/blocks/types';
-import { blockIcon } from '../../lib/blocks/presets';
 import { BLOCK_SIDEBAR_VIEWS } from './blockSidebarViews';
-import { FIELDS_BLOCK_TYPE, parseFields, soleSigilElement } from '../../lib/blocks/fields';
-import { addBlockActions, commonBlockActions } from './blockActions';
+import { addBlockActions, commonBlockActions, typeBlockActions } from './blockActions';
 
 /** Open/closed state of the blocks; outline (reading) and management (editing) share it. */
 const OPEN_KEY = 'blocks-sidebar-open';
+/** Open/closed state of the blocks' actions while reading. */
+const ACTIONS_OPEN_KEY = 'blocks-sidebar-actions-open';
 
 /** What the outline shows in read mode: only what can be read. */
 function readableBlocks(session: BlockSession): BlockInstance[] {
@@ -56,6 +57,47 @@ export default function BlockSidebarArea() {
     return <BlockOutline key={session.sessionId} session={session} />;
   }
   return <BlockManager key={session.sessionId} session={session} />;
+}
+
+/**
+ * The blocks' actions while reading (`BlockTypeDef.actions` with `inRead`),
+ * in a section of the properties panel of their own: one row per action and
+ * block, like the panel's other rows. Where several blocks offer the same
+ * action, each row names its block; the tooltip always does. Carried out by
+ * the block's view in the stack (`api.runAction`).
+ */
+export function BlockReadActions() {
+  const { t } = useTranslation();
+  const activeViewId = useUIStore((s) => s.activeView.id);
+  const session = useBlockSessionStore((s) => s.session);
+  if (!session || session.entryId !== activeViewId || session.isEditing) return null;
+  const rows = readableBlocks(session).flatMap((block) => blockActionsOf(block, { reading: true }).map((action) => ({
+    block, action, name: blockLabel(t, block),
+  })));
+  if (rows.length === 0) return null;
+  return (
+    <SidebarSection storageKey={ACTIONS_OPEN_KEY} label={t('blocks.actionsTitle')} count={rows.length}>
+      {rows.map(({ block, action, name }) => {
+        const Icon = action.icon;
+        // Several rows of the same action name their block; blocks of the same name are numbered.
+        const same = rows.filter((r) => r.action.labelKey === action.labelKey);
+        const namesakes = same.filter((r) => r.name === name);
+        const meta = same.length < 2 ? undefined
+          : namesakes.length < 2 ? name
+            : `${name} ${namesakes.findIndex((r) => r.block.id === block.id) + 1}`;
+        return (
+          <SidebarItemRow
+            key={`${block.id}:${action.id}`}
+            icon={<Icon size={14} />}
+            label={t(action.labelKey)}
+            meta={meta}
+            title={fromBlockTitle(t, meta ?? name)}
+            onClick={() => session.api.runAction(block.id, action.id)}
+          />
+        );
+      })}
+    </SidebarSection>
+  );
 }
 
 /**
@@ -117,8 +159,8 @@ function BlockOutline({ session }: { session: BlockSession }) {
         return (
           <div key={block.id}>
             <SidebarItemRow
-              icon={<BlockGlyph icon={blockIcon(block, meta) ?? Puzzle} size={14} />}
-              label={blockLabel(t, block, meta)}
+              icon={<BlockGlyph icon={blockIcon(block) ?? Puzzle} size={14} />}
+              label={blockLabel(t, block)}
               title={t('blocks.jumpTo')}
               active={selected}
               onClick={() => {
@@ -163,7 +205,7 @@ function BlockManager({ session }: { session: BlockSession }) {
     });
   }, [selection, session.sessionId, setSectionOpen, listRef]);
 
-  const openRowMenu = (e: MouseEvent, block: BlockInstance, meta: BlockTypeMeta | undefined) => {
+  const openRowMenu = (e: MouseEvent, block: BlockInstance, meta: BlockTypeDef | undefined) => {
     const showsTitle = showsTitleInRead(block, meta);
     setMenu({
       x: e.clientX,
@@ -172,9 +214,14 @@ function BlockManager({ session }: { session: BlockSession }) {
         { label: t('blocks.rename'), icon: <Pencil size={12} />, onClick: () => setRenamingId(block.id) },
         {
           label: t('blocks.showTitle'),
-          icon: showsTitle ? <Check size={12} /> : <Type size={12} />,
+          checked: showsTitle,
           onClick: () => api.setAttr(block.id, BLOCK_ATTR.showTitle, showTitleAttrValue(!showsTitle, meta)),
         },
+        // The live block: the session's lags behind a text block's typing.
+        ...typeBlockActions(t, api.liveBlocks().find((b) => b.id === block.id) ?? block, {
+          run: (actionId) => api.runAction(block.id, actionId),
+          update: (next) => api.update(block.id, next),
+        }),
         ...commonBlockActions(t, meta, {
           duplicate: () => api.duplicate(block.id),
           remove: () => api.remove(block.id),
@@ -197,9 +244,8 @@ function BlockManager({ session }: { session: BlockSession }) {
               <ManagerRow
                 key={block.id}
                 block={block}
-                meta={meta}
-                label={blockLabel(t, block, meta)}
-                typeLabel={blockTypeLabel(t, block, meta)}
+                label={blockLabel(t, block)}
+                typeLabel={blockTypeLabel(t, block)}
                 renaming={renamingId === block.id}
                 onRenamed={(title) => {
                   setRenamingId(null);
@@ -228,7 +274,6 @@ function BlockManager({ session }: { session: BlockSession }) {
 
 interface ManagerRowProps {
   block: BlockInstance;
-  meta: BlockTypeMeta | undefined;
   label: string;
   typeLabel: string;
   renaming: boolean;
@@ -251,12 +296,12 @@ interface ManagerRowProps {
  * sidebar's handle rows (`sidebarRowStateClasses`).
  */
 function ManagerRow({
-  block, meta, label, typeLabel, renaming, onRenamed, selected, isDragging, onGripPointerDown, onActivate, onToggleHidden, onOpenMenu, settings,
+  block, label, typeLabel, renaming, onRenamed, selected, isDragging, onGripPointerDown, onActivate, onToggleHidden, onOpenMenu, settings,
 }: ManagerRowProps) {
   const { t } = useTranslation();
   const cancelledRef = useRef(false);
   const hidden = isBlockHidden(block);
-  const glyph = blockIcon(block, meta) ?? Puzzle;
+  const glyph = blockIcon(block) ?? Puzzle;
 
   return (
     <div data-block-row={block.id}>
@@ -325,10 +370,8 @@ function ManagerRow({
  * The settings that a block type brings into the sidebar
  * (`blockSidebarViews.ts`); `null` if it has none for this mode.
  */
-function blockSettings(session: BlockSession, block: BlockInstance, meta: BlockTypeMeta | undefined): ReactNode {
+function blockSettings(session: BlockSession, block: BlockInstance, meta: BlockTypeDef | undefined): ReactNode {
   const { isEditing, api } = session;
-  // A calculator or charge on its own has no settings, as the sigil never had.
-  if (meta?.id === FIELDS_BLOCK_TYPE && soleSigilElement(parseFields(block))) return null;
   const views = meta ? BLOCK_SIDEBAR_VIEWS.get(meta.id) : undefined;
   if (isEditing && views?.Edit) {
     const Edit = views.Edit;

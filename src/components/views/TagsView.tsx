@@ -8,7 +8,7 @@ import { useUIStore } from '../../store/uiStore';
 import { useTemplateStore } from '../../store/templateStore';
 import { useImageStore } from '../../store/imageStore';
 import { useDashboardStore } from '../../store/dashboardStore';
-import { dashboardLabel, entryDateOf } from '../../lib/dashboards';
+import { dashboardLabel, entryDateOf, entryTagIds } from '../../lib/dashboards';
 import { useUndoStore } from '../../store/undoStore';
 import { useCollapsedSet } from '../../hooks/useCollapsedSet';
 import { useDeepLink } from '../../hooks/useDeepLink';
@@ -154,7 +154,8 @@ export default function TagsView() {
   const itemsByTag = useMemo(() => {
     const map = new Map<string, Entry[]>();
     for (const e of entries) {
-      for (const tagId of e.tags ?? []) {
+      // With the tags the entry's blocks give it (`entryTagIds`).
+      for (const tagId of entryTagIds(e)) {
         const list = map.get(tagId);
         if (list) list.push(e);
         else map.set(tagId, [e]);

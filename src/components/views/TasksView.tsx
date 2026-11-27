@@ -14,8 +14,7 @@ import EmptyState, { NoResults } from '../ui/EmptyState';
 import { useCollapsedSet } from '../../hooks/useCollapsedSet';
 import { usePersistedFlag } from '../../hooks/usePersistedFlag';
 import { useDeepLink } from '../../hooks/useDeepLink';
-import { useLinkItems } from '../../hooks/useLinkItems';
-import { linkItemKey, linkItemsByKey } from '../../lib/linkItems';
+import { useLinkTitle } from '../../hooks/useLinkItems';
 import { categoriesUsedBy, categoryLabel, hasUncategorized } from '../../lib/categories';
 import { sortItems } from '../../lib/sortItems';
 import { countBy, countByCategory, UNCATEGORIZED_KEY } from '../../lib/groupBy';
@@ -222,15 +221,14 @@ export default function TasksView() {
   );
 
   /**
-   * The title of a link target — from the same list as link chips and
-   * picker (`useLinkItems`). If it is in the trash or gone, "Deleted".
+   * The title of a link target — the app's one lookup (`useLinkTitle`), as
+   * link chips and the picker show it. If it is in the trash or gone, "Deleted".
    */
-  const linkItems = useLinkItems();
-  const linkItemByKey = useMemo(() => linkItemsByKey(linkItems), [linkItems]);
+  const linkTitle = useLinkTitle();
   // `null`: the target is in the trash or deleted for good.
   const resolveTaskLinkTitle = useCallback((targetKind: string, targetId: string) =>
-    linkItemByKey.get(linkItemKey({ id: targetId, targetKind }))?.label ?? null,
-  [linkItemByKey]);
+    linkTitle({ id: targetId, targetKind }) ?? null,
+  [linkTitle]);
 
   const renderTasksContent = () => (
     <>

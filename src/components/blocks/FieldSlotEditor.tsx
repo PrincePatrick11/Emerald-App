@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { ImagePlus, X } from 'lucide-react';
-import { imageFromSlot, imageSlotHtml, type ElementDef } from '../../lib/blocks/fields';
+import { imageSlotHtml, type ElementDef } from '../../lib/blocks/fields';
+import { imageFromSlot } from '../../lib/blocks/toolkit';
 import { imageSrc } from '../../lib/images';
 import { pickPictures } from '../../store/imagePickerStore';
 import { LinkEditor } from './BlockLink';

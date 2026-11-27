@@ -56,6 +56,10 @@ Scope focus for Emerald:
 
 - Shared TypeScript interfaces, union types, and DTOs that must include the new module's shape.
 
+- Blocks: a change to what a block holds or gives must reach every reader through the interfaces — references and the tags a block gives (`block_refs`, rebuilt from the blocks on every write and import; `remapBlock` with `tags` on `.vault.emerald` and `.emerald` imports, `retagBlocks` on a tag merge, `dropBlockTagStatements` on a purge), search, export, copy, data version. A block this version cannot read (`blockReadState`: `newer` or `broken`) must show, search and export nothing of its content and be saved unchanged; a path that reads a block's markup or data without going through `resolveBlockType` is a finding.
+
+- Block types: general code knows no single block type. Views, lists, stores, export and import ask the block interfaces (`BlockTypeDef`, `Documentation/architecture/blocks.md`, Registry and interfaces); naming a type ID, branching on one or importing a type's own module (`lib/blocks/kinds/*`, `sigil.ts`, `sigilCalc.ts`, `canvas.ts`, `paint.ts`, `fields.ts`, `definitions.ts`, a type's views under `components/blocks/`) outside that type is a `Must fix` — unless the place stands in the list of allowed exceptions in that section of `blocks.md`. A new exception needs a stated reason and the owner's consent; report it as a question, never accept it silently. Do not suggest an interface that only one type would use just to satisfy the rule: name the exception instead. Comments may name a type as an example.
+
 
 Method:
 

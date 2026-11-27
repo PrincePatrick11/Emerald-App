@@ -3,7 +3,8 @@ import { readImageAsBase64, saveImage } from './images';
 import { isIconFile, plausibleEmoji } from './icons';
 import { storedImageName, storedImageNamesIn } from './schema';
 import { parseBlocks } from './blocks/blockHtml';
-import { blockRefs } from './blocks/blockRefs';
+import { blockRefs, blockTagsOf } from './blocks/blockRefs';
+import { typesLinkingWhenHidden } from './blocks/blockTypes';
 import { save, message } from '@tauri-apps/plugin-dialog';
 import { exportFilename } from './helpers';
 import { marked } from 'marked';
@@ -13,13 +14,13 @@ import { useEntryStore } from '../store/entryStore';
 import { liveTagNames, useTagStore } from '../store/tagStore';
 import { useSettingsStore } from '../store/settingsStore';
 import { reloadModules } from '../store/moduleWiring';
-import { useTaskStore } from '../store/taskStore';
 import { getDb } from './db';
 import { categoryKey, categoryLabel } from './categories';
 import { useCategoryStore } from '../store/categoryStore';
 import { useTemplateStore } from '../store/templateStore';
 import i18n from '../i18n';
-import { buildLinkItems, linkItemKey, linkItemsByKey } from './linkItems';
+import { linkItemKey, linkItemsByKey } from './linkItems';
+import { linkItemsSnapshot, linkTitleSnapshot } from './linkItemsSnapshot';
 import { extractInternalLinks, linkTargetKindOf, remapInternalLinks } from './internalLinkHtml';
 import { entryView } from '../store/entryViews';
 import { dashboardShowing, startCategoryOf, startTagsOf } from './createItem';
@@ -34,8 +35,9 @@ import {
   definitionImageRefs, parseDefinitionElements, remapDefinitionDefaults, type LinkDefaultResolver,
 } from './blocks/definitions';
 import { nextDefinitionSortOrder } from './blockDefinitionRows';
+import { retagContent } from './blocks/blockRemap';
 import {
-  blocksToContent, categoryRowsOf, contentToBlocks, EMERALD_FORMAT_VERSION, gentlestImageMode, manifestCategoryOf,
+  blocksToContent, categoryRowsOf, contentToBlocks, EMERALD_FORMAT_VERSION, gentlestImageMode, manifestBlockTags, manifestCategoryOf,
   parseManifest, relinkWithinFile, usedDefinitionIds,
   renameStoredFiles, storedNameStem,
   type EmeraldManifest, type ImageMode, type ManifestBlockDefinition, type ManifestEntry, type ManifestItem,
@@ -51,20 +53,9 @@ export type { EmeraldProtection } from './emerald/file';
 
 // ── Link chips across vault boundaries ───────────────────────────────────────
 
-/** `buildLinkItems` over the current stores — the React-free variant of
- *  `useLinkItems`, for the import/export paths. */
-function linkItemsSnapshot(): SuggestionItem[] {
-  return buildLinkItems({
-    entries: useEntryStore.getState().entries,
-    tasks: useTaskStore.getState().tasks,
-    categories: useCategoryStore.getState().categories,
-    showMoonPhase: useSettingsStore.getState().settings.journal.moonPhase,
-  }, i18n.t);
-}
-
 /** The title of every link chip in the contents — travels along as the manifest's `links`. */
 function collectContentLinks(contents: readonly string[]): ManifestLink[] {
-  const byKey = linkItemsByKey(linkItemsSnapshot());
+  const titleOf = linkTitleSnapshot();
   const seen = new Set<string>();
   const out: ManifestLink[] = [];
   for (const content of contents) {
@@ -72,7 +63,7 @@ function collectContentLinks(contents: readonly string[]): ManifestLink[] {
       const key = linkItemKey(link);
       if (seen.has(key)) continue;
       seen.add(key);
-      out.push({ id: link.id, kind: link.targetKind === 'task' ? 'task' : 'entry', title: byKey.get(key)?.label ?? link.label });
+      out.push({ id: link.id, kind: link.targetKind === 'task' ? 'task' : 'entry', title: titleOf(link) ?? link.label });
     }
   }
   return out;
@@ -286,6 +277,8 @@ export async function writeEmeraldFile(path: string, options: EmeraldExportOptio
     blockDefinitions,
     // Name, note and tags of the pictures the file carries; a left-out one is a placeholder there.
     images: await imageDetailsOf(await getDb(), images.map((image) => image.name)),
+    // The tags the blocks give go by name, as the items' own do.
+    blockTags: manifestBlockTags(contents, (id) => liveTagNames([id])[0]),
   };
   await writeArchive(path, 'items', JSON.stringify(manifest), images, [...icons], options.protection ?? { type: 'none' });
 }
@@ -325,8 +318,11 @@ export async function linkedEntriesOf(
          FROM block_refs r
          JOIN blocks b ON b.row_id = r.block_row
          JOIN entries e ON e.id = r.target AND e.deleted_at IS NULL
-        WHERE r.target_kind = 'entry' AND b.entry_id IN (SELECT value FROM json_each($1))`,
-      [JSON.stringify(frontier)],
+        WHERE r.target_kind = 'entry' AND r.role = 'content' AND b.entry_id IN (SELECT value FROM json_each($1))
+          AND (b.hidden = 0 OR b.type IN (SELECT value FROM json_each($2)))`,
+      // The rule of "Linked entries" (`linkedIdsOf`): only links a block shows (`isLinkRef`,
+      // not a prefill), and of a hidden block only where its type says so (`blockCountsLinks`).
+      [JSON.stringify(frontier), JSON.stringify(typesLinkingWhenHidden())],
     );
     const fresh = rows.map((r) => r.target).filter((id) => !seen.has(id));
     fresh.forEach((id) => { seen.add(id); found.push(id); });
@@ -634,6 +630,15 @@ async function importManifest(
       result.entries.push(entry.id);
     }
 
+    // The tags the blocks of the items imported give, found or made here by
+    // name as the items' own tags are — not those only left-out items give.
+    const given = new Set(items.flatMap((item) => blockTagsOf(parseBlocks(blocksToContent(item.blocks)))));
+    const blockTagIds = new Map<string, string>();
+    for (const tag of manifest.blockTags.filter((t) => given.has(t.id))) {
+      const [id] = await ensureTagIds([tag.name]);
+      if (id) blockTagIds.set(tag.id, id);
+    }
+
     const ownIds = new Set(idMap.values());
     // A link to an item left out as already here points at the one here.
     const relinkMap = new Map([...skip, ...idMap]); // later pairs win: a created item over a skipped one
@@ -641,7 +646,7 @@ async function importManifest(
       const raw = blocksToContent(item.blocks);
       const renamed = renameStoredFiles(renameStoredFiles(raw, iconNames), imageNames);
       const relinked = remapImportedLinks(relinkWithinFile(renamed, relinkMap), manifest.links, linkItems, ownIds);
-      return sanitizeImportedHtml(relinked);
+      return sanitizeImportedHtml(retagContent(relinked, (id) => blockTagIds.get(id)));
     };
     const iconOf = (icon: string): string | undefined => {
       if (!icon) return undefined;

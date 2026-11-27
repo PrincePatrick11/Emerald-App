@@ -1,7 +1,13 @@
 import { useEntryStore } from '../store/entryStore';
 import { liveTagNames } from '../store/tagStore';
 import { renderBlocksForExport, type ExportText } from './blocks/exportRender';
-import { blockLabel, fieldFallbackText } from './blocks/blockAttrs';
+import { linkedIdsOf } from './blocks/blockRefs';
+import type { BlockExportFormat } from './blocks/blockType';
+import { blockLabel } from './blocks/blockAttrs';
+import { translatedOr } from './blocks/toolkit';
+import { linkTitleSnapshot } from './linkItemsSnapshot';
+import { withCurrentLinkTitles } from './internalLinkHtml';
+import type { LinkTitleOf } from './blocks/blockValue';
 import { formatIsoDateLong } from './formatDate';
 import { useCategoryStore } from '../store/categoryStore';
 import { entryMoonPhase, MOON_PHASE_SYMBOLS } from './moonPhase';
@@ -19,19 +25,22 @@ export interface ChipData {
   fallbackIcon?: string;  // plain emoji to use when icon is a data-URL (markdown export)
 }
 
-/** The texts the blocks are exported with, in the current language. */
-function exportText(): ExportText {
+/** The texts the blocks are exported with, in the current language; `linkTitle` names a link target as the app does. */
+function exportText(linkTitle: LinkTitleOf): ExportText {
   const t = i18n.t;
   return {
-    title: (block, meta) => blockLabel(t, block, meta),
-    fields: fieldFallbackText(t),
+    title: (block) => blockLabel(t, block),
+    yes: translatedOr(t, 'blocks.fields.yes', 'Yes'),
+    no: translatedOr(t, 'blocks.fields.no', 'No'),
     date: formatIsoDateLong,
     number: (value) => value.toLocaleString(i18n.language),
-    targetDate: t('creation.targetDate'),
-    technique: t('creation.chargingTechnique'),
-    loaded: t('blocks.sigil.loaded'),
-    notLoaded: t('blocks.sigil.notLoaded'),
-    drawing: t('blocks.types.sigilCanvas.label'),
+    t: (key) => t(key),
+    concealed: (until) => until
+      ? t('exportMenu.html.concealedUntil', { date: formatIsoDateLong(until) })
+      : t('exportMenu.html.concealed'),
+    reveal: t('exportMenu.html.reveal'),
+    conceal: t('exportMenu.html.conceal'),
+    linkTitle,
   };
 }
 
@@ -41,6 +50,8 @@ export interface ExportData {
   title: string;
   entryNumber?: number;
   content: string;
+  /** The entries and tasks it links to — what its blocks report (`linkedIdsOf` over the stored blocks, not the rendered `content`). */
+  linkedIds: string[];
   createdAt: string;
   // journal
   moonPhase?: string;         // emoji + label, e.g. "🌕 Full Moon"
@@ -56,8 +67,8 @@ function moonLabel(phase: string): string {
   return phase.split('_').map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
 }
 
-/** An entry as the PDF, HTML and Markdown exports read it — `null` if it is gone. */
-export async function collectExportDataFor(id: string): Promise<ExportData | null> {
+/** An entry as the PDF, HTML or Markdown export (`format`) reads it — `null` if it is gone. */
+export async function collectExportDataFor(id: string, format: BlockExportFormat): Promise<ExportData | null> {
   // Right after startup an entry's content may still be pending.
   await useEntryStore.getState().ensureEntryContent(id);
   const entry = useEntryStore.getState().getEntry(id);
@@ -66,12 +77,17 @@ export async function collectExportDataFor(id: string): Promise<ExportData | nul
   const cat = useCategoryStore.getState().categories.find((c) => c.id === entry.category_id);
   const showMoon = useSettingsStore.getState().settings.journal.moonPhase;
   const phase = entryMoonPhase(entry, showMoon);
+  const linkTitle = linkTitleSnapshot();
 
   return {
     id: entry.id,
     title: displayTitle(i18n.t, 'entry', entry.title),
     entryNumber: entry.entry_number,
-    content: renderBlocksForExport(entry.content, exportText()),
+    // Every link — a chip in a text, a link field — names its target's current
+    // title, as in the app; the stored one only once the target is gone.
+    content: withCurrentLinkTitles(renderBlocksForExport(entry.content, format, exportText(linkTitle)), linkTitle),
+    // Exactly what "Linked entries" lists (`linkedIdsOf`).
+    linkedIds: [...linkedIdsOf(entry.content)],
     createdAt: entry.created_at,
     moonPhase: phase ? `${MOON_PHASE_SYMBOLS[phase]} ${moonLabel(phase)}` : undefined,
     category: cat ? { id: cat.id, label: categoryLabel(i18n.t, cat), icon: cat.emoji } : undefined,

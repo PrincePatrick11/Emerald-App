@@ -1,11 +1,6 @@
 import type Database from './sqlite';
-import { decodeHtmlAttr } from './internalLinkHtml';
 import { parseBlocks, serializeBlocks } from './blocks/blockHtml';
-import type { BlockRefRole } from './blocks/blockRefs';
-import type { BlockInstance } from './blocks/types';
-import { FIELDS_BLOCK_TYPE, isSigilElement, parseFields, withoutElementContent } from './blocks/fields';
-import { isDrawingBlockType } from './blocks/paint';
-import { isCanvasBlockType, withoutCanvasFile } from './blocks/canvas';
+import { blockWithoutImage, type BlockRefRole } from './blocks/blockRefs';
 import { storedImageName } from './schema';
 
 /**
@@ -13,14 +8,15 @@ import { storedImageName } from './schema';
  * picture, and which pictures are not pictures of their own but the thing
  * itself (a drawing's render or layer, a canvas background), kept out of the
  * grid. Read from `block_refs`, which every save of a block rewrites
- * (`lib/blocks/blockRefs.ts`), so the roles are the ones it gives.
+ * (`lib/blocks/blockRefs.ts`, each block type reporting its own), so the roles
+ * are the ones they give.
  */
 
 /**
  * How a place uses a picture — the roles of `block_refs` (`BlockRefRole`) a
  * picture can have, and `cover`: an entry's cover image (`entries.cover_image`).
  */
-export type ImageUseRole = Exclude<BlockRefRole, 'icon'> | 'cover';
+export type ImageUseRole = Exclude<BlockRefRole, 'icon' | 'tag'> | 'cover';
 
 export interface ImageUse {
   kind: 'entry' | 'template' | 'blockDefinition';
@@ -113,37 +109,9 @@ export function isShownUse(use: ImageUse): boolean {
   return use.role === 'content' || use.role === 'default' || use.role === 'cover';
 }
 
-function withoutImageInHtml(html: string, file: string): string {
-  const doc = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html');
-  let changed = false;
-  for (const img of [...doc.body.querySelectorAll('img')]) {
-    if (storedImageName(img.getAttribute('src')) !== file) continue;
-    img.remove();
-    changed = true;
-  }
-  return changed ? doc.body.innerHTML : html;
-}
-
-/** The block without the picture where it is shown: an image field emptied, an image in a text gone. */
-function withoutImageInBlock(block: BlockInstance, file: string): BlockInstance {
-  if (isDrawingBlockType(block.type) || !block.html.includes(file)) return block;
-  if (isCanvasBlockType(block.type)) return withoutCanvasFile(block, file);
-  if (block.type === FIELDS_BLOCK_TYPE) {
-    // A drawing part keeps its pictures: they are the drawing, not a picture shown in it.
-    const drawings = new Set(parseFields(block).elements.filter(isSigilElement).map((el) => el.id));
-    const slots = new Set<string>();
-    const slotRe = /\bdata-block-slot="el:([^"]{1,200})"[^<>]*>([\s\S]*?)<\/dd>/gi;
-    for (const [, id, inner] of block.html.matchAll(slotRe)) {
-      if (inner.includes(file) && !drawings.has(decodeHtmlAttr(id))) slots.add(id);
-    }
-    return withoutElementContent(block, slots);
-  }
-  return { ...block, html: withoutImageInHtml(block.html, file) };
-}
-
 /** A block stack without the picture in its texts and image fields; drawings and defaults stay. */
 export function withoutImage(content: string, file: string): string {
   const blocks = parseBlocks(content);
-  const next = blocks.map((block) => withoutImageInBlock(block, file));
+  const next = blocks.map((block) => blockWithoutImage(block, file));
   return next.every((block, i) => block === blocks[i]) ? content : serializeBlocks(next);
 }

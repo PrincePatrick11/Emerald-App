@@ -1,6 +1,5 @@
 import type { ActiveView, Entry, Language, LexiconEntry, Tag, Task, VaultImage } from '../types';
 import { foldTypography, plainTextFor } from './searchText';
-import { withoutConcealed } from './blocks/sigil';
 import { entryView } from '../store/entryViews';
 import { displayTitle } from './entryTitle';
 import i18n from '../i18n';
@@ -197,16 +196,9 @@ export function searchCorpus(corpus: SearchCorpus, rawQuery: string): SearchHit[
     });
   };
 
-  // A loaded sigil that is still concealed is concealed from the search too —
-  // in every entry. The state lives in the cache stamp: the length of the
-  // visible content changes as soon as one of several chargings reaches its
-  // target date — then it is re-read. Likewise when the content was only
-  // loaded after startup (`pendingContent`): before that it is empty.
+  // What a block conceals (a loaded sigil) is not found (`contentSearchText`).
   const today = localIsoDay();
-  const visibleText = (id: string, updatedAt: string, content: string) => {
-    const visible = withoutConcealed(content, today);
-    return plainTextFor(id, `${updatedAt}|${visible.length}`, visible);
-  };
+  const visibleText = (id: string, updatedAt: string, content: string) => plainTextFor(id, updatedAt, content, today);
 
   for (const entry of corpus.entries.filter(notDeleted)) {
     const title = displayTitle(i18n.t, 'entry', entry.title);

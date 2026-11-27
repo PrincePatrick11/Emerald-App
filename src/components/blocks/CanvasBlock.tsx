@@ -7,26 +7,29 @@ import {
   type CanvasPaintOptions, type CanvasTypes, type RenderOptions, type RulerGuide,
 } from '../editors/canvas';
 import {
-  ALTAR_BLOCK_TYPE, canvasElementFile, parseCanvasBlock, storedCanvasElement, storedImageElement, withCanvasScene, withCanvasStripTag, type CanvasParts, type CanvasScene, type StoredCanvasElement,
+  CANVAS_BLOCK_TYPE, canvasElementFile, parseCanvasBlock, storedCanvasElement, storedImageElement, withCanvasScene, withCanvasStripTag, type CanvasParts, type CanvasScene, type StoredCanvasElement,
 } from '../../lib/blocks/canvas';
 import { canvasImageSrc, imageSrc, saveImage } from '../../lib/images';
 import { emptyPaintDoc, paintDocFromJson, type PaintDoc } from '../../lib/paint/document';
 import { altarBackgroundUrl } from '../../lib/altarBackground';
 import { generateId } from '../../lib/helpers';
-import { ALTAR_LIBRARY_TAG_ID, ALTAR_LIBRARY_TAG_NAME } from '../../lib/schema';
-import { acceptedImagePaths, fileBaseName, storeImageFromPath } from '../../lib/storeImage';
+import { acceptedImagePaths } from '../../lib/storeImage';
 import { getImageDragItem, setImageDragItem, subscribeImageDrag, type ImageDragItem } from '../../lib/imageDragState';
 import { useFileDrop } from '../../hooks/useFileDrop';
 import { useImportWindowStore } from '../../store/importWindowStore';
 import { useOwnSymbols } from '../../hooks/useOwnSymbols';
 import { pickPictures, useImagePickerStore } from '../../store/imagePickerStore';
-import { discardRenders, useImageStore } from '../../store/imageStore';
+import { discardRenders } from '../../store/imageStore';
 import { savePictureAs, textDataUrl } from '../../lib/pictureExport';
 import { exportErrorMessage } from '../../lib/export';
 import { reportImageError } from '../../store/imageNoticeStore';
 import { useTagStore } from '../../store/tagStore';
 import ImageStrip from '../images/ImageStrip';
 import AddImagesModal from '../images/AddImagesModal';
+import { resolveBlockType } from '../../lib/blocks/blockTypes';
+import { SAVE_PICTURE_ACTION } from '../../lib/blocks/kinds/canvas';
+import { blockTypeTextKey } from '../../lib/blocks/toolkit';
+import { storeBlockPicture, useBlockAction, useBlockStorage } from './toolkit';
 import type { BlockViewProps } from './blockViews';
 
 /** The width of the rendered picture the export and the card show. */
@@ -145,7 +148,10 @@ async function exportedScene(scene: CanvasScene, types: CanvasTypes, options: Ca
  * picker); with the part `images` on — an altar's default — "Images" stands
  * below in edit mode to drag from (or click, for the middle), and
  * files from the disk dropped on it go into "Images" and onto the canvas.
- * Read mode shows the scene itself, not the rendered picture.
+ * The strip starts on the type's storage tag (the altar's "Altar Library",
+ * `BlockTypeDef.storage`). Read mode shows the scene itself, not the
+ * rendered picture. "Save as picture" is the type's action, in the block's
+ * menu and the properties panel; it opens the canvas editor's export dialog.
  *
  * Saving: every change goes into the block at once; the rendered picture
  * for the export is made on "Done" if the scene changed, and goes into the
@@ -165,7 +171,7 @@ export default function CanvasBlock({ block, isEditing, onBlockChange, onPersist
   const editorRef = useRef<CanvasEditorHandle>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const editable = isEditing && !parsed.broken;
+  const editable = isEditing;
 
   const elements = useMemo(() => scene.elements.map(toElement), [scene.elements]);
   const background = useMemo(() => parseCanvasBackground(scene.background), [scene.background]);
@@ -194,7 +200,7 @@ export default function CanvasBlock({ block, isEditing, onBlockChange, onPersist
     const { block: current, onPersist: persist } = latest.current;
     const now = parseCanvasBlock(current);
     // Unchanged needs no new picture — unless it has none yet (an altar converted from before).
-    if (now.broken || !persist || (JSON.stringify(now.scene) === from && now.render)) return;
+    if (!persist || (JSON.stringify(now.scene) === from && now.render)) return;
     void renderScene(now.scene, profile.types, parseCanvasBackground(now.scene.background))
       .then(async (render) => {
         const { block: latestBlock, isEditing: editing, onPersist: save } = latest.current;
@@ -215,7 +221,6 @@ export default function CanvasBlock({ block, isEditing, onBlockChange, onPersist
   const commit = useCallback((patch: Partial<CanvasScene>) => {
     const { block: current, onBlockChange: change } = latest.current;
     const now = parseCanvasBlock(current);
-    if (now.broken) return;
     const next = withCanvasScene(current, { ...now.scene, ...patch }, now.render);
     // Seen at once by the next change, before the stack has rendered it (several pictures in a row).
     latest.current = { ...latest.current, block: next };
@@ -242,8 +247,11 @@ export default function CanvasBlock({ block, isEditing, onBlockChange, onPersist
   }, [commit]);
 
   // The strip's tag, saved with the block ('' for all; a tag gone since
-  // counts as none). Pictures added here carry it.
-  const { stripTag } = parsed;
+  // counts as none; none chosen yet: the type's storage tag). Pictures added here carry it.
+  const storage = useBlockStorage(block);
+  const storageTag = storage?.tagId ?? '';
+  const ensureStorageTag = storage?.ensure;
+  const stripTag = parsed.stripTag ?? storageTag;
   const tagLive = useTagStore((s) => s.tags.some((x) => x.id === stripTag));
   const activeTag = parts.images && tagLive ? stripTag : '';
   const setStripTag = useCallback((tag: string) => {
@@ -252,28 +260,31 @@ export default function CanvasBlock({ block, isEditing, onBlockChange, onPersist
     latest.current = { ...latest.current, block: next };
     change(next);
   }, []);
-  // The tag of pictures added here: the strip's. An altar's "Altar Library"
+  // The tag of pictures added here: the strip's. The type's storage tag
   // that this vault does not have yet is made with the first of them.
   const tagForNew = useCallback(async (): Promise<string> => {
     if (activeTag) return activeTag;
-    if (!parts.images || stripTag !== ALTAR_LIBRARY_TAG_ID) return '';
-    const tag = await useTagStore.getState().ensureTag(ALTAR_LIBRARY_TAG_NAME, ALTAR_LIBRARY_TAG_ID);
-    setStripTag(tag.id);
-    return tag.id;
-  }, [activeTag, parts.images, stripTag, setStripTag]);
+    if (!parts.images || !ensureStorageTag || stripTag !== storageTag) return '';
+    const tag = await ensureStorageTag();
+    setStripTag(tag);
+    return tag;
+  }, [activeTag, parts.images, stripTag, storageTag, ensureStorageTag, setStripTag]);
   const [adding, setAdding] = useState<string[] | null>(null);
   const [dropped, setDropped] = useState<string[]>([]);
 
   // The editor's export dialog: the scene as a file where the user chooses, named after the block's type.
   const exportPicture = useCallback((options: CanvasExportOptions) => {
     const { block: current } = latest.current;
+    const labelKey = resolveBlockType(current)?.labelKey ?? blockTypeTextKey(CANVAS_BLOCK_TYPE, 'label');
     void exportedScene(parseCanvasBlock(current).scene, profile.types, options)
       .then((dataUrl) => {
         if (!dataUrl) throw new Error('rendering the picture failed');
-        return savePictureAs(dataUrl, options.format, t(`blocks.types.${current.type === ALTAR_BLOCK_TYPE ? 'altar' : 'canvas'}.label`));
+        return savePictureAs(dataUrl, options.format, t(labelKey));
       })
       .catch((e: unknown) => exportErrorMessage(e, 'canvas'));
   }, [profile.types, t]);
+  // "Save as picture" from the block's menu or the properties panel: the export dialog.
+  useBlockAction(block.id, SAVE_PICTURE_ACTION, () => editorRef.current?.openExport());
 
   // The tool column's button: pictures from "Images" or the disk (the picture
   // picker, which gives the ones from the disk the strip's tag), in the
@@ -344,8 +355,7 @@ export default function CanvasBlock({ block, isEditing, onBlockChange, onPersist
       let offset = 0;
       for (const path of images) {
         try {
-          const file = await storeImageFromPath(path);
-          await useImageStore.getState().takeIn(file, { name: fileBaseName(path), tags: tag ? [tag] : [] });
+          const file = await storeBlockPicture(path, tag ? [tag] : []);
           await place(file, { x: at.x + offset, y: at.y + offset });
           offset += 32;
         } catch (e) {
@@ -355,7 +365,6 @@ export default function CanvasBlock({ block, isEditing, onBlockChange, onPersist
     })();
   });
 
-  if (parsed.broken) return <p className="block-field-error">{t('blocks.canvas.broken')}</p>;
   if (!isEditing && !elements.length && !background) return <p className="block-field-hint">{t('blocks.canvas.empty')}</p>;
 
   return (

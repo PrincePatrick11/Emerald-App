@@ -1,111 +1,72 @@
-import { extractInternalLinks } from '../internalLinkHtml';
-import { storedImageName, storedImageNamesIn } from '../schema';
-import { isImageIcon } from '../helpers';
-import { canvasBackgroundFile, canvasElementFile, isCanvasBlockType, parseCanvasBlock } from './canvas';
-import { FIELDS_BLOCK_TYPE, isSigilElement, parseFields } from './fields';
-import { isDrawingBlockType, parseDrawing } from './paint';
-import { sigilPartBlock } from './sigil';
-import { BLOCK_ATTR, type BlockInstance } from './types';
+import { parseBlocks } from './blockHtml';
+import { blockInterfaces, blockCountsLinks, resolveBlockType } from './blockTypes';
+import { RefReporter, type BlockRef } from './toolkit';
+import type { BlockInstance } from './types';
 
 /**
- * What a block points at — the rows of `block_refs`, rewritten whenever the
- * block is saved (`blockStore.ts`). Pure: the migration runs it under Node.
+ * What a block points at — the one list (`block_refs`) that "Linked
+ * entries", "include linked entries" in the export, "Images", the image
+ * cleanup and the tags a block gives its entry all read. Rewritten whenever
+ * the block is saved (`blockStore.ts`). Each type reports its own
+ * (`BlockTypeDef.refs`), the tags from its properties (`properties.tags`);
+ * this file only asks, and knows no block type or field kind.
  *
- * Roles:
- * - `content`: shown in the block — a link chip, a picture in a text or an
- *   image field, a picture on a canvas;
- * - `render`: the rendered picture of a canvas or a drawing;
- * - `layer`: the picture of a drawing's layer;
- * - `background`: a canvas's background picture;
- * - `default`: what a custom block's copy brings as a prefill;
- * - `icon`: a custom block's copy's icon, a file in the vault's `icons/`
- *   (kind `icon`) — every copy names the same file.
+ * Pure: the database path and `scripts/check-blocks.mjs` run it under Node.
  */
-type BlockRefKind = 'entry' | 'image' | 'icon';
-export type BlockRefRole = 'content' | 'render' | 'layer' | 'background' | 'default' | 'icon';
 
-interface BlockRef {
-  kind: BlockRefKind;
-  /** The entry's ID, or the stored file name of the picture or the icon. */
-  target: string;
-  role: BlockRefRole;
-}
-
-function imagesIn(text: string | null | undefined): string[] {
-  return storedImageNamesIn(text ?? '');
-}
-
-class RefSet {
-  private readonly seen = new Set<string>();
-  readonly refs: BlockRef[] = [];
-
-  add(kind: BlockRefKind, target: string | null | undefined, role: BlockRefRole): void {
-    if (!target) return;
-    if (kind === 'image' && !storedImageName(target)) return;
-    if (kind === 'icon' && !isImageIcon(target)) return;
-    const key = `${kind}\u0000${target}\u0000${role}`;
-    if (this.seen.has(key)) return;
-    this.seen.add(key);
-    this.refs.push({ kind, target, role });
-  }
-
-  /** Link chips and pictures in markup, as `role`. */
-  markup(html: string, role: BlockRefRole): void {
-    for (const link of extractInternalLinks(html)) this.add('entry', link.id, role);
-    for (const file of imagesIn(html)) this.add('image', file, role);
-  }
-
-  drawing(block: BlockInstance): void {
-    const { render, doc } = parseDrawing(block);
-    this.add('image', render, 'render');
-    for (const layer of doc?.layers ?? []) this.add('image', layer.image, 'layer');
-  }
-}
+export type { BlockRef, BlockRefRole } from './toolkit';
 
 export function blockRefs(block: BlockInstance): BlockRef[] {
-  const set = new RefSet();
+  const report = new RefReporter();
+  const def = blockInterfaces(block);
+  def.refs?.(block, report);
+  for (const tag of def.properties?.tags?.(block) ?? []) report.tag(tag);
+  return report.refs;
+}
 
-  if (isDrawingBlockType(block.type)) {
-    set.drawing(block);
-    return set.refs;
+/** The tags the blocks of a content give their entry — the same the save writes to `block_refs`. */
+export function blockTagsOf(blocks: readonly BlockInstance[]): string[] {
+  const tags = new Set<string>();
+  for (const block of blocks) {
+    // Only types that give tags: the rest would report every link and picture for nothing.
+    if (!resolveBlockType(block)?.properties?.tags) continue;
+    for (const ref of blockRefs(block)) if (ref.kind === 'tag') tags.add(ref.target);
   }
+  return [...tags];
+}
 
-  if (isCanvasBlockType(block.type)) {
-    const { scene, render } = parseCanvasBlock(block);
-    for (const el of scene.elements) set.add('image', canvasElementFile(el), 'content');
-    set.add('image', canvasBackgroundFile(scene.background), 'background');
-    set.add('image', render, 'render');
-    return set.refs;
-  }
+/** Is the reference a link the block shows (a chip, a link field) — not a prefill or a picture? */
+export function isLinkRef(ref: BlockRef): boolean {
+  return ref.kind === 'entry' && ref.role === 'content';
+}
 
-  if (block.type === FIELDS_BLOCK_TYPE) {
-    const model = parseFields(block);
-    const byId = new Map(model.elements.map((el) => [el.id, el]));
-    for (const [id, html] of Object.entries(model.slots)) {
-      const element = byId.get(id);
-      // A custom block's drawing part is a drawing of its own.
-      if (element?.kind === 'sigilCanvas' && isSigilElement(element)) set.drawing(sigilPartBlock(block, element, model));
-      else set.markup(html, 'content');
-    }
-    if (model.icon) set.add('icon', model.icon, 'icon');
-    for (const element of model.elements) {
-      const value = element.defaultValue;
-      if (element.kind === 'image' && typeof value === 'string') set.add('image', value, 'default');
-      if (element.kind === 'link' && value && typeof value === 'object' && 'id' in value) set.add('entry', String(value.id), 'default');
-    }
-    // A broken block keeps what its markup and JSON name, so nothing it holds goes unseen.
-    if (model.broken) {
-      set.markup(block.html, 'content');
-      for (const file of imagesIn(block.attrs[BLOCK_ATTR.config])) set.add('image', file, 'default');
-    }
-    return set.refs;
-  }
+/** Does the block link to this entry or task (`isLinkRef`)? */
+export function blockLinksTo(block: BlockInstance, id: string): boolean {
+  return blockRefs(block).some((ref) => isLinkRef(ref) && ref.target === id);
+}
 
-  // Text, and any type this version does not know: its markup is what it shows,
-  // a picture named in an attribute is the block's own.
-  set.markup(block.html, 'content');
-  for (const [name, value] of Object.entries(block.attrs)) {
-    for (const file of imagesIn(value)) set.add('image', file, name === BLOCK_ATTR.data ? 'content' : 'default');
+/**
+ * The entries and tasks a content links to, in order — what "Linked entries"
+ * lists, and the same set for the export's lists and "include linked entries":
+ * links a block shows (`isLinkRef`), of every block that counts them
+ * (`blockCountsLinks`: a block this version cannot read too, a hidden one only
+ * where its type says so). Its references stay in `block_refs` regardless.
+ */
+export function linkedIdsOf(content: string): Set<string> {
+  const ids = new Set<string>();
+  for (const block of parseBlocks(content)) {
+    if (!blockCountsLinks(block)) continue;
+    for (const ref of blockRefs(block)) if (isLinkRef(ref)) ids.add(ref.target);
   }
-  return set.refs;
+  return ids;
+}
+
+/**
+ * The block without a picture where it shows it as one of its own — its
+ * type's `withoutImage`; a type without one (a drawing) keeps it, as does a
+ * block this version cannot read (`blockReadState` newer or broken), which is
+ * saved unchanged.
+ */
+export function blockWithoutImage(block: BlockInstance, file: string): BlockInstance {
+  return blockInterfaces(block).withoutImage?.(block, file) ?? block;
 }

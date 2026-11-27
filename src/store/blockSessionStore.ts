@@ -25,6 +25,8 @@ export interface BlockStackApi {
   update: (id: string, next: BlockInstance) => void;
   /** Scroll to the block and highlight it briefly. */
   reveal: (id: string) => void;
+  /** Carry out an action of the block's type (`BlockTypeDef.actions`) — through its mounted view. */
+  runAction: (id: string, actionId: string) => void;
   /** The blocks with the live HTML of the text blocks — the session's `blocks` lags behind while typing. */
   liveBlocks: () => BlockInstance[];
   /** Open the stack's template picker — only in a stack with templates (`BlockSession.templates`). */

@@ -27,7 +27,7 @@ const DEFAULT_SORT: DashboardSort = { by: 'updated', dir: 'desc' };
  * built-ins' own start values into their rows (`BUILTIN_DASHBOARDS`), and a
  * new dashboard starts with this.
  */
-export const DEFAULT_DISPLAY: DashboardDisplay = { view: 'list', grouping: 'flat' };
+export const DEFAULT_DISPLAY: DashboardDisplay = { view: 'list', grouping: 'flat', info: 'long' };
 
 const DISPLAY_VIEWS: readonly DashboardDisplay['view'][] = ['list', 'cards', 'cards_wide', 'timeline'];
 
@@ -73,6 +73,7 @@ export function parseDashboardDisplay(raw: unknown): DashboardDisplay {
   return {
     view: DISPLAY_VIEWS.includes(value.view as DashboardDisplay['view']) ? value.view as DashboardDisplay['view'] : DEFAULT_DISPLAY.view,
     grouping: value.grouping === 'grouped' || value.grouping === 'flat' ? value.grouping : DEFAULT_DISPLAY.grouping,
+    info: value.info === 'short' || value.info === 'long' ? value.info : DEFAULT_DISPLAY.info,
   };
 }
 
@@ -135,13 +136,19 @@ export function filterCanMatch(filter: DashboardFilter, live: LiveIds): boolean 
   return ruleAlive(filter.categories, live.categories) && ruleAlive(filter.tags, live.tags);
 }
 
+/** The tags an entry carries: its own and those its blocks give it while they are there. */
+export function entryTagIds(entry: Pick<Entry, 'tags' | 'block_tags'>): string[] {
+  return entry.block_tags?.length ? [...new Set([...entry.tags, ...entry.block_tags])] : entry.tags;
+}
+
 /**
- * Does the entry pass the filter? A missing rule does not narrow; a rule that
- * names nothing that still exists (gone, or in the trash — `live` lacks them)
- * matches nothing. Also the export menu's collection (`bulkEntries`).
+ * Does the entry pass the filter? Tags count with those the blocks give
+ * (`entryTagIds`). A missing rule does not narrow; a rule that names nothing
+ * that still exists (gone, or in the trash — `live` lacks them) matches
+ * nothing. Also the export menu's collection (`bulkEntries`).
  */
 export function matchesFilter(
-  entry: Pick<Entry, 'category_id' | 'tags'>,
+  entry: Pick<Entry, 'category_id' | 'tags' | 'block_tags'>,
   filter: DashboardFilter,
   live: LiveIds,
 ): boolean {
@@ -149,7 +156,7 @@ export function matchesFilter(
     const id = entry.category_id;
     if (id === null || !filter.categories.includes(id) || !live.categories.has(id)) return false;
   }
-  if (filter.tags && !entry.tags.some((tag) => filter.tags!.includes(tag) && live.tags.has(tag))) return false;
+  if (filter.tags && !entryTagIds(entry).some((tag) => filter.tags!.includes(tag) && live.tags.has(tag))) return false;
   return true;
 }
 

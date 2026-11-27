@@ -4,7 +4,7 @@ import LinkedEntryPicker, { LinkedEntryChip, LinkItemIcon } from '../sidebar/fie
 import { useUIStore } from '../../store/uiStore';
 import { useLinkItems, useLinkTarget } from '../../hooks/useLinkItems';
 import { useCategoryStore } from '../../store/categoryStore';
-import { linkFromSlot, normalizeLinkCategoryFilter, passesLinkCategoryFilter, type LinkCategoryFilter } from '../../lib/blocks/fields';
+import { linkFromSlot, normalizeLinkCategoryFilter, passesLinkCategoryFilter, type LinkCategoryFilter } from '../../lib/blocks/toolkit';
 import { internalLinkChipHtml, toInternalLinkChip } from '../../lib/internalLinkHtml';
 import { isValidLinkTarget } from '../../lib/links';
 import { linkItemKey, type SuggestionItem } from '../../lib/linkItems';
