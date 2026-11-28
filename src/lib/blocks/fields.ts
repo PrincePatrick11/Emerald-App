@@ -509,14 +509,31 @@ export function newElement(kind: FieldKindDef, uses: FieldUses): ElementDef {
   return { id: generateId(), kind: kind.id, label: '', uses: { ...uses }, ...kind.initialConfig?.() };
 }
 
-/** A new field block with exactly one element of this kind — shown in its block only (`NO_USES`). */
-export function createFieldsBlock(kind: string): BlockInstance {
+function knownKind(kind: string): FieldKindDef {
   const def = fieldKindOf(kind);
   if (!def) throw new Error(`Unknown field kind: ${kind}`);
+  return def;
+}
+
+function fieldsBlockOf(elements: ElementDef[]): BlockInstance {
   return {
     id: generateId(),
     type: FIELDS_BLOCK_TYPE,
     html: '',
-    attrs: { [BLOCK_ATTR.config]: JSON.stringify({ elements: [newElement(def, NO_USES)], display: DEFAULT_DISPLAY }) },
+    attrs: { [BLOCK_ATTR.config]: JSON.stringify({ elements, display: DEFAULT_DISPLAY }) },
   };
+}
+
+/** A new field block with exactly one element of this kind — shown in its block only (`NO_USES`). */
+export function createFieldsBlock(kind: string): BlockInstance {
+  return fieldsBlockOf([newElement(knownKind(kind), NO_USES)]);
+}
+
+/**
+ * A new, empty field block with several named fields — the composite blocks
+ * the built-in templates start with. Each field takes its kind's start uses,
+ * as a field added in the block builder does.
+ */
+export function createNamedFieldsBlock(fields: readonly { kind: string; label: string }[]): BlockInstance {
+  return fieldsBlockOf(fields.map(({ kind, label }) => ({ ...newElement(knownKind(kind), initialUses(kind)), label })));
 }

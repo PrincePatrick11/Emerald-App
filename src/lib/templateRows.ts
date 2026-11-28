@@ -3,14 +3,18 @@ import type { TFunction } from 'i18next';
 import { nowIso } from './helpers';
 import { fromRow, type DbRow } from './row';
 import { readContents, replaceOwnerBlocks } from './blockStore';
-import { ALTAR_CATEGORY_ID, DREAMS_CATEGORY_ID, JOURNAL_CATEGORY_ID, SIGIL_CATEGORY_ID } from './schema';
-import { serializeBlocks } from './blocks/blockHtml';
+import {
+  ALTAR_CATEGORY_ID, CRYSTALS_CATEGORY_ID, DEITIES_CATEGORY_ID, DREAMS_CATEGORY_ID, JOURNAL_CATEGORY_ID, RITUAL_CATEGORY_ID, SIGIL_CATEGORY_ID,
+} from './schema';
+import { createTextBlock, serializeBlocks } from './blocks/blockHtml';
+import { createNamedFieldsBlock } from './blocks/fields';
 import { translatedOr } from './blocks/toolkit';
 import { createSigilBlock } from './blocks/sigil';
 import { altarBlockSet } from './blocks/canvas';
-import { moonBlockSet } from './blocks/moon';
+import { createMoonBlock, moonBlockSet } from './blocks/moon';
 import {
-  ALTAR_TEMPLATE_ID, DREAMS_TEMPLATE_ID, JOURNAL_TEMPLATE_ID, SIGIL_TEMPLATE_ID, templateToRow, type Template,
+  ALTAR_TEMPLATE_ID, CRYSTALS_TEMPLATE_ID, DEITIES_TEMPLATE_ID, DREAMS_TEMPLATE_ID, JOURNAL_TEMPLATE_ID, RITUAL_TEMPLATE_ID, SIGIL_TEMPLATE_ID,
+  templateToRow, type Template,
 } from './blocks/templates';
 import { readTags, tagStatements } from './tagRefs';
 import type { BlockInstance } from './blocks/types';
@@ -66,6 +70,9 @@ async function startCategoryWith(db: Database, categoryId: string, templateId: s
   await db.execute('UPDATE categories SET template_id=$1 WHERE id=$2 AND template_id IS NULL', [templateId, categoryId]);
 }
 
+/** A field's name in the app language, or `fallback` if i18n is not ready yet. */
+type FieldLabeler = (key: string, fallback: string) => string;
+
 /** A built-in template: what it is called and starts with, and the category it starts. */
 interface BuiltinTemplate {
   id: string;
@@ -73,8 +80,17 @@ interface BuiltinTemplate {
   nameKey: string;
   fallback: string;
   icon: string;
-  blocks: () => BlockInstance[];
+  /** Its blocks; the names of its fields end up in the row like its own name. */
+  blocks: (label: FieldLabeler) => BlockInstance[];
   categoryId: string;
+}
+
+/** A field of a built-in template: its kind, and its name under `templates.fields.<key>`. */
+type FieldSpec = readonly [kind: string, key: string, fallback: string];
+
+/** One field block with the named fields, in their order. */
+function namedFields(label: FieldLabeler, specs: readonly FieldSpec[]): BlockInstance {
+  return createNamedFieldsBlock(specs.map(([kind, key, fallback]) => ({ kind, label: label(`templates.fields.${key}`, fallback) })));
 }
 
 /**
@@ -86,11 +102,45 @@ interface BuiltinTemplate {
 const BUILTIN_TEMPLATES: readonly BuiltinTemplate[] = [
   // Moon phase and text.
   { id: JOURNAL_TEMPLATE_ID, nameKey: 'templates.builtin.journal', fallback: 'Journal', icon: '📓', blocks: moonBlockSet, categoryId: JOURNAL_CATEGORY_ID },
-  { id: DREAMS_TEMPLATE_ID, nameKey: 'templates.builtin.dreams', fallback: 'Dream Journal', icon: '💭', blocks: moonBlockSet, categoryId: DREAMS_CATEGORY_ID },
-  // One sigil block with all its parts.
-  { id: SIGIL_TEMPLATE_ID, nameKey: 'templates.builtin.sigil', fallback: 'Sigil', icon: '🔯', blocks: () => [createSigilBlock()], categoryId: SIGIL_CATEGORY_ID },
+  {
+    id: DREAMS_TEMPLATE_ID, nameKey: 'templates.builtin.dreams', fallback: 'Dream Journal', icon: '💭', categoryId: DREAMS_CATEGORY_ID,
+    blocks: (label) => [createMoonBlock(), namedFields(label, [
+      ['text', 'dream', 'Dream'],
+      ['shorttext', 'mood', 'Feeling/Mood'],
+      ['text', 'interpretation', 'Interpretation'],
+    ])],
+  },
+  // One sigil block with all its parts, and a text for notes.
+  { id: SIGIL_TEMPLATE_ID, nameKey: 'templates.builtin.sigil', fallback: 'Sigil', icon: '🔯', blocks: () => [createSigilBlock(), createTextBlock()], categoryId: SIGIL_CATEGORY_ID },
   // An altar and a text for notes.
   { id: ALTAR_TEMPLATE_ID, nameKey: 'templates.builtin.altar', fallback: 'Altar', icon: '🪔', blocks: altarBlockSet, categoryId: ALTAR_CATEGORY_ID },
+  {
+    id: RITUAL_TEMPLATE_ID, nameKey: 'templates.builtin.ritual', fallback: 'Ritual', icon: '🪄', categoryId: RITUAL_CATEGORY_ID,
+    blocks: (label) => [createMoonBlock(), namedFields(label, [
+      ['shorttext', 'intention', 'Intention'],
+      ['checklist', 'materials', 'Materials'],
+      ['text', 'procedure', 'Procedure'],
+      ['text', 'outcome', 'Outcome'],
+    ])],
+  },
+  {
+    id: DEITIES_TEMPLATE_ID, nameKey: 'templates.builtin.deities', fallback: 'Deity', icon: '✨', categoryId: DEITIES_CATEGORY_ID,
+    blocks: (label) => [namedFields(label, [
+      ['image', 'image', 'Image'],
+      ['shorttext', 'pantheon', 'Pantheon/Tradition'],
+      ['shorttext', 'domains', 'Domains'],
+      ['shorttext', 'symbols', 'Symbols and offerings'],
+    ]), createTextBlock()],
+  },
+  {
+    id: CRYSTALS_TEMPLATE_ID, nameKey: 'templates.builtin.crystals', fallback: 'Crystal', icon: '🔮', categoryId: CRYSTALS_CATEGORY_ID,
+    blocks: (label) => [namedFields(label, [
+      ['image', 'image', 'Image'],
+      ['shorttext', 'colour', 'Colour'],
+      ['shorttext', 'effect', 'Effect'],
+      ['shorttext', 'element', 'Element/Chakra'],
+    ]), createTextBlock()],
+  },
 ];
 
 /**
@@ -98,6 +148,7 @@ const BUILTIN_TEMPLATES: readonly BuiltinTemplate[] = [
  * trash) — for fresh vaults — and makes it the start template of its category.
  */
 export async function seedBuiltinTemplates(db: Database, t: TFunction): Promise<void> {
+  const label: FieldLabeler = (key, fallback) => translatedOr(t, key, fallback);
   for (const builtin of BUILTIN_TEMPLATES) {
     if (await templateById(db, builtin.id)) continue;
     const now = nowIso();
@@ -106,7 +157,7 @@ export async function seedBuiltinTemplates(db: Database, t: TFunction): Promise<
       name: translatedOr(t, builtin.nameKey, builtin.fallback),
       icon: builtin.icon,
       title: '',
-      content: serializeBlocks(builtin.blocks()),
+      content: serializeBlocks(builtin.blocks(label)),
       tags: [],
       sort_order: await nextTemplateSortOrder(db),
       created_at: now,

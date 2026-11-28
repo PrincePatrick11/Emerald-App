@@ -66,7 +66,7 @@ const label = categoryLabel(t, cat);
 const label = cat.name;
 ```
 
-`categoryLabel` resolves a builtin via `categories.builtin.<id>` and returns `cat.name` unchanged for everything else. That includes a fresh vault's nine starter categories: `categories.starter.<key>` is used only once, to *name* them at creation; from then on they are ordinary rows the user can rename or delete. There are no module-scoped category keys: every category name goes through `categories.*`.
+`categoryLabel` resolves a builtin via `categories.builtin.<id>` and returns `cat.name` unchanged for everything else. That includes a fresh vault's four starter categories: `categories.starter.<key>` is used only once, to *name* them at creation; from then on they are ordinary rows the user can rename or delete. There are no module-scoped category keys: every category name goes through `categories.*`.
 
 ## Key Structure
 
@@ -88,7 +88,7 @@ Top-level keys of `en.json`, with the conventions worth knowing:
 | `symbols` | The canvas editor's symbol library: its own labels, `packs.*` the pack names, and `<pack>.<name>` every symbol's name, which the library's search looks in; also `editTitle`, the title of the Symbols view's edit dialog |
 | `moonPhase` | Display names of the eight moon phases |
 | `search` | Dashboard search placeholders (`placeholder`, `placeholderIn` with `{{title}}`) and the title bar's global search (`globalPlaceholder`, `hint`, `clear`, `showMore`). Result module labels reuse `nav.*`; only `categories` has its own |
-| `templates` | Templates dashboard and page; `builtin.journal`, `builtin.dreams`, `builtin.sigil` and `builtin.altar` name the built-in `core-journal`, `core-dreams`, `core-sigil` and `core-altar` templates the way `categories.builtin.*` names a category; `insert.*` is the editor's picker and apply flow |
+| `templates` | Templates dashboard and page; `builtin.*` names the built-in `core-*` templates and `fields.*` the fields of their field blocks, both written into the rows once, at creation, like `categories.starter.*`; `insert.*` is the editor's picker and apply flow |
 | `lexicon` | Lexicon dashboard, language page and translate field. `wordCount` counts vocabulary rows; the translated text's own count is `textWordCount` |
 | `tags` | Tags view (`new`, `name`, `nameTaken`, `color`, `unused`; the usage filter `usage`, `inEntries` and the `onlyIn*`, `*Filter` and `*Hint` keys, one set per state; `deleteWarning` before deleting a tag still on entries, `entrySort` for the sort of the entries under the tags) |
 | `properties` | Right sidebar Properties panel; `fromBlock`/`fromBlockUnnamed`/`fromBlockFixed` are the tooltips of the "from a block" mark |

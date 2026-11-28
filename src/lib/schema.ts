@@ -411,9 +411,14 @@ export const ALTAR_CATEGORY_ID = 'altars';
 /**
  * The dream journal of the starter set: an ordinary category, renamable and
  * deletable, whose new entries start with the built-in template `core-dreams`
- * (moon phase and text) while it is there.
+ * while it is there.
  */
 export const DREAMS_CATEGORY_ID = 'dreams';
+
+/** The other starter categories; each starts with a built-in template of its own (`templateRows.ts`). */
+export const RITUAL_CATEGORY_ID = 'ritual';
+export const DEITIES_CATEGORY_ID = 'deities';
+export const CRYSTALS_CATEGORY_ID = 'crystals';
 
 /** [id, name (database only — `categories.builtin.<id>` is displayed), emoji]. */
 const BUILTIN_CATEGORIES: readonly [string, string, string][] = [
@@ -429,14 +434,9 @@ const BUILTIN_CATEGORIES: readonly [string, string, string][] = [
  */
 const STARTER_CATEGORIES: readonly [string, string][] = [
   [DREAMS_CATEGORY_ID, '💭'],
-  ['paradigm', '🌀'],
-  ['ritual', '🪄'],
-  ['meditation', '🧘'],
-  ['herbs', '🌿'],
-  ['crystals', '🔮'],
-  ['candles', '🕯️'],
-  ['deities', '✨'],
-  ['tools', '⚗️'],
+  [RITUAL_CATEGORY_ID, '🪄'],
+  [DEITIES_CATEGORY_ID, '✨'],
+  [CRYSTALS_CATEGORY_ID, '🔮'],
 ];
 
 /**
@@ -460,8 +460,8 @@ const BUILTIN_DASHBOARDS: readonly {
 }[] = [
   { key: 'all', categories: null, sort: { by: 'updated', dir: 'desc' }, display: { view: 'list', grouping: 'flat' } },
   { key: 'journal', categories: [JOURNAL_CATEGORY_ID, DREAMS_CATEGORY_ID], sort: { by: 'created', dir: 'desc' }, display: { view: 'list', grouping: 'flat' } },
-  { key: 'practice', categories: [SIGIL_CATEGORY_ID, ALTAR_CATEGORY_ID, 'ritual', 'meditation'], sort: { by: 'updated', dir: 'desc' }, display: { view: 'list', grouping: 'grouped' } },
-  { key: 'knowledge', categories: ['paradigm', 'herbs', 'crystals', 'candles', 'deities', 'tools'], sort: { by: 'title', dir: 'asc' }, display: { view: 'cards', grouping: 'grouped' } },
+  { key: 'practice', categories: [SIGIL_CATEGORY_ID, ALTAR_CATEGORY_ID, RITUAL_CATEGORY_ID], sort: { by: 'updated', dir: 'desc' }, display: { view: 'list', grouping: 'grouped' } },
+  { key: 'knowledge', categories: [DEITIES_CATEGORY_ID, CRYSTALS_CATEGORY_ID], sort: { by: 'title', dir: 'asc' }, display: { view: 'cards', grouping: 'grouped' } },
 ];
 
 /** The content tables with `category_id`. A literal, because it is interpolated into SQL. */
@@ -481,8 +481,8 @@ export async function createSchema(db: Database): Promise<void> {
  * Creates the built-in categories, the starter set and the built-in
  * dashboards. Only for fresh vaults. `starterName` translates a
  * STARTER_CATEGORIES key into the app language — the caller passes `i18n.t`
- * through so that this file stays free of i18n. The start templates of
- * `sigils` and `altars` are set by their seeds (`lib/templateRows.ts`).
+ * through so that this file stays free of i18n. The start templates of the
+ * categories are set by their seeds (`lib/templateRows.ts`).
  */
 export async function seedBuiltins(
   db: Database,

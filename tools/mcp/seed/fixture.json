@@ -169,7 +169,7 @@
       "title": "Prosperity Sigil",
       "category_id": "sigils",
       "entry_number": 8,
-      "content": "<p>Statement of intent, reduced and bound. Method in @@chip(seed-entry-sigil-method,entry,Sigil Method)@@.</p>",
+      "content": "<section data-block=\"core.sigil\" data-block-id=\"21de0178-8654-4201-8ad9-7b01492e9535\" data-block-data=\"{&quot;calc&quot;:{&quot;intention&quot;:&quot;I attract prosperity&quot;,&quot;letters&quot;:[&quot;I&quot;,&quot;A&quot;,&quot;T&quot;,&quot;R&quot;,&quot;C&quot;,&quot;P&quot;,&quot;O&quot;,&quot;S&quot;,&quot;E&quot;,&quot;Y&quot;],&quot;implemented&quot;:[&quot;I&quot;,&quot;A&quot;,&quot;T&quot;,&quot;R&quot;]}}\"><div data-sigil-part=\"calc\"><p>I attract prosperity</p><p><s>I</s> <s>A</s> <s>T</s> <s>R</s> C P O S E Y</p></div></section><section data-block=\"core.text\" data-block-id=\"69a2f6a0-10a9-45a5-9d84-d32ae337ae96\"><p>Statement of intent, reduced and bound. Method in @@chip(seed-entry-sigil-method,entry,Sigil Method)@@.</p></section>",
       "tags": [
         "seed-tag-ritual"
       ],

@@ -1289,7 +1289,7 @@ export async function resolveImportedCategories(
   const nameOf = (row: Row) => (row.is_builtin
     ? i18n.t(`categories.builtin.${String(row.id)}`, { defaultValue: String(row.name ?? '') })
     : String(row.name ?? ''));
-  // Built-ins and starters (`dreams`, `herbs` …) have the same ID in every
+  // Built-ins and starters (`dreams`, `ritual` …) have the same ID in every
   // vault; a starter's name may have been renamed or come from another app
   // language. Matched by ID, or the built-in dashboards, which name them,
   // would end up on a duplicate.

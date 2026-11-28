@@ -3,7 +3,7 @@
  *
  * The schema is not reproduced here. It is taken from the app checkout this is
  * pointed at, by bundling that checkout's own `src/lib/schema.ts` and calling
- * the real `createSchema` and `seedBuiltins`. A checkout on a branch that
+ * the real `createSchema`, `seedBuiltins` and `seedBuiltinTemplates`. A checkout on a branch that
  * changed the schema therefore gets a seed for *its* schema, which a golden
  * .db committed to this repo could never do.
  *
@@ -86,6 +86,19 @@ class HarnessDb {
   async select(sql, params = []) {
     return this.raw.prepare(toIndexedPlaceholders(sql)).all(...params);
   }
+  /** Like the app's `db_batch`: one transaction, all or nothing. */
+  async batch(statements) {
+    let affected = 0;
+    this.raw.exec('BEGIN');
+    try {
+      for (const [sql, params = []] of statements) affected += (await this.execute(sql, params)).rowsAffected;
+      this.raw.exec('COMMIT');
+    } catch (err) {
+      this.raw.exec('ROLLBACK');
+      throw err;
+    }
+    return affected;
+  }
   close() {
     this.raw.close();
   }
@@ -132,7 +145,8 @@ async function loadAppModules(checkout, workDir) {
     `export { BASELINE_VERSION, TABLES, createSchema, seedBuiltins, checkIntegrity } from '${src}/schema';
      export { internalLinkChipHtml } from '${src}/internalLinkHtml';
      export { runMigrations } from '${src}/db';
-     export { replaceOwnerBlocks } from '${src}/blockStore';`
+     export { replaceOwnerBlocks } from '${src}/blockStore';
+     export { seedBuiltinTemplates } from '${src}/templateRows';`
   );
 
   const bundlePath = join(workDir, 'bundle.mjs');
@@ -152,9 +166,10 @@ async function loadAppModules(checkout, workDir) {
 
 /* -- fixture ----------------------------------------------------------- */
 
-/** Starter category names as the app would render them, read from the
- *  checkout's own locale file rather than the i18n runtime. */
-function starterNamer(checkout, locale) {
+/** Texts as the app would render them - starter category names, the names of
+ *  the built-in templates and their fields - read from the checkout's own
+ *  locale file rather than the i18n runtime. Takes a dotted key, as `t` does. */
+function localeText(checkout, locale) {
   let messages = {};
   try {
     messages = JSON.parse(
@@ -368,7 +383,12 @@ export async function buildSeed(opts) {
     await db.execute('PRAGMA foreign_keys = ON');
 
     await app.createSchema(db);
-    await app.seedBuiltins(db, starterNamer(opts.checkout, opts.locale));
+    // What a fresh vault of the app starts with (`runMigrations` in db.ts): the
+    // categories and dashboards, then the built-in templates, each the start
+    // template of its category - without them a new sigil would start empty.
+    const t = localeText(opts.checkout, opts.locale);
+    await app.seedBuiltins(db, (key) => t(`categories.starter.${key}`));
+    await app.seedBuiltinTemplates(db, t);
 
     const report = { counts: {}, dropped: {} };
     const chipHtml = app.internalLinkChipHtml;

@@ -21,7 +21,7 @@ export function createMoonBlock(): BlockInstance {
   return { id: generateId(), type: MOON_BLOCK_TYPE, html: '', attrs: {} };
 }
 
-/** What the built-in journal and dream journal templates start with: the moon phase, then text. */
+/** What the built-in journal template starts with: the moon phase, then text. */
 export function moonBlockSet(): BlockInstance[] {
   return [createMoonBlock(), createTextBlock()];
 }

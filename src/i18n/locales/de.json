@@ -38,14 +38,9 @@
     },
     "starter": {
       "dreams": "Traumtagebuch",
-      "paradigm": "Paradigma",
       "ritual": "Ritual",
-      "meditation": "Meditation",
-      "herbs": "Kräuter",
       "crystals": "Kristalle",
-      "candles": "Kerzen",
-      "deities": "Gottheiten",
-      "tools": "Werkzeuge"
+      "deities": "Gottheiten"
     },
     "startTemplate": "Startvorlage",
     "startTemplateHint": "Womit ein neuer Eintrag in dieser Kategorie beginnt. „Standardvorlage“ ist die unter Vorlagen eingestellte.",
@@ -1297,7 +1292,26 @@
       "sigil": "Sigille",
       "altar": "Altar",
       "journal": "Journal",
-      "dreams": "Traumtagebuch"
+      "dreams": "Traumtagebuch",
+      "ritual": "Ritual",
+      "deities": "Gottheit",
+      "crystals": "Kristall"
+    },
+    "fields": {
+      "dream": "Traum",
+      "mood": "Gefühl/Stimmung",
+      "interpretation": "Deutung",
+      "intention": "Absicht",
+      "materials": "Material",
+      "procedure": "Ablauf",
+      "outcome": "Ergebnis",
+      "image": "Bild",
+      "pantheon": "Pantheon/Tradition",
+      "domains": "Zuständigkeiten",
+      "symbols": "Symbole und Opfergaben",
+      "colour": "Farbe",
+      "effect": "Wirkung",
+      "element": "Element/Chakra"
     },
     "newTemplate": "Neue Vorlage",
     "defaultName": "Neue Vorlage",

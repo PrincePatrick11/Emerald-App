@@ -139,6 +139,8 @@ writeFileSync(
    export { invalidateVaultCache } from '${root}/src/lib/vaultManager';
    export { clearSavedBlocks, readContents, replaceOwnerBlocks, retagBlocks, dropBlockTagStatements, placeholders } from '${root}/src/lib/blockStore';
    export { BUILTIN_TEMPLATE_IDS } from '${root}/src/lib/blocks/templates';
+   export { parseBlocks } from '${root}/src/lib/blocks/blockHtml';
+   export { parseFields } from '${root}/src/lib/blocks/fields';
    export { registerBlockType } from '${root}/src/lib/blocks/blockTypes';
    export { collectImageUses } from '${root}/src/lib/imageUsage';
    export { imageDetailsOf, importImageDetails } from '${root}/src/lib/emerald/imageDetails';`
@@ -181,7 +183,7 @@ const {
   assertPayloadReferencesResolve, collectVaultContent, definitionRows, doMerge, doReplace, insertBlockDefinitions,
   resolveImportedCategories, vaultContentOf, vaultManifestOf, FULL_BACKUP_OPTIONS, prepareRawDatabase,
   categoryRowsOf, contentToBlocks, manifestCategoryOf, parseManifest, parseVaultManifest, usedDefinitionIds, EMERALD_FORMAT_VERSION,
-  invalidateVaultCache, clearSavedBlocks, readContents, replaceOwnerBlocks, retagBlocks, dropBlockTagStatements, placeholders, BUILTIN_TEMPLATE_IDS, registerBlockType, collectImageUses,
+  invalidateVaultCache, clearSavedBlocks, readContents, replaceOwnerBlocks, retagBlocks, dropBlockTagStatements, placeholders, BUILTIN_TEMPLATE_IDS, parseBlocks, parseFields, registerBlockType, collectImageUses,
   imageDetailsOf, importImageDetails,
 } = await import(pathToFileURL(bundlePath).href);
 
@@ -653,8 +655,9 @@ console.log('\n7. Seeds: built-in categories, starter set, built-in templates an
     JSON.stringify(cats)
   );
   check(
-    'starter set as normal categories, translated (harness: en)',
-    cats.some((c) => c.id === 'herbs' && c.is_builtin === 0 && c.name === 'Herbs') && cats.some((c) => c.id === 'dreams' && c.is_builtin === 0 && c.name === 'Dream Journal'),
+    'exactly the seven start categories, the starter set as normal categories, translated (harness: en)',
+    cats.map((c) => c.id).join() === 'journal,dreams,sigils,altars,ritual,deities,crystals'
+      && JSON.stringify(cats.filter((c) => c.is_builtin === 0).map((c) => c.name)) === JSON.stringify(['Dream Journal', 'Ritual', 'Deities', 'Crystals']),
     JSON.stringify(cats)
   );
   check(
@@ -671,21 +674,34 @@ console.log('\n7. Seeds: built-in categories, starter set, built-in templates an
     JSON.stringify(starts)
   );
   check(
-    'with one sigil block (harness: English name)',
-    t?.name === 'Sigil' && (content.match(/data-block="/g) ?? []).length === 1 && content.includes('data-block="core.sigil"'),
+    'with a sigil block, then a text for notes (harness: English name)',
+    t?.name === 'Sigil' && [...content.matchAll(/data-block="([^"]+)"/g)].map((m) => m[1]).join() === 'core.sigil,core.text',
     content
   );
   check('the altar template, the start template of "altars"',
     starts.altars === 'core-altar', JSON.stringify(starts));
-  check('the journal and dream journal templates start "journal" and "dreams"; no other category has one',
-    starts.journal === 'core-journal' && starts.dreams === 'core-dreams'
-      && Object.entries(starts).every(([id, tpl]) => ['sigils', 'altars', 'journal', 'dreams'].includes(id) || tpl === null), JSON.stringify(starts));
-  for (const [id, name] of [['core-journal', 'Journal'], ['core-dreams', 'Dream Journal']]) {
+  check('every start category starts with its own built-in template',
+    Object.keys(starts).length === 7 && Object.entries({
+      journal: 'core-journal', dreams: 'core-dreams', sigils: 'core-sigil', altars: 'core-altar',
+      ritual: 'core-ritual', deities: 'core-deities', crystals: 'core-crystals',
+    }).every(([id, tpl]) => starts[id] === tpl), JSON.stringify(starts));
+  check('the built-in templates are exactly BUILTIN_TEMPLATE_IDS',
+    (await baseline.select('SELECT id FROM templates ORDER BY id')).map((r) => r.id).join() === [...BUILTIN_TEMPLATE_IDS].sort().join());
+  // What each built-in template starts with: its blocks in order, and the named fields of its field block (harness: English).
+  const builtinStacks = {
+    'core-journal': ['Journal', 'core.moon,core.text', []],
+    'core-dreams': ['Dream Journal', 'core.moon,core.fields', [['text', 'Dream'], ['shorttext', 'Feeling/Mood'], ['text', 'Interpretation']]],
+    'core-ritual': ['Ritual', 'core.moon,core.fields', [['shorttext', 'Intention'], ['checklist', 'Materials'], ['text', 'Procedure'], ['text', 'Outcome']]],
+    'core-deities': ['Deity', 'core.fields,core.text', [['image', 'Image'], ['shorttext', 'Pantheon/Tradition'], ['shorttext', 'Domains'], ['shorttext', 'Symbols and offerings']]],
+    'core-crystals': ['Crystal', 'core.fields,core.text', [['image', 'Image'], ['shorttext', 'Colour'], ['shorttext', 'Effect'], ['shorttext', 'Element/Chakra']]],
+  };
+  for (const [id, [name, types, fields]] of Object.entries(builtinStacks)) {
     const [row] = await baseline.select('SELECT name FROM templates WHERE id=$1', [id]);
-    const stack = await stackOf(baseline, 'template', id);
-    const types = [...stack.matchAll(/data-block="([^"]+)"/g)].map((m) => m[1]).join();
-    check(`${id}: a moon phase, then text (harness: English name)`,
-      row?.name === name && types === 'core.moon,core.text', stack);
+    const blocks = parseBlocks(await stackOf(baseline, 'template', id));
+    const named = blocks.filter((b) => b.type === 'core.fields').flatMap((b) => parseFields(b).elements.map((e) => [e.kind, e.label]));
+    check(`${id}: ${types} (harness: English names)`,
+      row?.name === name && blocks.map((b) => b.type).join() === types && JSON.stringify(named) === JSON.stringify(fields),
+      JSON.stringify({ name: row?.name, types: blocks.map((b) => b.type), named }));
   }
   const dashboards = await baseline.select('SELECT id, builtin, position, filter, sort FROM dashboards ORDER BY position');
   const filterOf = (id) => JSON.parse(dashboards.find((d) => d.id === id)?.filter ?? 'null');
@@ -694,8 +710,8 @@ console.log('\n7. Seeds: built-in categories, starter set, built-in templates an
   check('"all" has no filter; journal, practice and knowledge filter by their starter categories',
     JSON.stringify(filterOf('all')) === '{}'
       && JSON.stringify(filterOf('journal')) === JSON.stringify({ categories: ['journal', 'dreams'] })
-      && JSON.stringify(filterOf('practice')) === JSON.stringify({ categories: ['sigils', 'altars', 'ritual', 'meditation'] })
-      && JSON.stringify(filterOf('knowledge')) === JSON.stringify({ categories: ['paradigm', 'herbs', 'crystals', 'candles', 'deities', 'tools'] }),
+      && JSON.stringify(filterOf('practice')) === JSON.stringify({ categories: ['sigils', 'altars', 'ritual'] })
+      && JSON.stringify(filterOf('knowledge')) === JSON.stringify({ categories: ['deities', 'crystals'] }),
     JSON.stringify(dashboards));
   check('every category of a dashboard exists', (await checkIntegrity(baseline)).filter((o) => o.table === 'dashboards').length === 0);
 }
@@ -710,7 +726,7 @@ console.log('\n8. Templates and the lexicon\n');
   );
   await db.execute(
     `INSERT INTO dashboards (id,name,filter,created_at,updated_at) VALUES ('d1','Eigen',$1,$2,$2)`, // lang-ok
-    [JSON.stringify({ categories: ['weg', 'herbs', 'fehlt'] }), now],
+    [JSON.stringify({ categories: ['weg', 'crystals', 'fehlt'] }), now],
   );
   await insertWithStack(db, 'templates', { id: 't1', name: 'Vorlage', created_at: now, updated_at: now }, `<p><img src="${'d'.repeat(64)}.png"></p>`);
   const orphans = await checkIntegrity(db);
@@ -723,14 +739,14 @@ console.log('\n8. Templates and the lexicon\n');
   const [d1] = await db.select("SELECT filter FROM dashboards WHERE id='d1'");
   check(
     'reassignCategoryContent removes the category from the dashboards\' filters',
-    !d1.filter.includes('"weg"') && d1.filter.includes('"herbs"'),
+    !d1.filter.includes('"weg"') && d1.filter.includes('"crystals"'),
     d1.filter
   );
   // A category's start template: deleting the template for good leaves the category without one.
-  await db.execute("UPDATE categories SET template_id='t1' WHERE id='herbs'");
+  await db.execute("UPDATE categories SET template_id='t1' WHERE id='crystals'");
   await db.execute("DELETE FROM templates WHERE id='t1'");
   check('deleting a start template for good clears it on its category (ON DELETE SET NULL)',
-    (await db.select("SELECT template_id FROM categories WHERE id='herbs'"))[0].template_id === null);
+    (await db.select("SELECT template_id FROM categories WHERE id='crystals'"))[0].template_id === null);
   await insertWithStack(db, 'templates', { id: 't1', name: 'Vorlage', created_at: now, updated_at: now }, `<p><img src="${'d'.repeat(64)}.png"></p>`);
   check(
     'collectUsedImageFilenames knows images in the block stack of a template',
@@ -1203,6 +1219,14 @@ console.log('\n11. .vault.emerald: the round trip of a vault content, other vers
     check('.emerald: another category goes by the name it had at export', map.get('c-ritual') === 'c-local', [...map]);
     check('.emerald: a category without a namesake here is created, once',
       !!created && map.get('c-new') === created.id && (await itemDst.select('SELECT COUNT(*) AS n FROM categories'))[0].n === before + 1);
+    // A starter ID no longer in the starter set (`herbs`, a former starter): an ordinary category, created under its name.
+    const old = await resolveImportedCategories(itemDst, [{ id: 'herbs', name: 'Kräuter', emoji: '🌿', is_builtin: 0 }]); // lang-ok
+    const [herbs] = await itemDst.select("SELECT id, name, is_builtin FROM categories WHERE name = 'Kräuter'"); // lang-ok
+    check('.emerald: a category under a starter ID that no longer exists is created under its name',
+      !!herbs && herbs.is_builtin === 0 && old.map.get('herbs') === herbs.id, [...old.map]);
+    const again = await resolveImportedCategories(itemDst, [{ id: 'herbs', name: 'Herbs', emoji: '🌿', is_builtin: 0 }]);
+    check('.emerald: …and matched by name, not by that ID, the next time',
+      again.map.get('herbs') !== herbs.id && (await itemDst.select("SELECT COUNT(*) AS n FROM categories WHERE name = 'Herbs'"))[0].n === 1, [...again.map]);
     await insertBlockDefinitions(itemDst, parsed.blockDefinitions);
     await insertBlockDefinitions(itemDst, parsed.blockDefinitions);
     const definitions = await itemDst.select('SELECT id, name FROM block_definitions WHERE id = $1', [DEF]);

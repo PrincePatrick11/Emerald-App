@@ -97,15 +97,15 @@ placeholder — in practice the MCP client replaces that with direct tool calls.
 
 **Example conversation:**
 
-> User: "Create an article about sage for me"
+> User: "Create an article about amethyst for me"
 >
 > Hermes (following this skill):
 > 1. Looks up the entry create pattern
 > 2. Opens the Knowledge dashboard in the rail and presses "New entry"
-> 3. Types the title "Sage"
+> 3. Types the title "Amethyst"
 > 4. Fills the body via ProseMirror
 > 5. Presses "Done"
-> 6. Optionally: opens Properties, sets the category to "Herbs"
+> 6. Optionally: opens Properties, sets the category to "Crystals"
 
 **Hermes-specific notes:**
 - Wait for the next state with `wait_for` (React needs time to re-render): `await mcp.call_tool("wait_for", { selector, timeout_ms: 3000 })`

@@ -38,14 +38,9 @@
     },
     "starter": {
       "dreams": "Diario de sueños",
-      "paradigm": "Paradigma",
       "ritual": "Ritual",
-      "meditation": "Meditación",
-      "herbs": "Hierbas",
       "crystals": "Cristales",
-      "candles": "Velas",
-      "deities": "Deidades",
-      "tools": "Herramientas"
+      "deities": "Deidades"
     },
     "startTemplate": "Plantilla inicial",
     "startTemplateHint": "Con qué empieza una entrada nueva de esta categoría. «Plantilla predeterminada» es la que se elige en Plantillas.",
@@ -1297,7 +1292,26 @@
       "sigil": "Sigilo",
       "altar": "Altar",
       "journal": "Diario",
-      "dreams": "Diario de sueños"
+      "dreams": "Diario de sueños",
+      "ritual": "Ritual",
+      "deities": "Deidad",
+      "crystals": "Cristal"
+    },
+    "fields": {
+      "dream": "Sueño",
+      "mood": "Sentimiento/Estado de ánimo",
+      "interpretation": "Interpretación",
+      "intention": "Intención",
+      "materials": "Materiales",
+      "procedure": "Desarrollo",
+      "outcome": "Resultado",
+      "image": "Imagen",
+      "pantheon": "Panteón/Tradición",
+      "domains": "Ámbitos",
+      "symbols": "Símbolos y ofrendas",
+      "colour": "Color",
+      "effect": "Efecto",
+      "element": "Elemento/Chakra"
     },
     "newTemplate": "Nueva plantilla",
     "defaultName": "Nueva plantilla",

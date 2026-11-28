@@ -38,14 +38,9 @@
     },
     "starter": {
       "dreams": "Journal de rêves",
-      "paradigm": "Paradigme",
       "ritual": "Rituel",
-      "meditation": "Méditation",
-      "herbs": "Herbes",
       "crystals": "Cristaux",
-      "candles": "Bougies",
-      "deities": "Divinités",
-      "tools": "Outils"
+      "deities": "Divinités"
     },
     "startTemplate": "Modèle de départ",
     "startTemplateHint": "Ce par quoi commence une nouvelle entrée de cette catégorie. « Modèle par défaut » est celui choisi sous Modèles.",
@@ -1297,7 +1292,26 @@
       "sigil": "Sigil",
       "altar": "Autel",
       "journal": "Journal",
-      "dreams": "Journal de rêves"
+      "dreams": "Journal de rêves",
+      "ritual": "Rituel",
+      "deities": "Divinité",
+      "crystals": "Cristal"
+    },
+    "fields": {
+      "dream": "Rêve",
+      "mood": "Ressenti/Humeur",
+      "interpretation": "Interprétation",
+      "intention": "Intention",
+      "materials": "Matériel",
+      "procedure": "Déroulement",
+      "outcome": "Résultat",
+      "image": "Image",
+      "pantheon": "Panthéon/Tradition",
+      "domains": "Domaines",
+      "symbols": "Symboles et offrandes",
+      "colour": "Couleur",
+      "effect": "Effet",
+      "element": "Élément/Chakra"
     },
     "newTemplate": "Nouveau modèle",
     "defaultName": "Nouveau modèle",

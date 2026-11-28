@@ -38,14 +38,9 @@
     },
     "starter": {
       "dreams": "Dream Journal",
-      "paradigm": "Paradigm",
       "ritual": "Ritual",
-      "meditation": "Meditation",
-      "herbs": "Herbs",
       "crystals": "Crystals",
-      "candles": "Candles",
-      "deities": "Deities",
-      "tools": "Tools"
+      "deities": "Deities"
     },
     "startTemplate": "Start template",
     "startTemplateHint": "What a new entry in this category starts with. \"Default template\" is the one set under Templates.",
@@ -1297,7 +1292,26 @@
       "sigil": "Sigil",
       "altar": "Altar",
       "journal": "Journal",
-      "dreams": "Dream Journal"
+      "dreams": "Dream Journal",
+      "ritual": "Ritual",
+      "deities": "Deity",
+      "crystals": "Crystal"
+    },
+    "fields": {
+      "dream": "Dream",
+      "mood": "Feeling/Mood",
+      "interpretation": "Interpretation",
+      "intention": "Intention",
+      "materials": "Materials",
+      "procedure": "Procedure",
+      "outcome": "Outcome",
+      "image": "Image",
+      "pantheon": "Pantheon/Tradition",
+      "domains": "Domains",
+      "symbols": "Symbols and offerings",
+      "colour": "Colour",
+      "effect": "Effect",
+      "element": "Element/Chakra"
     },
     "newTemplate": "New template",
     "defaultName": "New template",

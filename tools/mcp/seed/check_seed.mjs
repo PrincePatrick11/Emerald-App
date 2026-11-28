@@ -51,6 +51,17 @@ const withBlock = (type, where = '1') =>
   one(`SELECT COUNT(DISTINCT e.id) AS n FROM entries e JOIN blocks b ON b.entry_id = e.id WHERE b.type = '${type}' AND ${where}`).n;
 
 check('the sigil category is there', one("SELECT COUNT(*) AS n FROM categories WHERE id = 'sigils'").n === 1);
+// As in a fresh vault of the app: every start category starts with its built-in template, a new sigil with a sigil block.
+const START_TEMPLATES = {
+  journal: 'core-journal', dreams: 'core-dreams', sigils: 'core-sigil', altars: 'core-altar',
+  ritual: 'core-ritual', deities: 'core-deities', crystals: 'core-crystals',
+};
+const starts = Object.fromEntries(q('SELECT c.id, c.template_id FROM categories c JOIN templates t ON t.id = c.template_id').map((r) => [r.id, r.template_id]));
+check('the start categories have their built-in start templates',
+  Object.entries(START_TEMPLATES).every(([id, template]) => starts[id] === template), JSON.stringify(starts));
+check('the start template of Sigils begins with a sigil block',
+  one("SELECT b.type FROM categories c JOIN blocks b ON b.template_id = c.template_id WHERE c.id = 'sigils' ORDER BY b.position LIMIT 1")?.type === 'core.sigil');
+check('a sigil is there, an entry of the category Sigils with a sigil block', withBlock('core.sigil', "e.category_id = 'sigils'") >= 1);
 check('an altar is there, an entry of the category Altars', withBlock('core.altar', "e.category_id = 'altars'") >= 1);
 check('the Dream Journal has an entry', one("SELECT COUNT(*) AS n FROM entries WHERE category_id = 'dreams'").n >= 1);
 const pictures = one('SELECT COUNT(*) AS n FROM images WHERE deleted_at IS NULL').n;
