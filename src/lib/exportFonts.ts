@@ -1,4 +1,5 @@
 import { readFileAsDataUrl } from './helpers';
+import { EXPORT_UI_FONT } from './exportStyle';
 import {
   EDITOR_FONT_SIZE_OPTIONS, FONT_OPTIONS,
   type EditorFontSize, type FontId,
@@ -91,7 +92,13 @@ export async function embeddedFontCss(id: ExportFontId): Promise<string> {
   return out.filter(Boolean).join('\n');
 }
 
-/** CSS that sets the entries in the font and size: `@font-face` rules and the custom properties the export's stylesheet reads. */
+/**
+ * CSS that sets the entries in the font and size: `@font-face` rules of the
+ * text font and of the UI font labels and chips are set in
+ * (`EXPORT_UI_FONT`, `exportStyle.ts`), and the custom properties the
+ * export's stylesheet reads.
+ */
 export async function typographyCss({ font, size }: ExportTypography): Promise<string> {
-  return `${await embeddedFontCss(font)}\n:root { --doc-font: ${fontStack(font)}; --doc-size: ${size}px; }`;
+  const faces = [await embeddedFontCss(font), font === EXPORT_UI_FONT ? '' : await embeddedFontCss(EXPORT_UI_FONT)];
+  return `${faces.filter(Boolean).join('\n')}\n:root { --doc-font: ${fontStack(font)}; --doc-size: ${size}px; }`;
 }

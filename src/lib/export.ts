@@ -2,7 +2,6 @@ import { invoke } from '@tauri-apps/api/core';
 import { imageRefsInHtml, readImageAsBase64, rewriteImageRefs } from './images';
 import { save, message } from '@tauri-apps/plugin-dialog';
 import TurndownService from 'turndown';
-import { TEXT_COLORS, TEXT_COLOR_SHADES } from './textColors';
 import { format } from 'date-fns';
 import { exportFilename, safeFileBase } from './helpers';
 import { compressDataUrl } from './imageCompression';
@@ -18,6 +17,8 @@ import { linkItemsSnapshot } from './linkItemsSnapshot';
 import { linkTargetKindOf } from './internalLinkHtml';
 import { portableIcon } from './icons';
 import { typographyCss, type ExportTypography } from './exportFonts';
+import { pdfCss, tagStyle } from './exportStyle';
+import { formatEntryDateLong } from './formatDate';
 import type { ExportOrder } from './exportMenu';
 import i18n from '../i18n';
 
@@ -40,7 +41,9 @@ export function sanitizeDataImageUrl(value: string | null | undefined): string |
 
 
 /** The vault's pictures in the HTML as data URLs, compressed by `mode` (`placeholder` is `stripImages`' job). */
-async function embedImages(html: string, mode: Exclude<ImageMode, 'placeholder'>): Promise<string> {
+async function embedImages(source: string, mode: Exclude<ImageMode, 'placeholder'>): Promise<string> {
+  // Before the stored pictures become data URLs too: only the drawn ones are compressed here.
+  const html = await compressDrawnPictures(source, mode);
   const refs = [...new Set(imageRefsInHtml(html))];
   if (refs.length === 0) return html;
 
@@ -58,6 +61,23 @@ async function embedImages(html: string, mode: Exclude<ImageMode, 'placeholder'>
   );
 
   return rewriteImageRefs(html, (ref) => resolved.get(ref) ?? null);
+}
+
+/**
+ * A block's picture the export drew itself (an altar that kept none) comes as
+ * a data URL, not a stored file: compressed to the same level here.
+ */
+async function compressDrawnPictures(html: string, mode: Exclude<ImageMode, 'placeholder'>): Promise<string> {
+  if (mode === 'none') return html;
+  const drawn = [...html.matchAll(/<img\b[^>]*\bdata-export-placeholder=[^>]*>/gi)]
+    .map((m) => /\bsrc="(data:image\/[^"]+)"/i.exec(m[0])?.[1])
+    .filter((src): src is string => !!src);
+  let out = html;
+  for (const src of new Set(drawn)) {
+    const smaller = await compressDataUrl(src, mode).catch(() => src);
+    out = out.split(`src="${src}"`).join(`src="${smaller}"`);
+  }
+  return out;
 }
 
 /**
@@ -204,157 +224,28 @@ export function exportDate(iso: string | Date): string {
   return format(new Date(iso), 'MMMM d, yyyy');
 }
 
-// Top bar: icon, date and the category's name — 📓 January 15, 2026 · Journal
-function buildTopBar(data: ExportData): string {
-  const dateStr = exportDate(data.createdAt);
-  const subtitle = data.category?.label ?? '';
+/** The date atop an entry in PDF and HTML, in the app language: 28. November 2026. */
+export function exportDisplayDate(iso: string | Date): string {
+  return formatEntryDateLong(iso);
+}
 
+/** The line above the title: the entry's icon and category on the left, its date on the right. */
+function buildTopBar(data: ExportData): string {
   const icon = exportIcon(data);
   const iconHtml = icon.image
-    ? `<img src="${icon.image}" class="topbar-icon-img">`
+    ? `<img src="${icon.image}" class="topbar-icon-img" alt="">`
     : `<span class="topbar-icon">${htmlEscape(icon.emoji)}</span>`;
-
-  const suffix = subtitle ? ` · ${htmlEscape(subtitle)}` : '';
-  return `<div class="entry-topbar">${iconHtml}<span class="topbar-date">${dateStr}${suffix}</span></div>`;
+  const category = data.category?.label ? `<span>${htmlEscape(data.category.label)}</span>` : '';
+  return `<div class="entry-topbar"><span class="topbar-category">${iconHtml}${category}</span>`
+    + `<span class="topbar-date">${htmlEscape(exportDisplayDate(data.createdAt))}</span></div>`;
 }
 
-// Build the metadata section HTML below the top bar
-function buildMetaHtml(data: ExportData): string {
-  const parts: string[] = [];
-
-  // the category is shown in the topbar, not here
-  // Tags
-  if (data.tagNames?.length) {
-    const tags = data.tagNames.map(t => `<span class="tag">${htmlEscape(t)}</span>`).join('');
-    parts.push(`<div class="meta-row">${tags}</div>`);
-  }
-  return parts.length ? `<div class="meta-section">${parts.join('\n')}</div>` : '';
+/** The tags as chips in their colours, as in the app. */
+function buildTagsHtml(data: ExportData): string {
+  if (!data.tags.length) return '';
+  const chips = data.tags.map((tag) => `<span class="tag" style="${tagStyle(tag.color)}">${htmlEscape(tag.name)}</span>`);
+  return `<div class="entry-tags">${chips.join('')}</div>`;
 }
-
-// CSS for the print window
-const PRINT_CSS = `
-  /* Both webviews print without backgrounds by default; chips, tags and code keep theirs. */
-  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  body {
-    font-family: var(--doc-font, Georgia, 'Times New Roman', serif);
-    font-size: var(--doc-size, 12pt);
-    line-height: 1.75;
-    color: #111;
-    background: #f0f0f0;
-  }
-  /* No more img.emoji rasterization — the native webview renders
-     Segoe UI Emoji / Apple Color Emoji / Noto Color Emoji directly, so
-     emoji glyphs flow like any other text and the flex containers
-     (align-items: baseline) keep them on the text baseline. The whole
-     canvas-rasterize-and-position-shift dance (see git history of the
-     pre-native-webview branch) evaporates with the engine swap. */
-  #toolbar {
-    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-    background: #1c1c1e; padding: 0 24px;
-    display: flex; align-items: center; gap: 12px; height: 48px;
-  }
-  #toolbar span { color: #aaa; font-family: system-ui,sans-serif; font-size: 13px; flex: 1; }
-  #print-btn {
-    font-family: system-ui,sans-serif; font-size: 14px; font-weight: 600;
-    color: #fff; background: #00a066; border: none; border-radius: 8px;
-    padding: 8px 22px; cursor: pointer;
-  }
-  #print-btn:hover { background: #00c47a; }
-  #page {
-    max-width: 21cm; margin: 64px auto 32px; background: #fff;
-    padding: 2.2cm 2.8cm; box-shadow: 0 2px 16px rgba(0,0,0,0.18);
-  }
-  h1.entry-title {
-    font-size: 2em; font-weight: bold;
-    margin-bottom: 0.5em; padding-bottom: 0.4em; border-bottom: 2px solid #eee;
-  }
-  .entry-number { font-size: 0.5em; font-weight: normal; color: #999; margin-left: 0.4em; vertical-align: middle; }
-  /* Top bar: 📓 January 15, 2026 · Journal — plain, like the main view */
-  .entry-topbar {
-    display: flex; align-items: baseline; gap: 6px;
-    margin-bottom: 0.5em;
-    font-family: system-ui, sans-serif;
-    font-size: 0.9em; color: #666;
-  }
-  .topbar-icon { font-size: 1.1em; line-height: 1; }
-  .topbar-icon-img { width: 1.2em; height: 1.2em; object-fit: cover; border-radius: 3px; flex-shrink: 0; }
-  .topbar-date { color: #555; }
-  /* Metadata section */
-  .meta-section { margin-bottom: 1.2em; padding-bottom: 0.8em; border-bottom: 1px solid #eee; }
-  .meta-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 6px; }
-  .meta-date { font-size: 0.85em; color: #666; font-style: italic; margin-right: 4px; }
-  .tag {
-    display: inline-block; font-family: system-ui,sans-serif; font-size: 0.78em;
-    background: #e8e8e8; border-radius: 12px; padding: 2px 10px; color: #444;
-  }
-  /* Content */
-  .entry-content h1, .entry-content h2, .entry-content h3, .entry-content h4 { margin-top: 1.3em; margin-bottom: 0.4em; }
-  .entry-content p  { margin-bottom: 0.8em; }
-  .entry-content dl { margin-bottom: 0.8em; }
-  .entry-content dt { font-size: 0.85em; font-weight: 600; color: #666; margin-top: 0.4em; }
-  .entry-content dd { margin: 0 0 0.3em 0; }
-  .entry-content dd ul { margin-bottom: 0; }
-  /* An image's alignment is set as margin-left/-right in its
-     style attribute and beats this shorthand — only the vertical
-     spacing comes from here. */
-  .entry-content img { display: block; max-width: 100%; height: auto; margin: 0.6em 0; border-radius: 4px; }
-  .entry-content hr { border: 0; border-top: 1px solid #ccc; margin: 1.4em 0; }
-  .entry-content pre {
-    background: #f5f5f5; padding: 0.8em 1em; border-radius: 4px;
-    white-space: pre-wrap; font-size: 0.85em; margin: 0.8em 0;
-  }
-  .entry-content code { background: #f0f0f0; padding: 0.15em 0.35em; border-radius: 3px; font-size: 0.9em; }
-  .entry-content blockquote {
-    border-left: 3px solid #bbb; padding-left: 1em; color: #555; margin: 0.8em 0;
-  }
-  /* A table whose columns were resized carries a pixel width inline; on the
-     page it is the text column, or the right columns would be cut off. */
-  .entry-content table { border-collapse: collapse; width: 100% !important; max-width: 100%; table-layout: fixed; margin: 0.8em 0; }
-  .entry-content col { width: auto !important; }
-  .entry-content details { margin: 0.6em 0; padding: 0.3em 0.6em; border: 1px solid #ddd; border-radius: 4px; }
-  .entry-content summary { font-weight: 600; list-style: none; }
-  .entry-content summary::-webkit-details-marker { display: none; }
-  ${TEXT_COLORS.map((c) => `.entry-content span[data-color="${c}"] { color: ${TEXT_COLOR_SHADES.light[c]}; }`).join('\n  ')}
-  .entry-content td, .entry-content th { border: 1px solid #ccc; padding: 0.4em 0.6em; }
-  .entry-content ul, .entry-content ol { padding-left: 1.6em; margin-bottom: 0.8em; }
-  .entry-content li { margin-bottom: 0.2em; }
-  /* Internal link chips — jade accent like in the app */
-  .entry-content span[data-type="internalLink"] {
-    display: inline-flex; align-items: baseline; gap: 4px;
-    font-family: system-ui,sans-serif; font-size: 0.82em;
-    background: #e6faf3; border: 1px solid #99dfc0; border-radius: 5px;
-    padding: 1px 7px; color: #006b42; vertical-align: middle;
-    font-weight: 500;
-  }
-  .entry-content span[data-type="internalLink"] .il-icon-img {
-    width: 13px; height: 13px; object-fit: cover; border-radius: 2px;
-  }
-  .entry-content span[data-type="internalLink"] .il-icon-emoji { font-size: 0.9em; line-height: 1; }
-  .entry-content span[data-type="internalLink"].il-gone {
-    background: transparent; border-color: #ccc; color: #888; text-decoration: line-through;
-  }
-  /* Mirrored for the native page setup in src-tauri/src/pdf_export/mod.rs. */
-  @page { margin: 2cm 2.5cm; }
-  @media print {
-    body { background: #fff; }
-    #toolbar { display: none; }
-    #page { margin: 0; padding: 0; box-shadow: none; max-width: none; }
-    /* Prevent WKWebView from avoiding page breaks inside elements,
-       which causes large whitespace gaps before page boundaries. */
-    * {
-      page-break-inside: auto !important;
-      break-inside:      auto !important;
-      page-break-before: auto !important;
-      page-break-after:  auto !important;
-      break-before:      auto !important;
-      break-after:       auto !important;
-    }
-    /* Several entries: each starts on a page of its own. */
-    .entry-article + .entry-article { page-break-before: always !important; break-before: page !important; }
-  }
-  /* On screen a gap instead of the page break; every platform prints with the print styles. */
-  @media screen { .entry-article + .entry-article { margin-top: 3em; padding-top: 2em; border-top: 1px solid #ddd; } }
-`;
 
 // ── PDF export ──────────────────────────────────────────────────────────────
 //
@@ -376,6 +267,8 @@ export interface ExportItem {
  */
 export interface ExportFile {
   bundle?: string;
+  /** What several entries are called inside the document (the HTML sidebar, the PDF footer): the dashboard's name. */
+  title?: string;
   typography?: ExportTypography;
   /** The HTML sidebar's starting order; the entries come in the order given. */
   order?: ExportOrder;
@@ -391,9 +284,9 @@ export function defaultFilename(items: readonly ExportItem[], file: ExportFile, 
   return exportFilename(items[0].data.title, items[0].data.createdAt, ext);
 }
 
-/** The document's title: the bundle's name for several entries, else the entry's. */
+/** The document's title: the collection's name for several entries, else the entry's. */
 export function documentTitle(items: readonly ExportItem[], file: ExportFile): string {
-  return items.length > 1 && file.bundle ? file.bundle : items[0].data.title;
+  return items.length > 1 && file.title ? file.title : items[0].data.title;
 }
 
 /** The `<style>` content that sets the entries in the chosen font and size; empty keeps the stylesheet's own. */
@@ -403,7 +296,7 @@ export async function typographyStyle(file: ExportFile): Promise<string> {
 
 /**
  * One entry as an `<article>` of a PDF or HTML document: top bar, title,
- * tags and content, pictures as `images` says, link chips pre-rendered.
+ * tags, a rule and content (styled by `exportStyle.ts`), pictures as `images` says, link chips pre-rendered.
  * `bundleIds` and `footerHtml` are the HTML export's: links into the file,
  * and the references inside the article.
  */
@@ -418,10 +311,11 @@ export async function exportArticle(
   // Collapsible sections print open, or their content would be missing on paper.
   const transformedContent = transformInternalLinks(embeddedContent, opts.bundleIds).replace(/<details(?![^>]*\sopen)/g, '<details open');
   const numStr = data.entryNumber ? `<span class="entry-number">#${data.entryNumber}</span>` : '';
-  return `<article class="entry-article" id="${entryAnchor(data.id)}" data-title="${htmlEscape(data.title)}">
+  return `<article class="entry-article" id="${entryAnchor(data.id)}" data-title="${htmlEscape(data.title)}" data-category="${htmlEscape(data.category?.label ?? '')}">
     ${buildTopBar(data)}
     <h1 class="entry-title">${htmlEscape(data.title)}${numStr}</h1>
-    ${buildMetaHtml(data)}
+    ${buildTagsHtml(data)}
+    <hr class="entry-rule">
     <div class="entry-content">${DOMPurify.sanitize(transformedContent, {
       ADD_ATTR: ['data-type', 'data-id', 'data-target-kind', 'data-label', 'data-icon', 'data-entry-number', 'data-href', 'colwidth', 'data-color'],
     })}</div>
@@ -450,14 +344,13 @@ export async function exportAsPDF(items: readonly ExportItem[], file: ExportFile
 <html lang="${i18n.language}">
 <head>
   <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; font-src data:; style-src 'unsafe-inline'">
   <title>${htmlEscape(title)}</title>
-  <style>${PRINT_CSS}</style>
+  <style>${pdfCss({ title, pageOf: i18n.t('exportMenu.pdf.pageOf', { page: '{{page}}', pages: '{{pages}}' }) })}</style>
   <style>${await typographyStyle(file)}</style>
 </head>
 <body>
-  <div id="page">
-    ${articles.join('\n')}
-  </div>
+  ${articles.join('\n')}
 </body>
 </html>`;
 
@@ -543,7 +436,7 @@ function markdownOf(data: ExportData, td: TurndownService): string {
   const lines: string[] = [`# ${data.title}`, ''];
   lines.push(`*${exportDate(data.createdAt)}*`);
   if (data.category)            lines.push(`Category: ${mdIcon(data.category.icon, data.category.fallbackIcon)}${data.category.label}`.trim());
-  if (data.tagNames?.length)    lines.push(`Tags: ${data.tagNames.join(', ')}`);
+  if (data.tags.length)         lines.push(`Tags: ${data.tags.map((tag) => tag.name).join(', ')}`);
   lines.push('', '---', '');
   lines.push(td.turndown(stripImages(data.content)), '');
   return lines.join('\n');

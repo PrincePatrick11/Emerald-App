@@ -151,6 +151,10 @@ The exceptions, each for a reason:
 
 ---
 
+### Exports
+
+PDF and HTML exports do not read the theme variables — an export is a file of its own. Their colours (copies of Parchment and Noctis), fonts, sizes, spacing and radii are kept together at the top of `src/lib/exportStyle.ts`, the one place to change how an export looks; see [The export menu](architecture/shell.md#the-export-menu).
+
 ## Open Points
 
 Where the code contradicts the rules above today. No prioritisation — each point names the rule, the violation, and what resolving it would cost.

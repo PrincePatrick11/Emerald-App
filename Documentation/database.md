@@ -357,7 +357,7 @@ The `deleted_at` indexes matter because `runPeriodicCleanup` runs a range scan a
 
 **Reading and writing rows.** `src/lib/row.ts` is the only place that converts between SQLite rows and the types in `src/types`. Read with `fromRow.*`, write with `toInt`. SQLite has no booleans: they come back as `0`/`1`.
 
-**Tags.** Entries, templates and pictures carry tag **ids** through the link tables, in memory as `tags: string[]`. The ids of trashed tags stay linked and are simply not shown (`visibleTags`); exports (`.emerald`, Markdown, HTML) write names (`liveTagNames`), and imports map names back to ids. Tasks carry no tags.
+**Tags.** Entries, templates and pictures carry tag **ids** through the link tables, in memory as `tags: string[]`. The ids of trashed tags stay linked and are simply not shown (`visibleTags`); exports write names (`.emerald` through `liveTagNames`; PDF, HTML and Markdown through `liveTags`, PDF and HTML with the tag's colour), and imports map names back to ids. Tasks carry no tags.
 
 **entry_number.** A stable, compact, human-readable number, shown in the search and the link picker as `#12`. `nextEntryNumber(db)` in `db.ts` assigns it at insert time — one count over all entries, trashed rows included, so a restored entry never duplicates a number; `idx_entries_number` makes it unique. It is a stored value, never derived from `ROWID`, so a replace import cannot shift it, and a change of category keeps it. An import numbers what it brings behind the vault's (see [Import](#import)).
 

@@ -290,9 +290,11 @@ A `.emerald` file comes from anywhere. `read_emerald_file` (`src-tauri/src/emera
 
 User-provided text interpolated into the PDF and HTML export goes through `htmlEscape()` (in `src/lib/export.ts`), which replaces `&`, `<`, `>`, `"` and `'` with HTML entities. It is applied to:
 
-- the entry title (in `<title>` and the `<h1>`),
-- the top bar's emoji icon and its label (the category name),
+- the entry title (in `<title>` and the `<h1>`, and the article's `data-title`),
+- the top bar's emoji icon and its label (the category name, also the article's `data-category`, which the HTML file's script reads with `getAttribute` and writes with `textContent`),
 - tag names.
+
+The PDF footer's title is written into a `<style>` element as a CSS string: `cssString` (`src/lib/exportStyle.ts`) writes every character outside letters, digits and plain punctuation as a CSS hex escape, so no `</style>` can end the element. A tag's colour goes into a `style` attribute only as `#rrggbb` (`tagChipColors`). The PDF document carries a CSP of its own (`default-src 'none'`, pictures and fonts as `data:`, inline styles only), since the app's does not reach its `file://` page.
 
 An image icon is passed through `sanitizeDataImageUrl` instead. The content HTML itself (TipTap output) is not re-escaped — it is sanitised (see below). Stored image references are resolved to base64 data-URLs by `embedImages()` before the HTML goes to the export backend.
 

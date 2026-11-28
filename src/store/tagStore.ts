@@ -275,10 +275,14 @@ export function useTagMap(): Map<string, Tag> {
   return useMemo(() => new Map(tags.map((t) => [t.id, t])), [tags]);
 }
 
-/** The names of the live tags of a list — what exports write out. */
+/** The live tags of a list — what PDF, HTML and Markdown show (name and colour). */
+export function liveTags(ids: readonly string[] | undefined): Tag[] {
+  return visibleTags(ids, new Map(useTagStore.getState().tags.map((t) => [t.id, t])));
+}
+
+/** The names of the live tags of a list — what the `.emerald` export writes out. */
 export function liveTagNames(ids: readonly string[] | undefined): string[] {
-  const byId = new Map(useTagStore.getState().tags.map((t) => [t.id, t]));
-  return visibleTags(ids, byId).map((tag) => tag.name);
+  return liveTags(ids).map((tag) => tag.name);
 }
 
 /** The tags of a list that are visible — without those in the trash and unknown ones. */

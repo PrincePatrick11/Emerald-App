@@ -176,9 +176,14 @@ function ExportMenuBody({ target }: { target: ExportTarget }) {
 
   const canExport = !busy && !passwordProblem && linkedReady && (count === null || count > 0) && !(scope === 'bulk' && range.invalid);
 
-  /** A collective export's name: the dashboard (or "Export") and its days. */
+  /** What a collective export is called inside the document (the HTML sidebar, the PDF footer): the dashboard, or "Export". */
+  function bundleTitle(): string {
+    return s.source === 'filter' || !dashboard ? t('exportMenu.bundleFilter') : dashboardLabel(t, dashboard);
+  }
+
+  /** A collective export's file name: its title and its days. */
   function bundleName(): string {
-    const label = s.source === 'filter' || !dashboard ? t('exportMenu.bundleFilter') : dashboardLabel(t, dashboard);
+    const label = bundleTitle();
     const days = range.from || range.to ? [range.from, range.to ?? new Date()].filter((d): d is Date => !!d).map((d) => format(d, DAY)) : [];
     return ['Emerald', safeFileBase(label), ...days].join('_');
   }
@@ -214,7 +219,7 @@ function ExportMenuBody({ target }: { target: ExportTarget }) {
           const data = await collectExportDataFor(entry.id, fmt);
           if (data) items.push({ data, images: linkedIds.has(entry.id) ? linkedImageMode(s) : s.images });
         }
-        const file = { bundle: scope === 'bulk' ? bundleName() : undefined, typography, order: s.order };
+        const file = { bundle: scope === 'bulk' ? bundleName() : undefined, title: scope === 'bulk' ? bundleTitle() : undefined, typography, order: s.order };
         saved = fmt === 'pdf' ? await exportAsPDF(items, file)
           : fmt === 'html' ? await exportAsHTML(items, file)
           : await exportAsMarkdown(items, file);

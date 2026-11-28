@@ -29,7 +29,11 @@ import { localIsoDay } from '../helpers';
  * `.export-concealed` box: the cover with its switch, then the content; the
  * HTML file's script switches it (`htmlExport.ts`).
  *
- * Pure and DOM-free; the caller passes in the texts (language, formats).
+ * The layout is pure and DOM-free; a block's own export may be async and
+ * may need the page (the altar draws a picture it has not kept); the caller passes in the texts
+ * (language, formats). Part headings and notes carry a class
+ * (`export-part`, `export-note`), so the stylesheet (`exportStyle.ts`) sets
+ * them apart from the headings and paragraphs of a text.
  */
 
 export interface ExportText {
@@ -76,6 +80,11 @@ function valueHtml(value: BlockExportValue | null, label: string, text: ExportTe
   }
 }
 
+/** A part's heading (a sigil's "Charge"): styled apart from the headings of a text (`export-part`, `exportStyle.ts`). */
+function partHeading(label: string): string {
+  return `<h4 class="export-part">${escapeHtml(label)}</h4>`;
+}
+
 /** Content the reader uncovers: the cover with its switch, the content behind it (shown by the file's script). */
 function coveredHtml(until: string | null, inner: string, text: ExportText): string {
   return '<div class="export-concealed">'
@@ -105,8 +114,8 @@ function partsHtml(parts: readonly BlockExportPart[], format: BlockExportFormat,
     }
     flush();
     switch (part.kind) {
-      case 'heading': html += `<h4>${escapeHtml(text.t(part.labelKey))}</h4>`; break;
-      case 'note': html += `<p>${escapeHtml(text.t(part.textKey))}</p>`; break;
+      case 'heading': html += partHeading(text.t(part.labelKey)); break;
+      case 'note': html += `<p class="export-note">${escapeHtml(text.t(part.textKey))}</p>`; break;
       case 'text': html += `<p>${escapeHtml(part.text)}</p>`; break;
       case 'html': html += part.html; break;
       case 'image': html += imageHtml(part.file, part.altKey ? text.t(part.altKey) : title); break;
@@ -114,7 +123,7 @@ function partsHtml(parts: readonly BlockExportPart[], format: BlockExportFormat,
         if (format !== 'html') break;
         const inner = partsHtml(part.parts, format, title, text);
         if (!inner.trim()) break;
-        if (part.labelKey) html += `<h4>${escapeHtml(text.t(part.labelKey))}</h4>`;
+        if (part.labelKey) html += partHeading(text.t(part.labelKey));
         html += coveredHtml(part.until, inner, text);
         break;
       }
@@ -124,17 +133,17 @@ function partsHtml(parts: readonly BlockExportPart[], format: BlockExportFormat,
   return html;
 }
 
-function bodyHtml(block: BlockInstance, ctx: ExportContext, text: ExportText): string {
+async function bodyHtml(block: BlockInstance, ctx: ExportContext, text: ExportText): Promise<string> {
   // A block this app cannot read goes out as the notice it shows, never as what it holds.
   const state = blockReadState(block);
   if (state !== 'readable') return `<p>${escapeHtml(text.t(UNREADABLE_NOTICE[state]))}</p>`;
   const meta = resolveBlockType(block);
   // Without an export of its own (the text block): its markup.
   if (!meta?.export) return block.html;
-  return partsHtml(meta.export(block, ctx), ctx.format, text.title(block), text);
+  return partsHtml(await meta.export(block, ctx), ctx.format, text.title(block), text);
 }
 
-export function renderBlocksForExport(
+export async function renderBlocksForExport(
   content: string,
   format: BlockExportFormat,
   text: ExportText,
@@ -146,7 +155,7 @@ export function renderBlocksForExport(
     /** The entry's day (toolkit, `entryDate`) — what a block shown by its entry's date needs. */
     entryDate?: string | null;
   } = {},
-): string {
+): Promise<string> {
   const blocks = parseBlocks(content);
   const { concealed } = entryEffects(blocks, { today });
   const ctx: ExportContext = { format, entryDate, today, concealed };
@@ -155,7 +164,7 @@ export function renderBlocksForExport(
     if (isBlockHidden(block)) continue;
     const covered = concealed.has(block.id);
     if (covered && format !== 'html') continue;
-    let body = bodyHtml(block, ctx, text);
+    let body = await bodyHtml(block, ctx, text);
     if (!body.trim()) continue;
     if (covered) body = coveredHtml(concealed.get(block.id) ?? null, body, text);
     const title = showsTitleInRead(block) ? `<h3>${escapeHtml(text.title(block))}</h3>` : '';

@@ -1,15 +1,16 @@
 import { invoke } from '@tauri-apps/api/core';
 import { save } from '@tauri-apps/plugin-dialog';
 import i18n from '../i18n';
-import { TEXT_COLORS, TEXT_COLOR_SHADES } from './textColors';
 import { useCategoryStore } from '../store/categoryStore';
 import { groupByCategory } from './groupBy';
 import {
-  defaultFilename, documentTitle, entryAnchor, exportArticle, exportDate, exportIcon, htmlEscape, typographyStyle, withEnding,
+  defaultFilename, documentTitle, entryAnchor, exportArticle, exportDisplayDate, exportIcon, htmlEscape, typographyStyle, withEnding,
   type ExportFile, type ExportItem,
 } from './export';
 import type { ExportData } from './exportData';
 import { exportDefaultPath } from './vaultManager';
+import { HTML_CSS } from './exportStyle';
+import { formatDateRange, formatEntryDate } from './formatDate';
 
 // ── Interactive HTML export ─────────────────────────────────────────────────
 //
@@ -27,6 +28,11 @@ import { exportDefaultPath } from './vaultManager';
 // what read mode hides with the eye is not in the file, and what a block
 // conceals (a loaded sigil's parts) is in it, covered, with a switch to
 // uncover it.
+
+/** The toolbar's icons (lucide): the theme switch shows the one it switches to. */
+const ICON_MOON = '<svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>';
+const ICON_SUN = '<svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+const ICON_PRINT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>';
 
 /** Where "Emerald App" in the export's footer links to. */
 const EMERALD_URL = 'https://the-emerald-app.com/';
@@ -47,7 +53,7 @@ function labels(count: number) {
     sortNewest: t('exportMenu.order.desc'),
     entryCount: t('exportMenu.count', { count }),
     // `{{app}}` passes through untouched (`escapeValue: false`) and becomes the link after `htmlEscape` in the footer.
-    exportedOn: t('exportMenu.html.exportedOn', { date: exportDate(new Date()), app: '{{app}}' }),
+    exportedOn: t('exportMenu.html.exportedOn', { date: exportDisplayDate(new Date()), app: '{{app}}' }),
     uncategorized: t('categories.uncategorized'),
   };
 }
@@ -97,12 +103,19 @@ function buildNav(entries: ExportData[], text: Labels): string {
   return groups.map((group) => {
     const items = group.items.map((e) => `<a class="nav-item" href="#${entryAnchor(e.id)}" data-target="${entryAnchor(e.id)}" data-ts="${new Date(e.createdAt).getTime() || 0}">
         <span class="nav-icon">${navIcon(e)}</span>
-        <span class="nav-text"><span class="nav-title">${htmlEscape(e.title)}</span><span class="nav-sub">${htmlEscape(exportDate(e.createdAt))}</span></span>
+        <span class="nav-text"><span class="nav-title">${htmlEscape(e.title)}</span><span class="nav-sub">${htmlEscape(formatEntryDate(e.createdAt))}</span></span>
         ${mediaMarks(e)}
         <span class="nav-hits" hidden></span>
       </a>`).join('');
     return `<div class="nav-group"><div class="nav-group-title">${htmlEscape(group.label)}</div>${items}</div>`;
   }).join('');
+}
+
+/** "5 entries · 1 Sep – 28 Nov 2026": how many, from the first day to the last, as short as the app language puts a range. */
+function bundleSubtitle(entries: ExportData[], countText: string): string {
+  const days = entries.map((e) => new Date(e.createdAt).getTime()).filter((t) => !Number.isNaN(t));
+  if (!days.length) return countText;
+  return `${countText} · ${formatDateRange(Math.min(...days), Math.max(...days))}`;
 }
 
 /** The entries as one interactive HTML document. */
@@ -137,7 +150,7 @@ export async function buildInteractiveHtml(items: readonly ExportItem[], file: E
     <div class="sidebar-head">
       <div class="bundle-title">${htmlEscape(title)}</div>
       <div class="bundle-sub">
-        <span>${htmlEscape(text.entryCount)}</span>
+        <span>${htmlEscape(bundleSubtitle(entries, text.entryCount))}</span>
         <button class="sort-btn" id="sort-btn" aria-label="${htmlEscape(text.sortOldest)} / ${htmlEscape(text.sortNewest)}" data-order="${file.order ?? 'asc'}"
           data-label-asc="${htmlEscape(text.sortOldest)}" data-label-desc="${htmlEscape(text.sortNewest)}">⇅</button>
       </div>
@@ -150,8 +163,8 @@ export async function buildInteractiveHtml(items: readonly ExportItem[], file: E
     <header class="toolbar">
       ${multi ? `<button class="tb-btn" id="sidebar-btn" title="${htmlEscape(text.toggleSidebar)}" aria-label="${htmlEscape(text.toggleSidebar)}">☰</button>` : ''}
       <span class="crumb" id="crumb"></span>
-      <button class="tb-btn" id="theme-btn" title="${htmlEscape(text.toggleTheme)}" aria-label="${htmlEscape(text.toggleTheme)}">◐</button>
-      <button class="tb-btn tb-primary" id="print-btn">${htmlEscape(text.print)}</button>
+      <button class="tb-btn" id="theme-btn" title="${htmlEscape(text.toggleTheme)}" aria-label="${htmlEscape(text.toggleTheme)}">${ICON_MOON}${ICON_SUN}</button>
+      <button class="tb-btn tb-primary" id="print-btn">${ICON_PRINT}${htmlEscape(text.print)}</button>
     </header>
     <div class="content-wrap">
       <div class="doc" id="doc">
@@ -185,220 +198,6 @@ export async function exportAsHTML(items: readonly ExportItem[], file: ExportFil
   await invoke('write_file', { path: withEnding(chosen, 'html'), content: html });
   return true;
 }
-
-// ── Embedded stylesheet ─────────────────────────────────────────────────────
-//
-// The entries' title and text read `--doc-font` / `--doc-size`, which
-// `typographyStyle` sets; the file's own controls stay in the system font.
-
-/** The editor's text colours as custom properties, in the shades for a light or dark sheet. */
-const colorVars = (shades: keyof typeof TEXT_COLOR_SHADES) =>
-  TEXT_COLORS.map((c) => `--color-${c}: ${TEXT_COLOR_SHADES[shades][c]};`).join(' ');
-
-const HTML_CSS = `
-:root {
-  --bg: #f6f5f1; --surface: #ffffff; --sidebar: #efede7; --text: #1f1e1b; --muted: #6d6b64;
-  --faint: #9a978e; --border: #e3e0d8; --accent: #00a066; --accent-hover: #00b874;
-  --accent-soft: #e4f7ef; --accent-border: #9bdcc0; --accent-text: #00663f; --chip: #f1efea;
-  --mark: #fff0a8; --shadow: 0 1px 2px rgba(0,0,0,.04), 0 4px 18px rgba(0,0,0,.05);
-  ${colorVars('light')}
-  color-scheme: light;
-}
-:root[data-theme="dark"] {
-  --bg: #131312; --surface: #1b1b19; --sidebar: #171716; --text: #e9e7e1; --muted: #a09d94;
-  --faint: #6f6c65; --border: #2c2b28; --accent: #00c47a; --accent-hover: #1fd68e;
-  --accent-soft: rgba(0,196,122,.12); --accent-border: rgba(0,196,122,.35); --accent-text: #5fe3ae;
-  --chip: #252522; --mark: rgba(255,214,10,.32); --shadow: none;
-  ${colorVars('dark')}
-  color-scheme: dark;
-}
-* { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; }
-body {
-  background: var(--bg); color: var(--text);
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size: 15px;
-  -webkit-font-smoothing: antialiased;
-}
-a { color: inherit; }
-.app { display: flex; min-height: 100vh; }
-
-/* Sidebar */
-.sidebar {
-  width: 280px; flex-shrink: 0; background: var(--sidebar); border-right: 1px solid var(--border);
-  position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column;
-}
-.sidebar-head { padding: 20px 16px 12px; border-bottom: 1px solid var(--border); }
-.bundle-title { font-weight: 600; font-size: 15px; line-height: 1.3; overflow-wrap: anywhere; }
-.bundle-sub { color: var(--muted); font-size: 12px; margin: 2px 0 12px; display: flex; align-items: center; justify-content: space-between; }
-.sort-btn {
-  font: inherit; font-size: 12px; color: var(--muted); background: transparent; border: 1px solid var(--border);
-  border-radius: 6px; padding: 1px 8px; cursor: pointer;
-}
-.sort-btn:hover { color: var(--text); background: var(--chip); }
-.sort-btn:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-.search {
-  width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border);
-  background: var(--surface); color: var(--text); font: inherit; font-size: 13px; outline: none;
-}
-.search:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-.nav { overflow-y: auto; padding: 8px 8px 24px; flex: 1; }
-.nav-group { margin-top: 10px; }
-.nav-group[hidden] { display: none; }
-.nav-group-title {
-  font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
-  color: var(--faint); padding: 4px 8px;
-}
-.nav-item {
-  display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 7px;
-  text-decoration: none; color: var(--text); font-size: 13px;
-}
-.nav-item:hover { background: var(--chip); }
-.nav-item.active { background: var(--accent-soft); color: var(--accent-text); }
-.nav-item[hidden] { display: none; }
-.nav-icon { width: 20px; text-align: center; flex-shrink: 0; line-height: 1; }
-.nav-icon-img, .ref-icon img { width: 18px; height: 18px; border-radius: 4px; object-fit: cover; vertical-align: middle; }
-.nav-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
-.nav-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nav-sub { font-size: 11px; color: var(--faint); }
-.nav-media { font-size: 11px; flex-shrink: 0; opacity: .8; }
-.nav-hits {
-  font-size: 11px; background: var(--accent); color: #fff; border-radius: 10px; padding: 0 7px; line-height: 18px;
-}
-.no-results { color: var(--muted); font-size: 13px; padding: 16px; text-align: center; }
-
-/* Main */
-.main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.toolbar {
-  position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 8px;
-  padding: 10px 20px; background: var(--bg); background: color-mix(in srgb, var(--bg) 88%, transparent);
-  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); border-bottom: 1px solid var(--border);
-}
-.crumb { flex: 1; min-width: 0; color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tb-btn {
-  font: inherit; font-size: 13px; color: var(--text); background: transparent; border: 1px solid var(--border);
-  border-radius: 8px; padding: 6px 12px; cursor: pointer; line-height: 1.2;
-}
-.tb-btn:hover { background: var(--chip); }
-.tb-primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
-.tb-primary:hover { background: var(--accent-hover); }
-#sidebar-btn { display: none; }
-.content-wrap { display: flex; justify-content: center; gap: 32px; padding: 32px 24px 64px; }
-.doc { width: 100%; max-width: 780px; min-width: 0; }
-
-/* Entry */
-.entry-article {
-  background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
-  padding: 40px 48px; box-shadow: var(--shadow);
-}
-body.has-sidebar .entry-article:not(.active) { display: none; }
-.entry-topbar { display: flex; align-items: baseline; gap: 6px; color: var(--muted); font-size: 13px; margin-bottom: 6px; }
-.topbar-icon { font-size: 1.1em; line-height: 1; }
-.topbar-icon-img { width: 1.2em; height: 1.2em; object-fit: cover; border-radius: 3px; align-self: center; }
-h1.entry-title {
-  font-family: var(--doc-font, Georgia, "Times New Roman", serif); font-size: calc(var(--doc-size, 17px) * 1.8);
-  line-height: 1.2; font-weight: 700; margin: 0 0 16px; overflow-wrap: anywhere;
-}
-.entry-number { font-family: system-ui, sans-serif; font-size: .45em; font-weight: 400; color: var(--faint); margin-left: .5em; vertical-align: middle; }
-.meta-section { padding-bottom: 14px; margin-bottom: 22px; border-bottom: 1px solid var(--border); }
-.meta-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 6px; }
-.tag { display: inline-block; font-size: 12px; background: var(--chip); border-radius: 12px; padding: 2px 10px; color: var(--muted); }
-
-.entry-content {
-  font-family: var(--doc-font, Georgia, "Times New Roman", serif); font-size: var(--doc-size, 17px);
-  line-height: 1.75; overflow-wrap: break-word;
-}
-.entry-content h1, .entry-content h2, .entry-content h3, .entry-content h4 { line-height: 1.3; margin: 1.5em 0 .5em; scroll-margin-top: 72px; }
-.entry-content p { margin: 0 0 .9em; }
-.entry-content dl { margin: 0 0 .9em; }
-.entry-content dt { font-size: .85em; font-weight: 600; color: var(--muted); margin-top: .4em; }
-.entry-content dd { margin: 0 0 .3em 0; }
-.entry-content dd ul { margin-bottom: 0; }
-/* An image's alignment comes as margin-left/-right in its style attribute. */
-.entry-content img { display: block; max-width: 100%; height: auto; margin: .8em 0; border-radius: 6px; }
-.entry-content pre { background: var(--chip); padding: .9em 1.1em; border-radius: 8px; white-space: pre-wrap; font-size: .85em; }
-.entry-content code { background: var(--chip); padding: .12em .35em; border-radius: 4px; font-size: .88em; }
-.entry-content pre code { background: none; padding: 0; }
-.entry-content blockquote { border-left: 3px solid var(--accent-border); margin: 1em 0; padding: .1em 0 .1em 1em; color: var(--muted); }
-.entry-content table { border-collapse: collapse; width: 100% !important; max-width: 100%; table-layout: fixed; margin: 1em 0; font-size: .92em; }
-.entry-content col { width: auto !important; }
-.entry-content td, .entry-content th { border: 1px solid var(--border); padding: .45em .65em; text-align: left; }
-.entry-content ul, .entry-content ol { padding-left: 1.6em; }
-.entry-content a { color: var(--accent-text); }
-.entry-content hr { border: none; border-top: 1px solid var(--border); margin: 2em 0; }
-.entry-content details { margin: .6em 0; padding: .3em .6em; border: 1px solid var(--border); border-radius: 6px; }
-.entry-content summary { font-weight: 600; cursor: pointer; }
-/* Covered content (a concealed sigil part): the cover with its switch; the content shows once uncovered. */
-.export-concealed { margin: .6em 0; }
-.export-concealed-cover {
-  display: flex; align-items: center; gap: .75em; flex-wrap: wrap; margin: 0;
-  padding: .6em .8em; border: 1px dashed var(--border); border-radius: 8px;
-  font-family: system-ui, sans-serif; font-size: .8em; color: var(--muted);
-}
-.export-concealed-toggle {
-  margin-left: auto; font: inherit; color: var(--muted); background: transparent;
-  border: 1px solid var(--border); border-radius: 6px; padding: 1px 8px; cursor: pointer;
-}
-.export-concealed-toggle:hover { color: var(--text); background: var(--chip); }
-.export-concealed-toggle:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-.export-concealed-body { display: none; padding-top: .6em; }
-.export-concealed.revealed .export-concealed-body { display: block; }
-${TEXT_COLORS.map((c) => `.entry-content span[data-color="${c}"] { color: var(--color-${c}); }`).join('\n')}
-.entry-content [data-type="internalLink"] {
-  display: inline-flex; align-items: center; gap: 4px; font-family: system-ui, sans-serif; font-size: .8em;
-  font-weight: 500; background: var(--accent-soft); border: 1px solid var(--accent-border); border-radius: 6px;
-  padding: 0 7px; color: var(--accent-text); vertical-align: baseline; text-decoration: none;
-}
-.entry-content a[data-type="internalLink"]:hover { border-color: var(--accent); }
-.entry-content [data-type="internalLink"].il-external { background: var(--chip); border-color: var(--border); color: var(--muted); border-style: dashed; }
-.entry-content [data-type="internalLink"].il-gone { background: transparent; border-color: var(--border); color: var(--muted); text-decoration: line-through; }
-.entry-content [data-type="internalLink"] .il-icon-img { width: 13px; height: 13px; object-fit: cover; border-radius: 2px; margin: 0; display: inline; }
-mark.hit { background: var(--mark); color: inherit; border-radius: 2px; padding: 0 1px; }
-
-/* References */
-.refs { margin-top: 36px; padding-top: 18px; border-top: 1px solid var(--border); display: grid; gap: 16px; }
-.refs h2 { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--faint); margin: 0 0 8px; }
-.refs-list { display: flex; flex-wrap: wrap; gap: 6px; }
-.ref {
-  display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 8px; font-size: 13px;
-  border: 1px solid var(--border); text-decoration: none; background: var(--bg);
-}
-.ref:hover { border-color: var(--accent); color: var(--accent-text); }
-.footer { text-align: center; color: var(--faint); font-size: 12px; margin-top: 24px; }
-.footer a { color: var(--accent-text); text-decoration: none; }
-.footer a:hover { text-decoration: underline; }
-
-/* Outline */
-.outline { width: 220px; flex-shrink: 0; position: sticky; top: 76px; align-self: flex-start; max-height: calc(100vh - 100px); overflow-y: auto; }
-.outline-title { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--faint); margin-bottom: 8px; }
-.outline a { display: block; font-size: 13px; color: var(--muted); text-decoration: none; padding: 3px 0 3px 10px; border-left: 2px solid var(--border); }
-.outline a:hover { color: var(--text); }
-.outline a.active { color: var(--accent-text); border-left-color: var(--accent); }
-.outline a.lvl-2 { padding-left: 20px; }
-.outline a.lvl-3 { padding-left: 30px; }
-@media (max-width: 1180px) { .outline { display: none !important; } }
-
-/* Narrow screens: the sidebar becomes a drawer */
-@media (max-width: 820px) {
-  #sidebar-btn { display: inline-block; }
-  .sidebar { position: fixed; left: 0; top: 0; z-index: 20; transform: translateX(-100%); transition: transform .2s ease; }
-  body.sidebar-open .sidebar { transform: none; box-shadow: 0 0 40px rgba(0,0,0,.25); }
-  .content-wrap { padding: 16px 12px 48px; }
-  .entry-article { padding: 24px 20px; border-radius: 10px; }
-}
-
-@media print {
-  :root, :root[data-theme="dark"] { ${colorVars('light')} }
-  body { background: #fff; color: #111; }
-  .sidebar, .toolbar, .outline, .footer, .refs { display: none !important; }
-  .content-wrap { padding: 0; display: block; }
-  .doc { max-width: none; }
-  body.has-sidebar .entry-article:not(.active) { display: block; }
-  .entry-article { border: none; box-shadow: none; padding: 0; border-radius: 0; background: #fff; }
-  .entry-article + .entry-article { break-before: page; }
-  mark.hit { background: none; }
-  .export-concealed-toggle, .export-concealed.revealed .export-concealed-cover { display: none; }
-}
-`;
 
 // ── Embedded script ─────────────────────────────────────────────────────────
 //
@@ -473,6 +272,10 @@ const HTML_JS = `
 
   // From the attribute, not the heading: search highlighting splits the heading's text nodes.
   function titleOf(article) { return article.getAttribute('data-title') || ''; }
+  function crumbOf(article) {
+    var category = article.getAttribute('data-category');
+    return category ? category + ' › ' + titleOf(article) : titleOf(article);
+  }
 
   // ── Search highlighting ──
   function clearMarks(el) {
@@ -554,7 +357,7 @@ const HTML_JS = `
     articles.forEach(function (a) { a.classList.toggle('active', a === target); });
     navItems.forEach(function (n) { n.classList.toggle('active', n.getAttribute('data-target') === target.id); });
     current = target;
-    crumb.textContent = titleOf(target);
+    crumb.textContent = crumbOf(target);
     document.title = titleOf(target);
     buildOutline(target);
     var hit = markHits(target, query);

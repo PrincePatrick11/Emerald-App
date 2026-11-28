@@ -330,8 +330,9 @@ export interface BlockTypeDef {
    * without it, its readable markup. A part of the block the entry's effects
    * conceal (`ctx.concealed`) is the block's own to show covered or leave
    * out; a block concealed as a whole the export covers (HTML) or leaves out.
+   * May take its time (a promise): the altar draws a picture it has not kept yet.
    */
-  export?: (block: BlockInstance, ctx: ExportContext) => BlockExportPart[];
+  export?: (block: BlockInstance, ctx: ExportContext) => BlockExportPart[] | Promise<BlockExportPart[]>;
   /** 3 — rows and suggested values for the entry's properties; the panel shows them, a suggested value marked as the block's. */
   properties?: BlockProperties;
   /** 4 / 9 — values to filter and sort dashboards by; the dashboard's controls for them come with #117. */

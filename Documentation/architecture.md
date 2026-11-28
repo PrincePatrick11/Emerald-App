@@ -135,6 +135,7 @@ src/
 │   ├── export.ts, exportData.ts, emeraldFormat.ts   Markdown and PDF export (one entry or several), the article PDF and HTML share; `.emerald` files of entries and templates
 │   ├── htmlExport.ts            the interactive HTML export: one self-contained file with its own stylesheet, script and CSP
 │   ├── exportFonts.ts           the fonts of PDF and HTML: the app's (embedded from `fonts.css` as data URLs) and common system ones
+│   ├── exportStyle.ts           the look of PDF and HTML in one place: palettes, fonts, sizes, spacing, and the stylesheets built from them
 │   ├── exportMenu.ts            the export menu's rules: remembered choices, Normal's fixed settings, period, collection, order
 │   ├── importFile.ts, importPaths.ts   the import window's files: which it takes, opening one to see what it is, what it remembers
 │   ├── emerald/                 `manifest.ts` (the manifest, pure), `file.ts` (the `.emerald` commands, asking for a secret)

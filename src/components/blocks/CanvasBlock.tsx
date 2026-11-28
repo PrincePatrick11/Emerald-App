@@ -4,13 +4,13 @@ import { useTranslation } from 'react-i18next';
 import {
   CANVAS_SWATCHES, CanvasEditor, canvasToDataUrl, fullProfile, parseCanvasBackground, renderCanvasImage, renderCanvasSvg,
   type CanvasBackground, type CanvasEditorHandle, type CanvasElement, type CanvasExportOptions,
-  type CanvasPaintOptions, type CanvasTypes, type RenderOptions, type RulerGuide,
+  type CanvasPaintOptions, type CanvasTypes, type RulerGuide,
 } from '../editors/canvas';
+import { drawingDoc, sceneRenderOptions, scenePicture } from './canvasScene';
 import {
   CANVAS_BLOCK_TYPE, canvasElementFile, parseCanvasBlock, storedCanvasElement, storedImageElement, withCanvasScene, withCanvasStripTag, type CanvasParts, type CanvasScene, type StoredCanvasElement,
 } from '../../lib/blocks/canvas';
-import { imageSrc, loadCanvasImage, saveImage } from '../../lib/images';
-import { emptyPaintDoc, paintDocFromJson, type PaintDoc } from '../../lib/paint/document';
+import { imageSrc, saveImage } from '../../lib/images';
 import { generateId } from '../../lib/helpers';
 import { acceptedImagePaths } from '../../lib/storeImage';
 import { getImageDragItem, setImageDragItem, subscribeImageDrag, type ImageDragItem } from '../../lib/imageDragState';
@@ -31,9 +31,6 @@ import { blockTypeTextKey } from '../../lib/blocks/toolkit';
 import { BLOCK_BACKGROUND_IMAGES, storeBlockPicture, useBlockAction, useBlockStorage } from './toolkit';
 import type { BlockViewProps } from './blockViews';
 
-/** The width of the rendered picture the export and the card show. */
-const RENDER_WIDTH = 1200;
-
 /**
  * What the block offers in the canvas editor: everything, less the parts
  * switched off — their elements still draw and move, only nothing new of
@@ -48,11 +45,6 @@ function profileFor(parts: CanvasParts) {
   off('symbol', parts.symbols);
   off('drawing', parts.drawing);
   return { ...profile, types };
-}
-
-/** A drawing's document from the stored JSON (`paintDocToJson`), checked like every foreign one. */
-function drawingDoc(raw: unknown): PaintDoc {
-  return paintDocFromJson(raw) ?? emptyPaintDoc();
 }
 
 /** A stored element as the canvas editor shows it: a picture's file as a URL, a drawing's document read. */
@@ -75,26 +67,9 @@ async function ratioOf(file: string): Promise<number> {
   }
 }
 
-/** What drawing the scene off the editor takes: its elements with their pictures by file, read back as data URLs (`loadCanvasImage`). */
-function sceneRenderOptions(scene: CanvasScene, types: CanvasTypes, background: CanvasBackground | null, outWidth: number): RenderOptions {
-  return {
-    types,
-    width: scene.width,
-    height: scene.height,
-    elements: scene.elements.map((el) => (el.type === 'drawing'
-      ? { ...el, props: { ...el.props, doc: drawingDoc(el.props.doc) } }
-      : { ...el, props: { emoji: '', ...el.props } })),
-    outWidth,
-    background,
-    loadImage: loadCanvasImage,
-  };
-}
-
 /** The scene as a stored picture, for the export and the card; `null` if it is empty or could not be stored. */
-async function renderScene(scene: CanvasScene, types: CanvasTypes, background: CanvasBackground | null): Promise<string | null> {
-  if (!scene.elements.length && !background) return null;
-  const canvas = await renderCanvasImage(sceneRenderOptions(scene, types, background, RENDER_WIDTH));
-  const data = canvas ? await canvasToDataUrl(canvas, 'image/png') : null;
+async function renderScene(scene: CanvasScene, types: CanvasTypes): Promise<string | null> {
+  const data = await scenePicture(scene, types);
   return data ? saveImage(data) : null;
 }
 
@@ -180,7 +155,7 @@ export default function CanvasBlock({ block, isEditing, onBlockChange, onPersist
     const now = parseCanvasBlock(current);
     // Unchanged needs no new picture — unless it has none yet (an altar converted from before).
     if (!persist || (JSON.stringify(now.scene) === from && now.render)) return;
-    void renderScene(now.scene, profile.types, parseCanvasBackground(now.scene.background))
+    void renderScene(now.scene, profile.types)
       .then(async (render) => {
         const { block: latestBlock, isEditing: editing, onPersist: save } = latest.current;
         // Editing again, or the scene changed meanwhile: that edit renders anew.

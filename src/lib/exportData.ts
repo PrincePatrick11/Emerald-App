@@ -1,5 +1,5 @@
 import { useEntryStore } from '../store/entryStore';
-import { liveTagNames } from '../store/tagStore';
+import { liveTags } from '../store/tagStore';
 import { renderBlocksForExport, type ExportText } from './blocks/exportRender';
 import { linkedIdsOf } from './blocks/blockRefs';
 import type { BlockExportFormat } from './blocks/blockType';
@@ -55,8 +55,13 @@ export interface ExportData {
   category?: ChipData;
   // the entry's icon by the app's rule (`entryIcon`): emoji or data-URL
   icon: string;
-  // common
-  tagNames?: string[];
+  // its live tags, with their colour for the chips of PDF and HTML
+  tags: ExportTag[];
+}
+
+export interface ExportTag {
+  name: string;
+  color: string;
 }
 
 /** An entry as the PDF, HTML or Markdown export (`format`) reads it — `null` if it is gone. */
@@ -75,13 +80,13 @@ export async function collectExportDataFor(id: string, format: BlockExportFormat
     entryNumber: entry.entry_number,
     // Every link — a chip in a text, a link field — names its target's current
     // title, as in the app; the stored one only once the target is gone.
-    content: withCurrentLinkTitles(renderBlocksForExport(entry.content, format, exportText(linkTitle), { entryDate: entryDate(entry) }), linkTitle),
+    content: withCurrentLinkTitles(await renderBlocksForExport(entry.content, format, exportText(linkTitle), { entryDate: entryDate(entry) }), linkTitle),
     // Exactly what "Linked entries" lists (`linkedIdsOf`).
     linkedIds: [...linkedIdsOf(entry.content)],
     createdAt: entry.created_at,
     category: cat ? { id: cat.id, label: categoryLabel(i18n.t, cat), icon: cat.emoji } : undefined,
     // An uploaded icon as a data URL: the export document cannot reach the vault's files.
     icon: await portableIcon(entryIcon(entry, cat)),
-    tagNames: liveTagNames(entry.tags),
+    tags: liveTags(entry.tags).map(({ name, color }) => ({ name, color })),
   };
 }

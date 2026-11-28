@@ -38,7 +38,7 @@ const PAGE_LOAD_TIMEOUT: Duration = Duration::from_secs(30);
 const PRINT_TIMEOUT: Duration = Duration::from_secs(120);
 
 /// The page margins, in points — the `@page { margin: 2cm 2.5cm }` of the
-/// export's print styles, which WebKit's print path takes from `NSPrintInfo`.
+/// export's print styles (`PDF_MARGINS` in `src/lib/exportStyle.ts`), which WebKit's print path takes from `NSPrintInfo`.
 const POINTS_PER_INCH: f64 = 72.0;
 const MARGIN_VERTICAL: f64 = super::MARGIN_VERTICAL_IN * POINTS_PER_INCH;
 const MARGIN_HORIZONTAL: f64 = super::MARGIN_HORIZONTAL_IN * POINTS_PER_INCH;

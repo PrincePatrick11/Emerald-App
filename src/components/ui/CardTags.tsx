@@ -1,11 +1,16 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import type { Tag } from '../../types';
+import { tagChipColors } from '../../lib/tagChipColors';
 
 const CHIP_CLASS = 'h-6 inline-flex items-center px-2.5 rounded-full text-xs font-medium whitespace-nowrap border';
 
 /** A tag chip's colours, from the tag's own colour; `dashed` for a tag a block gives (`TagInput`). Goes with a `border` class. */
 export function chipStyle(color: string, dashed = false) {
-  return { backgroundColor: `${color}20`, color, borderColor: `${color}${dashed ? '60' : '40'}`, ...(dashed && { borderStyle: 'dashed' }) };
+  const colors = tagChipColors(color, dashed);
+  return {
+    ...(colors && { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }),
+    ...(dashed && { borderStyle: 'dashed' }),
+  };
 }
 
 /**

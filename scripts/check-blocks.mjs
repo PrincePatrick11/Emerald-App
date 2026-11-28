@@ -660,7 +660,7 @@ console.log('\n4f. Sigils\n');
         && back.doc.layers[1].name === 'Oben' && back.doc.layers[1].hidden // lang-ok
         && isDeepStrictEqual(back.doc.layers[0].strokes[0].points, [1.2, 2.3, 0.5, 10, 20, 0.78])
         && back.doc.layers[0].strokes[0].color === '#ef4444' && back.doc.layers[0].strokes[0].pressure, back);
-    const exported = renderBlocksForExport(serializeBlocks([saved]), 'pdf', exportText);
+    const exported = await renderBlocksForExport(serializeBlocks([saved]), 'pdf', exportText);
     check('drawing: the export shows only the render', exported.includes(render) && !exported.includes(old), exported);
 
     // Something that knows only the image (an older app) replaced it: the new image counts, as a layer.
@@ -825,35 +825,35 @@ console.log('\n4f. Sigils\n');
 
   const secret = { ...createTextBlock('<p>geheim</p>'), attrs: { 'data-block-hidden': '1' } };
   const exportedContent = serializeBlocks([createTextBlock('<p>sichtbar</p>'), secret, sigil]);
-  const exported = renderBlocksForExport(exportedContent, 'pdf', exportText, { today: '2029-12-31' });
+  const exported = await renderBlocksForExport(exportedContent, 'pdf', exportText, { today: '2029-12-31' });
   check('export: hidden blocks and the concealed parts are missing, the charge stays',
     exported.includes('sichtbar') && !exported.includes('geheim') && !exported.includes('Ich') && !exported.includes('<img')
-      && exported.includes('<dt>K:creation.targetDate</dt><dd>D:2030-01-01</dd>') && exported.includes('<p>K:blocks.sigil.loaded</p>'), exported);
+      && exported.includes('<dt>K:creation.targetDate</dt><dd>D:2030-01-01</dd>') && exported.includes('<p class="export-note">K:blocks.sigil.loaded</p>'), exported);
   check('export: no sections, the parts under their headings, no title of its own',
-    !exported.includes('<section') && exported.includes('<h4>K:blocks.types.sigil.parts.charge</h4><dl>')
-      && !exported.includes('<h4>K:blocks.types.sigil.parts.calc</h4>') && !exported.includes('T:core.sigil') && !exported.includes('T:core.text'), exported);
-  const revealed = renderBlocksForExport(exportedContent, 'pdf', exportText, { today: '2030-02-01' });
+    !exported.includes('<section') && exported.includes('<h4 class="export-part">K:blocks.types.sigil.parts.charge</h4><dl>')
+      && !exported.includes('<h4 class="export-part">K:blocks.types.sigil.parts.calc</h4>') && !exported.includes('T:core.sigil') && !exported.includes('T:core.text'), exported);
+  const revealed = await renderBlocksForExport(exportedContent, 'pdf', exportText, { today: '2030-02-01' });
   check('export after the target date: calculator and drawing (with alt text) are included',
-    revealed.includes('<h4>K:blocks.types.sigil.parts.calc</h4><p>Ich &lt;b&gt;bin')
+    revealed.includes('<h4 class="export-part">K:blocks.types.sigil.parts.calc</h4><p>Ich &lt;b&gt;bin')
       && revealed.includes(`<img src="${drawnFile}" alt="K:blocks.types.sigil.parts.drawing" data-export-placeholder="1">`), revealed);
   for (const format of ['pdf', 'markdown']) {
-    const out = renderBlocksForExport(exportedContent, format, exportText, { today: '2029-12-31' });
+    const out = await renderBlocksForExport(exportedContent, format, exportText, { today: '2029-12-31' });
     check(`export (${format}): a concealed part is missing, with no cover`, out === exported && !out.includes('export-concealed'), out);
   }
-  const html = renderBlocksForExport(exportedContent, 'html', exportText, { today: '2029-12-31' });
+  const html = await renderBlocksForExport(exportedContent, 'html', exportText, { today: '2029-12-31' });
   check('export (HTML): the concealed parts are there, covered under their headings, with a switch',
-    html.includes('<h4>K:blocks.types.sigil.parts.calc</h4><div class="export-concealed"><p class="export-concealed-cover"><span>C:2030-01-01</span><button type="button" class="export-concealed-toggle" data-reveal="R" data-conceal="Z">R</button></p><div class="export-concealed-body"><p>Ich &lt;b&gt;bin')
+    html.includes('<h4 class="export-part">K:blocks.types.sigil.parts.calc</h4><div class="export-concealed"><p class="export-concealed-cover"><span>C:2030-01-01</span><button type="button" class="export-concealed-toggle" data-reveal="R" data-conceal="Z">R</button></p><div class="export-concealed-body"><p>Ich &lt;b&gt;bin')
       && html.includes(`<div class="export-concealed-body"><img src="${drawnFile}"`)
       && (html.match(/class="export-concealed"/g) ?? []).length === 2, html);
   check('export (HTML): hidden blocks stay missing, the charge stays open',
-    !html.includes('geheim') && html.includes('<p>K:blocks.sigil.loaded</p>') && !/export-concealed-body"><h4>K:blocks\.types\.sigil\.parts\.charge/.test(html), html);
+    !html.includes('geheim') && html.includes('<p class="export-note">K:blocks.sigil.loaded</p>') && !/export-concealed-body"><h4 class="export-part">K:blocks\.types\.sigil\.parts\.charge/.test(html), html);
   check('export (HTML): after the target date nothing is covered',
-    renderBlocksForExport(exportedContent, 'html', exportText, { today: '2030-02-01' }) === revealed, renderBlocksForExport(exportedContent, 'html', exportText, { today: '2030-02-01' }));
+    await renderBlocksForExport(exportedContent, 'html', exportText, { today: '2030-02-01' }) === revealed, await renderBlocksForExport(exportedContent, 'html', exportText, { today: '2030-02-01' }));
   check('export (HTML): a part switched off stays missing even concealed',
-    !renderBlocksForExport(serializeBlocks([withBlockSetting(sigil, calcSetting, false)]), 'html', exportText, { today: '2029-12-31' }).includes('Ich'));
+    !(await renderBlocksForExport(serializeBlocks([withBlockSetting(sigil, calcSetting, false)]), 'html', exportText, { today: '2029-12-31' })).includes('Ich'));
   check('export: a part switched off is not exported',
-    !renderBlocksForExport(serializeBlocks([withBlockSetting(unloaded, calcSetting, false)]), 'pdf', exportText, { today: '2029-12-31' }).includes('Ich'));
-  const brokenOut = renderBlocksForExport(serializeBlocks([broken]), 'html', exportText, { today: '2029-12-31' });
+    !(await renderBlocksForExport(serializeBlocks([withBlockSetting(unloaded, calcSetting, false)]), 'pdf', exportText, { today: '2029-12-31' })).includes('Ich'));
+  const brokenOut = await renderBlocksForExport(serializeBlocks([broken]), 'html', exportText, { today: '2029-12-31' });
   check('export: an unreadable sigil goes out as the notice, never with what it holds',
     brokenOut === '<p>K:blocks.unreadable.broken</p>', brokenOut);
   const brokenCharge = withSigilPart(sigil, 'charge', { ...sigilPartBlock(sigil, 'charge'), attrs: { [BLOCK_ATTR.data]: '"kaputt"' } }); // lang-ok
@@ -918,7 +918,7 @@ console.log('\n4f. Sigils\n');
     html: `<dl><dt>Foto</dt><dd data-block-slot="el:e6"><img src="${'ef'.repeat(32)}.png"></dd></dl>`,
   };
   const titled = { ...createTextBlock('<p>mit Titel</p>'), attrs: { 'data-block-show-title': '1' } };
-  const fieldsOut = renderBlocksForExport(serializeBlocks([fieldsBlock, titled]), 'pdf', exportText, { today: '2030-01-01' });
+  const fieldsOut = await renderBlocksForExport(serializeBlocks([fieldsBlock, titled]), 'pdf', exportText, { today: '2030-01-01' });
   check('export: fields as in read mode — formatted, without empty ones',
     fieldsOut.includes('<dt>Datum</dt><dd>D:2030-05-01</dd>') && fieldsOut.includes('<dt>Menge</dt><dd>N:3</dd>')
       && !fieldsOut.includes('Leer'), fieldsOut);
@@ -975,7 +975,7 @@ console.log('\n4g. Link and image defaults with markup\n');
     linkFromSlot(cm.slots.lnk)?.id === linkTargetId && imageFromSlot(cm.slots.pic) === img && !cm.slots.lnk2 && !cm.slots.pic2, cm.slots);
   check('the links of the copy are in the content (link table, backlinks)',
     extractInternalLinks(serializeBlocks([copy])).length === 1);
-  check('export: the link field shows its chip', renderBlocksForExport(serializeBlocks([copy]), 'pdf', text).includes('data-target-kind="entry"'));
+  check('export: the link field shows its chip', (await renderBlocksForExport(serializeBlocks([copy]), 'pdf', text)).includes('data-target-kind="entry"'));
 
   const remapped = parseDefinitionElements(remapDefinitionDefaults(
     JSON.stringify(elements), (name) => (name === img ? `${'ef'.repeat(32)}.png` : name),
@@ -1000,8 +1000,8 @@ console.log('\n4g2. The paint block\n');
     title: () => 'Painting', date: (iso) => iso, number: String, t: (key) => key,
     yes: '', no: '', concealed: () => '', reveal: '', conceal: '',
   };
-  check('paint: the export shows the picture', renderBlocksForExport(serializeBlocks([saved]), 'pdf', text).includes(render));
-  check('paint: an empty one exports nothing of it', !renderBlocksForExport(serializeBlocks([paint]), 'pdf', text).includes('<img'));
+  check('paint: the export shows the picture', (await renderBlocksForExport(serializeBlocks([saved]), 'pdf', text)).includes(render));
+  check('paint: an empty one exports nothing of it', !(await renderBlocksForExport(serializeBlocks([paint]), 'pdf', text)).includes('<img'));
 }
 
 console.log('\n5. What is derived from the content sees through the blocks\n');
@@ -1131,8 +1131,15 @@ console.log('\nCanvas block\n');
   check('foreign data: sizes bounded, bad ids left out, numbers filled in',
     read.width === 8192 && read.elements.length === 1 && read.elements[0].x === 0, read);
 
-  const exported = renderBlocksForExport(serializeBlocks([full]), 'pdf', { title: () => 'Canvas' });
+  const exported = await renderBlocksForExport(serializeBlocks([full]), 'pdf', { title: () => 'Canvas' });
   check('the export shows the rendered picture', exported.includes(render) && !exported.includes(`src="${pic}"`), exported);
+  // Without a kept picture the app draws one (not here, without a page); Markdown only names it.
+  const unrendered = serializeBlocks([withCanvasScene(createCanvasBlock(ALTAR_BLOCK_TYPE), scene, null)]);
+  const unrenderedMd = await renderBlocksForExport(unrendered, 'markdown', { title: () => 'Altar' });
+  check('an altar without a kept picture: Markdown names it, nothing of its pictures goes out',
+    unrenderedMd.includes('alt="Altar" data-export-placeholder="1"') && !unrenderedMd.includes(pic), unrenderedMd);
+  check('an altar without a kept picture: no picture drawn without a page',
+    (await renderBlocksForExport(unrendered, 'pdf', { title: () => 'Altar' })) === '');
 }
 
 console.log('\n7. Blocks as rows (blocks, block_refs)\n');
@@ -1358,8 +1365,8 @@ console.log('\n7b. Block interfaces: registry, toolkit, copies, actions, setting
   });
   const veiled = { ...createTextBlock('<p>darunter</p>'), id: 'veiled', attrs: { 'data-block-show-title': '1' } };
   const veilContent = serializeBlocks([{ id: 'vl', type: 'test.veil', html: '', attrs: {} }, veiled, createTextBlock('<p>offen</p>')]);
-  const veilPdf = renderBlocksForExport(veilContent, 'pdf', exportText, { today: '2030-01-01' });
-  const veilHtml = renderBlocksForExport(veilContent, 'html', exportText, { today: '2030-01-01' });
+  const veilPdf = await renderBlocksForExport(veilContent, 'pdf', exportText, { today: '2030-01-01' });
+  const veilHtml = await renderBlocksForExport(veilContent, 'html', exportText, { today: '2030-01-01' });
   check('export: a block concealed as a whole is missing in PDF, the rest stays',
     !veilPdf.includes('darunter') && !veilPdf.includes('T:core.text') && veilPdf.includes('offen'), veilPdf);
   check('export: a block concealed as a whole is covered in HTML, its title above the cover',
@@ -1462,11 +1469,11 @@ console.log('\n7b. Block interfaces: registry, toolkit, copies, actions, setting
     ]);
     const titleOf = (l) => (l.id === target && l.targetKind === 'entry' ? 'Neuer <Titel>' : undefined); // lang-ok
     // The export path: the blocks' parts, then the chips named as the app names them (`collectExportDataFor`).
-    const renamed = withCurrentLinkTitles(renderBlocksForExport(linked, 'html', { ...exportText, linkTitle: titleOf }), titleOf);
+    const renamed = withCurrentLinkTitles(await renderBlocksForExport(linked, 'html', { ...exportText, linkTitle: titleOf }), titleOf);
     check('export: a link field and a chip in a text show their target\'s current title',
       renamed.split('data-label="Neuer &lt;Titel&gt;">Neuer &lt;Titel&gt;</span>').length === 3
         && !renamed.includes('Alter Titel') && !renamed.includes('Im Text') && renamed.includes('<p>vor ') && renamed.includes(' nach</p>'), renamed); // lang-ok
-    const goneHtml = renderBlocksForExport(linked, 'markdown', { ...exportText, linkTitle: () => undefined });
+    const goneHtml = await renderBlocksForExport(linked, 'markdown', { ...exportText, linkTitle: () => undefined });
     check('export: a gone target keeps the title stored with the link',
       withCurrentLinkTitles(goneHtml, () => undefined) === goneHtml && goneHtml.includes('Alter Titel'), goneHtml); // lang-ok
     check('a link value names its target by the same lookup',
@@ -1513,7 +1520,7 @@ console.log('\n7b. Block interfaces: registry, toolkit, copies, actions, setting
     resolveBlockType(brokenCanvas) === undefined && blockActionsOf(brokenCanvas, { reading: true }).length === 0
       && blockSearchText(brokenCanvas) === '' && entryEffects([brokenCanvas], { today: '2030-01-01' }).lockEntry === false);
   check('its registered type still names it', registeredBlockType(brokenCanvas)?.id === CANVAS_BLOCK_TYPE);
-  const unreadableOut = renderBlocksForExport(serializeBlocks([unknownPic, brokenCanvas]), 'pdf', exportText);
+  const unreadableOut = await renderBlocksForExport(serializeBlocks([unknownPic, brokenCanvas]), 'pdf', exportText);
   check('the export shows the notice of each, never its content',
     unreadableOut === '<p>K:blocks.unreadable.newer</p><p>K:blocks.unreadable.broken</p>', unreadableOut);
 }
@@ -1762,9 +1769,9 @@ console.log('\n9. Moon phase block (lib/blocks/moon.ts, kinds/moon.ts)\n');
   check('another creation day, another phase — the summary follows the date', later.properties.icon?.value === '🌑', later.properties.icon);
   const hidden = { ...moon, attrs: { 'data-block-hidden': '1' } };
   check('hidden, it suggests no icon', entryBlockSummary({ ...entry, id: 'moon-h', content: serializeBlocks([hidden]) }, '2026-11-25').properties.icon === null);
-  const out = renderBlocksForExport(content, 'pdf', exportText, { today: '2026-11-25', entryDate: '2025-01-15' });
+  const out = await renderBlocksForExport(content, 'pdf', exportText, { today: '2026-11-25', entryDate: '2025-01-15' });
   check('the export shows it as a row', out.includes('🌕 K:moonPhase.full'), out);
-  check('the export outside an entry leaves it out', !renderBlocksForExport(content, 'pdf', exportText, { today: '2026-11-25' }).includes('moonPhase'));
+  check('the export outside an entry leaves it out', !(await renderBlocksForExport(content, 'pdf', exportText, { today: '2026-11-25' })).includes('moonPhase'));
   check('a template\'s block shows no phase', resolveBlockType(moon)?.properties?.icon?.(moon, { entryId: null, entryDate: null, today: '2026-11-25' }) === null);
 }
 

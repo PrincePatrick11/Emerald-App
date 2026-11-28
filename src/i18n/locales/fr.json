@@ -1603,6 +1603,9 @@
       "concealed": "Masqué",
       "reveal": "Découvrir",
       "conceal": "Couvrir"
+    },
+    "pdf": {
+      "pageOf": "Page {{page}} sur {{pages}}"
     }
   },
   "emeraldKey": {

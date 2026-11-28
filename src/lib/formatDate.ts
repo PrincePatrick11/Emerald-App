@@ -10,8 +10,10 @@ import type { AppLanguage } from '../i18n';
  * setDateLocale). A new app language needs a loader here —
  * the Record over AppLanguage makes forgetting it a compile error.
  *
- * lib/export.ts and lib/emeraldFormat.ts deliberately do NOT format through here:
- * file exports stay locale-independent (English or yyyy-MM-dd).
+ * lib/emeraldFormat.ts and the Markdown export deliberately do NOT format
+ * through here: they stay locale-independent (English or yyyy-MM-dd), since
+ * the import reads them back. PDF and HTML are for reading and follow the app
+ * language, like the values their blocks show.
  */
 const LOCALE_LOADERS: Record<Exclude<AppLanguage, 'en'>, () => Promise<Locale>> = {
   de: () => import('date-fns/locale/de').then((m) => m.de),
@@ -57,8 +59,8 @@ export function formatEntryDate(date: string | Date): string {
   return format(new Date(date), 'PP', { locale: activeLocale });
 }
 
-/** Long date ('PPP', enUS: "August 26th, 2026") — the basis of `formatIsoDateLong`. */
-function formatEntryDateLong(date: string | Date): string {
+/** Long date ('PPP', enUS: "August 26th, 2026") — the basis of `formatIsoDateLong`, the date atop an entry in PDF and HTML. */
+export function formatEntryDateLong(date: string | Date): string {
   return format(new Date(date), 'PPP', { locale: activeLocale });
 }
 
@@ -85,6 +87,11 @@ export function formatIsoDateLong(iso: string): string {
 export function formatIsoDate(iso: string): string {
   const date = isoLocalDate(iso);
   return date ? formatEntryDate(date) : iso;
+}
+
+/** Two days as one range, as short as the app language puts it ("Sep 1 – Nov 28, 2026"); one day if both are the same. */
+export function formatDateRange(from: Date | number, to: Date | number): string {
+  return new Intl.DateTimeFormat(activeLocale.code, { day: 'numeric', month: 'short', year: 'numeric' }).formatRange(from, to);
 }
 
 /**

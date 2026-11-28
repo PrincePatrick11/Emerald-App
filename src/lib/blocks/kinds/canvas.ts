@@ -1,7 +1,7 @@
 import { Frame, ImageDown } from 'lucide-react';
 import { AltarIcon } from '../../altarIcon';
 import { isRecord } from '../../helpers';
-import type { BlockActionDef, BlockExportPart, BlockTypeDef } from '../blockType';
+import type { BlockActionDef, BlockExportPart, BlockTypeDef, ExportContext } from '../blockType';
 import {
   ALTAR_BLOCK_TYPE, CANVAS_BLOCK_TYPE, canvasElementFile, createCanvasBlock, parseCanvasBlock, withoutCanvasFile,
 } from '../canvas';
@@ -38,6 +38,33 @@ function drawsBackground(background: unknown): boolean {
   return (!!fill && fill.kind !== 'none') || !!background.image || !!background.tint;
 }
 
+/**
+ * The rendered picture, named after the block; the pictures behind it are
+ * only references. A scene without a kept picture yet (an altar from before
+ * pictures were kept, or never opened since) is drawn here, as the block
+ * draws it when it keeps one; Markdown shows only the picture's name, so it
+ * is not drawn for it.
+ */
+async function canvasExport(block: BlockInstance, ctx: ExportContext): Promise<BlockExportPart[]> {
+  const { render, scene } = parseCanvasBlock(block);
+  if (render) return [{ kind: 'image', file: render }];
+  // The empty file stands in for the picture: Markdown keeps only its name (`stripImages`).
+  if (ctx.format === 'markdown') return scene.elements.length ? [{ kind: 'image', file: '' }] : [];
+  // Drawing needs a page (the block checks run without one). The type's own
+  // drawing lives with its view; loaded only here, so this file stays free of
+  // React for everything else (an exception in blocks.md).
+  if (typeof document === 'undefined') return [];
+  try {
+    const { scenePicture } = await import('../../../components/blocks/canvasScene');
+    const drawn = await scenePicture(scene);
+    return drawn ? [{ kind: 'image', file: drawn }] : [];
+  } catch (err) {
+    // Left out rather than failing the whole export, as a block without a picture always was.
+    console.error('[export] canvas scene not drawn', err);
+    return [];
+  }
+}
+
 /** What canvas and altar share: a scene of the canvas editor, no text, pictures as references. */
 const canvasLike = {
   origin: 'core',
@@ -45,11 +72,7 @@ const canvasLike = {
   dataVersion: 1,
   defaultShowTitle: false,
   isBroken: (block: BlockInstance) => parseCanvasBlock(block).broken,
-  // The rendered picture, named after the block; the pictures behind it are only references.
-  export: (block: BlockInstance): BlockExportPart[] => {
-    const { render } = parseCanvasBlock(block);
-    return render ? [{ kind: 'image', file: render }] : [];
-  },
+  export: canvasExport,
   refs: canvasRefs,
   withoutImage: withoutCanvasFile,
   actions: CANVAS_ACTIONS,

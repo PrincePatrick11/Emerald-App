@@ -30,7 +30,7 @@ use std::path::{Path, PathBuf};
 #[cfg(any(target_os = "windows", target_os = "macos"))]
 pub(crate) const A4_INCHES: (f64, f64) = (210.0 / 25.4, 297.0 / 25.4);
 /// The page margins of the export's print styles, in inches — keep in step
-/// with `@page { margin: 2cm 2.5cm }` in `src/lib/export.ts`.
+/// with `PDF_MARGINS` (`@page { margin: 2cm 2.5cm }`) in `src/lib/exportStyle.ts`.
 pub(crate) const MARGIN_VERTICAL_IN: f64 = 2.0 / 2.54;
 pub(crate) const MARGIN_HORIZONTAL_IN: f64 = 2.5 / 2.54;
 
