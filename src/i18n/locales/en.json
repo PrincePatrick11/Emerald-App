@@ -875,6 +875,7 @@
     "linkGone": "Deleted",
     "linkGoneHint": "Deleted or in the trash",
     "icon": "Icon",
+    "image": "Image",
     "symbol": "Symbol",
     "chooseSymbol": "Choose symbol…",
     "emoji": "Emoji",

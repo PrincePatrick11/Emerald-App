@@ -98,7 +98,7 @@ export default function Favicon({ value, onChange, onRemove, symbols = false }: 
           />
         )}
         <Button tone="neutral" small title={value ? t('properties.changeIcon') : t('properties.addIcon')} onClick={pickFile}>
-          <ImagePlus size={12} /> {value ? t('properties.change') : t('properties.icon')}
+          <ImagePlus size={12} /> {symbols ? t('properties.image') : value ? t('properties.change') : t('properties.icon')}
         </Button>
         <EmojiPicker
           value={value ?? ''}
