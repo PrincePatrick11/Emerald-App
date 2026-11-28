@@ -1,7 +1,8 @@
 /**
  * Uploaded icons — of entries, templates, custom blocks and languages.
  *
- * An icon is an emoji (text in the row) or a picture. A picture is stored as a
+ * An icon is an emoji (text in the row) or a picture — or, on a dashboard, a
+ * line symbol (`lib/dashboardSymbols.ts`), which has no file. A picture is stored as a
  * small file in the vault's own `icons/` folder, sealed and named after a hash
  * of its bytes like the pictures in `images/` (`src-tauri/src/images.rs`),
  * and the row holds only that name (`ICON_FIELDS` in `schema.ts`). Icons are

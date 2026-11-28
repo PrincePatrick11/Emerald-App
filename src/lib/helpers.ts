@@ -1,5 +1,6 @@
 import { format } from 'date-fns';
 import { storedImageName } from './schema';
+import { isSymbolIconValue } from './dashboardSymbols';
 
 /**
  * Whether an icon is an uploaded picture — the stored name of a file in the
@@ -12,11 +13,12 @@ export function isImageIcon(icon: string | null | undefined): boolean {
 
 /**
  * Icon and name as one line — for lists that show both side by side
- * (trash). An image icon is a file name and would appear as text in front of the
- * name; in that case the row already carries its symbol in its own column.
+ * (trash). An image icon is a file name and a dashboard's line symbol a
+ * `symbol:` value; either would appear as text in front of the name, so the
+ * name stands alone — the row already carries its kind's glyph in its own column.
  */
 export function iconTitle(icon: string, name: string): string {
-  return isImageIcon(icon) ? name : `${icon} ${name}`;
+  return isImageIcon(icon) || isSymbolIconValue(icon) ? name : `${icon} ${name}`;
 }
 
 export function generateId(): string {

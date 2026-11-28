@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { readImageAsBase64, saveImage } from './images';
 import { isIconFile, plausibleEmoji } from './icons';
+import { isSymbolIconValue } from './dashboardSymbols';
 import { storedImageName, storedImageNamesIn } from './schema';
 import { parseBlocks } from './blocks/blockHtml';
 import { blockRefs, blockTagsOf } from './blocks/blockRefs';
@@ -651,6 +652,8 @@ async function importManifest(
     const iconOf = (icon: string): string | undefined => {
       if (!icon) return undefined;
       if (isIconFile(icon)) return iconNames.get(storedNameStem(icon));
+      // A line symbol belongs to dashboards only; on an entry or template it is no icon.
+      if (isSymbolIconValue(icon)) return undefined;
       return plausibleEmoji(icon) || undefined;
     };
 

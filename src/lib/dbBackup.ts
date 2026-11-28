@@ -54,6 +54,7 @@ import { isBuiltinDashboard, parseDashboardFilter } from './dashboards';
 import { fromRow } from './row';
 import { ICON_FIELDS, IMAGE_FIELDS, STARTER_CATEGORY_IDS, imageColumns, storedImageName, storedImageNamesIn } from './schema';
 import { iconFileNames, plausibleEmoji } from './icons';
+import { dashboardSymbol, isSymbolIconValue } from './dashboardSymbols';
 import { readTagLinks, tagIdList, tagInsertStatements, tagNameKey, unlinkTags, type TagOwner } from './tagRefs';
 import { randomTagColor } from '../store/tagStore';
 import { categoryKey } from './categories';
@@ -577,10 +578,20 @@ async function iconNamesOf(data: VaultData): Promise<string[]> {
 
 /**
  * Points every icon column of the file's rows at the name its icon was
- * stored under here (`iconMap`, from the archive); a value that is neither an
- * emoji nor an icon the file brings (a data URL, a name without its file) is
- * dropped, so that the row falls back to its default icon.
+ * stored under here (`iconMap`, from the archive); a dashboard's line symbol
+ * (`lib/dashboardSymbols.ts`) stays as it is. A value that is neither an
+ * emoji, a known symbol on a dashboard nor an icon the file brings (a data
+ * URL, a name without its file, a symbol this version does not have or on
+ * another row) is dropped, so that the row falls back to its default icon.
  */
+/** One icon value of `remapIconColumns`: the file's new name, a dashboard's known symbol, an emoji, or `''`. */
+function remapIcon(table: string, value: string, iconMap: ReadonlyMap<string, string>): string {
+  const name = storedImageName(value);
+  if (name) return iconMap.get(name) ?? '';
+  if (isSymbolIconValue(value)) return table === 'dashboards' && dashboardSymbol(value) ? value : '';
+  return plausibleEmoji(value);
+}
+
 function remapIconColumns(data: VaultData, iconMap: ReadonlyMap<string, string>): VaultData {
   const out: VaultData = { ...data };
   for (const { table, column } of ICON_FIELDS) {
@@ -591,8 +602,7 @@ function remapIconColumns(data: VaultData, iconMap: ReadonlyMap<string, string>)
       if (typeof row !== 'object' || row === null) return row;
       const value = (row as Row)[column];
       if (typeof value !== 'string' || !value) return row;
-      const name = storedImageName(value);
-      const next = name ? iconMap.get(name) ?? '' : plausibleEmoji(value);
+      const next = remapIcon(table, value, iconMap);
       return next === value ? row : { ...row, [column]: next || null };
     });
   }

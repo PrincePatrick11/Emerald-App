@@ -990,6 +990,13 @@ console.log('\n11. .vault.emerald: the round trip of a vault content, other vers
     ...tagStatements('image', 'img1', ['t-b']),
   ]);
   globalThis.harnessIconFiles = [ico('a'), ico('b'), ico('c')];
+  // A dashboard's line symbol is neither file nor emoji; one this version does not know is dropped on the way in.
+  await src.execute(
+    `INSERT INTO dashboards (id,name,icon,filter,created_at,updated_at) VALUES ('dsym','S','symbol:telescope','{}',$1,$1), ('dgone','G','symbol:no-such-symbol','{}',$1,$1)`,
+    [now],
+  );
+  // A symbol only belongs on a dashboard: on an entry a restore drops it.
+  await src.execute("UPDATE entries SET icon = 'symbol:moon' WHERE id = $1", [J]);
   await src.execute(`INSERT INTO tasks (id,title,created_at,updated_at) VALUES ($1,'Aufgabe',$2,$2)`, [TASK, now]); // lang-ok
   await src.execute(`INSERT INTO task_links (id,task_id,target_id,target_type) VALUES ('tl1',$1,$2,'entry')`, [TASK, W]);
   // A block written at another time than the others keeps that time.
@@ -1042,6 +1049,10 @@ console.log('\n11. .vault.emerald: the round trip of a vault content, other vers
   const [wRow] = await dst.select('SELECT icon, cover_image FROM entries WHERE id = $1', [W]);
   const [tRow] = await dst.select('SELECT icon FROM templates WHERE id = $1', [TPL]);
   check('restore: icons are stored anew and the rows name them', wRow.icon === iconNames.get(ico('b')) && tRow.icon === iconNames.get(ico('c')), { wRow, tRow });
+  const symbolIcons = Object.fromEntries((await dst.select("SELECT id, icon FROM dashboards WHERE id IN ('dsym','dgone')")).map((r) => [r.id, r.icon]));
+  const [jRow] = await dst.select('SELECT icon FROM entries WHERE id = $1', [J]);
+  check("restore: a dashboard keeps its line symbol, an unknown symbol or one on an entry falls back to the default, and none travels as an icon file",
+    symbolIcons.dsym === 'symbol:telescope' && !symbolIcons.dgone && !jRow.icon && !collected.icons.some((n) => n.startsWith('symbol:')), { symbolIcons, jRow, icons: collected.icons });
   check('restore: the cover names the picture stored here', wRow.cover_image === names.get(pic('7')), wRow);
   check("restore: the block copy's icon is renamed and referenced as an icon",
     (await refRows(dst, 'entry', W)).some((r) => r.target_kind === 'icon' && r.target === iconNames.get(ico('a'))));

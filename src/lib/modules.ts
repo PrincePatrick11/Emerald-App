@@ -147,8 +147,8 @@ const BUILTIN_DASHBOARD_ICONS: Record<BuiltinDashboard, LucideIcon> = {
 
 /**
  * The rail glyph of a dashboard without an icon of its own: a built-in's
- * glyph, or the dashboard glyph. Callers draw an own icon (`FaviconGlyph`)
- * first, each in its own size.
+ * glyph, or the dashboard glyph. Its caller, `DashboardGlyph`, draws an own
+ * icon first — and falls back here for a line symbol this version does not know.
  */
 export function dashboardIcon(dashboard: Pick<Dashboard, 'builtin'>): LucideIcon {
   return dashboard.builtin ? BUILTIN_DASHBOARD_ICONS[dashboard.builtin] : DEFAULT_DASHBOARD_ICON;

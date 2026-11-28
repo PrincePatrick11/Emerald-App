@@ -132,7 +132,7 @@ function DashboardSettingsModal({ dashboard, onClose }: { dashboard: Dashboard; 
       />
       <div>
         <p className="label-xs mb-2">{t('properties.icon')}</p>
-        <Favicon value={icon} onChange={chooseIcon} onRemove={() => chooseIcon('')} />
+        <Favicon symbols value={icon} onChange={chooseIcon} onRemove={() => chooseIcon('')} />
       </div>
       <div>
         <p className="label-xs mb-1">{t('dashboards.infoLine')}</p>

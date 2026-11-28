@@ -18,7 +18,8 @@ import { useBlockDefinitionStore } from '../../store/blockDefinitionStore';
 import { useTemplateStore } from '../../store/templateStore';
 import { useLexiconStore } from '../../store/lexiconStore';
 import { definitionLabel, templateLabel } from '../../lib/blocks/blockAttrs';
-import { AUX_VIEWS, dashboardIcon, ENTRY_ICON, TASKS_VIEW } from '../../lib/modules';
+import { AUX_VIEWS, ENTRY_ICON, TASKS_VIEW } from '../../lib/modules';
+import DashboardGlyph from '../ui/DashboardGlyph';
 import { dashboardLabel } from '../../lib/dashboards';
 import { dashboardOrAll, useDashboardStore } from '../../store/dashboardStore';
 
@@ -73,9 +74,9 @@ function TabButton({ view, onSelect, onClose }: { view: ActiveView; onSelect: ()
   }
 
   let icon: ReactNode;
-  const Icon = dashboard ? dashboardIcon(dashboard) : isEntry ? ENTRY_ICON : meta?.icon ?? MoreHorizontal;
+  const Icon = isEntry ? ENTRY_ICON : meta?.icon ?? MoreHorizontal;
   if (dashboard) {
-    icon = renderIconValue(dashboard.icon, <Icon size={14} />);
+    icon = <DashboardGlyph dashboard={dashboard} size={14} />;
   } else if (isEntry) {
     icon = entry ? renderIconValue(entryIcon(entry, category), null) : <Icon size={14} />;
   } else if (type === 'blocks' && id) {

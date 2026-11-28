@@ -707,7 +707,9 @@ export const IMAGE_FIELDS: {
 
 /**
  * The columns that hold an icon: an emoji, or the stored name of a file in the
- * vault's `icons/` folder (`lib/icons.ts`) — never a data URL. A custom
+ * vault's `icons/` folder (`lib/icons.ts`) — never a data URL; `dashboards.icon`
+ * may also hold a line symbol, `symbol:<name>` (`lib/dashboardSymbols.ts`),
+ * which is no file and which `storedImageName` passes by. A custom
  * block's copies carry its icon in `blocks.config` and name it in
  * `block_refs` (`target_kind` 'icon'). `collectUsedIconFilenames` and the
  * backup read exactly these.
